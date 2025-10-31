@@ -1,0 +1,26 @@
+/* src/components/Artboard.css */
+
+.artboard {
+  /* 見た目 */
+  background-color: #ffffff;
+  color: #000000;
+  border-radius: 4px;
+
+  /* 影をつけて立体感を出す */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+
+  /* サイズ (例として固定サイズ) */
+  width: 1000px;
+  height: 700px;
+
+  /* 親要素(ビューポート)の中で中央に配置 */
+  margin: 20px auto;
+
+  /* ↓↓↓↓↓↓↓↓↓↓ これが重要 ↓↓↓↓↓↓↓↓↓↓ */
+  /* 子要素(PlacedItem)を絶対座標で配置するための基準点 */
+  position: relative;
+}
+
+/* .placed-item { ... } のスタイルは
+  PlacedItem.css に移動したので、ここからは削除します。
+*/

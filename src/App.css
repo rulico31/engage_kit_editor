@@ -1,0 +1,98 @@
+/* src/App.css */
+
+/* パネルコンテナのスタイル */
+.container {
+  height: 100%; /* 親要素( #root )の高さ 100% */
+  width: 100%; /* 親要素( #root )の幅 100% */
+}
+
+/* 各パネルの基本スタイル */
+.panel-content {
+  padding: 12px;
+  box-sizing: border-box; /* パディングを含めてサイズ計算する */
+  overflow: auto; /* 内容が多ければスクロール */
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  margin: 2px;
+}
+
+/* 左側の上下パネル用（マージン調整） */
+.panel-column .panel-content {
+  margin-left: 4px;
+  margin-right: 4px;
+}
+.panel-column .panel-content:first-child {
+  margin-top: 4px;
+}
+.panel-column .panel-content:last-child {
+  margin-bottom: 4px;
+}
+
+/* リサイズハンドルのスタイル */
+.resize-handle {
+  background-color: #444;
+  transition: background-color 0.2s ease;
+}
+
+/* ハンドルをホバーまたはドラッグした時のスタイル */
+.resize-handle[data-state="hover"],
+.resize-handle[data-state="drag"] {
+  background-color: #007acc; /* 目立つ色に変更 */
+}
+
+/* 縦方向ハンドルの太さ */
+.resize-handle[data-orientation="vertical"] {
+  width: 4px;
+}
+
+/* 横方向ハンドルの太さ */
+.resize-handle[data-orientation="horizontal"] {
+  height: 4px;
+}
+
+/* 各パネルのヘッダー（タイトル） */
+.panel-header {
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 8px;
+  color: #eee; /* タイトル文字を少し明るく */
+}
+
+/* ツールボックスのアイテム一覧 */
+.tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* 各アイテム間の隙間 */
+}
+
+/* ツールボックスの各アイテム */
+.tool-item {
+  background-color: #3a3a3a;
+  border: 1px solid #555;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: grab;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.tool-item:hover {
+  background-color: #4a4a4a;
+  border-color: #777;
+}
+.tool-item:active {
+  cursor: grabbing;
+}
+
+/* キャンバスのビューポート（アートボードの親） */
+.canvas-viewport {
+  height: calc(100% - 45px);
+  width: 100%;
+  background-color: #222;
+  overflow: auto;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+/* ( .resize-hitbox 関連のスタイルはすべて削除 ) */

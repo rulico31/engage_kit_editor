@@ -1,0 +1,26 @@
+/* src/components/PlacedItem.css */
+
+.placed-item {
+  background-color: #f0f0f0;
+  border: 2px solid #ccc; /* 枠線を少し太く */
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: move;
+  user-select: none;
+  white-space: nowrap;
+
+  /* サイズ計算を簡単にするため */
+  box-sizing: border-box;
+
+  /* CSS Transitionで滑らかに */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  
+  /* (注) position: relative は不要 */
+}
+
+/* 選択状態のスタイル */
+.placed-item.is-selected {
+  border-color: #007acc; /* 選択色 */
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.7); /* 影 */
+  z-index: 1; /* 他のアイテムより手前に表示 */
+}

@@ -1,0 +1,75 @@
+/* src/components/PropertiesPanel.css */
+
+.properties-panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #eee;
+}
+
+.placeholder-text {
+  color: #888;
+  font-style: italic;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.prop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prop-label {
+  font-size: 0.9em;
+  color: #aaa;
+  margin-bottom: 2px;
+}
+
+/* ↓↓↓↓↓↓↓↓↓↓ .prop-value を .prop-input に変更し、input用のスタイルを追加 ↓↓↓↓↓↓↓↓↓↓ */
+.prop-input {
+  font-size: 1em;
+  font-weight: 500;
+  background-color: #2a2a2a;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  color: #eee; /* 入力文字の色 */
+  font-family: inherit; /* フォントを親と合わせる */
+  width: 100%; /* 親要素の幅いっぱいに */
+  box-sizing: border-box; /* paddingを含めて幅を計算 */
+}
+
+/* inputがフォーカスされた時のスタイル */
+.prop-input:focus {
+  border-color: #007acc;
+  outline: none;
+  box-shadow: 0 0 0 1px #007acc;
+}
+
+/* (数値入力のスピナー（矢印）を非表示にする - オプション) */
+.prop-input[type="number"] {
+  -moz-appearance: textfield;
+}
+.prop-input[type="number"]::-webkit-outer-spin-button,
+.prop-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
+
+.prop-row {
+  display: flex;
+  gap: 8px;
+}
+
+.prop-group-half {
+  flex: 1;
+}
+
+.prop-label-inline {
+  font-size: 0.9em;
+  color: #aaa;
+  margin-bottom: 4px;
+  padding-left: 2px;
+}
