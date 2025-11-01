@@ -7,11 +7,11 @@ import PlacedItem from "./PlacedItem";
 import type { PlacedItemType } from "../types";
 import "./Artboard.css";
 
-// 型定義 (ResizeDragItem を削除)
+import type { NodeGraph } from "../App";
+
+// (型定義は変更なし)
 interface ToolDragItem { name: string; }
 interface PlacedDragItem { id: string; x: number; y: number; }
-
-// (AllDragItems を修正)
 type AllDragItems = ToolDragItem | PlacedDragItem;
 
 interface ArtboardProps {
@@ -19,29 +19,30 @@ interface ArtboardProps {
   setPlacedItems: React.Dispatch<React.SetStateAction<PlacedItemType[]>>;
   setSelectedItemId: (id: string | null) => void;
   selectedItemId: string | null;
+  
+  // ↓↓↓↓↓↓↓↓↓↓ 受け取る Props を変更 ↓↓↓↓↓↓↓↓↓↓
+  setAllItemLogics: React.Dispatch<React.SetStateAction<Record<string, NodeGraph>>>;
+  nodeGraphTemplates: Record<string, NodeGraph>; // (initialNodeGraph ではなく)
+  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
 }
-
-// (MIN_SIZE は削除)
 
 const Artboard: React.FC<ArtboardProps> = ({
   placedItems,
   setPlacedItems,
   setSelectedItemId,
   selectedItemId,
+  // (Props を展開)
+  setAllItemLogics,
+  nodeGraphTemplates, // (名前を変更)
 }) => {
   const artboardRef = useRef<HTMLDivElement>(null);
 
-  // (リサイズ関連のロジックは削除)
-
   const [, drop] = useDrop(
     () => ({
-      // (accept から RESIZE_HANDLE を削除)
       accept: [
         ItemTypes.TOOL,
         ItemTypes.PLACED_ITEM,
       ],
-
-      // (hover 関数 (リサイズ用) は削除)
 
       drop: (item: AllDragItems, monitor: DropTargetMonitor) => {
         if (!artboardRef.current) return;
@@ -55,17 +56,29 @@ const Artboard: React.FC<ArtboardProps> = ({
           const x = clientOffset.x - artboardRect.left;
           const y = clientOffset.y - artboardRect.top;
 
-          const { name } = item as ToolDragItem;
+          const { name } = item as ToolDragItem; // (例: "ボタン")
           const newItem: PlacedItemType = {
             id: `item-${Date.now()}`,
             name: name, x: x, y: y, width: 100, height: 40,
           };
           
           setPlacedItems((prevItems) => [...prevItems, newItem]);
+          
+          // ↓↓↓↓↓↓↓↓↓↓ (重要) アイテム名に応じたグラフをセット ↓↓↓↓↓↓↓↓↓↓
+          
+          // テンプレートから該当のグラフを探す (該当がなければ "Default" を使う)
+          const graphTemplate = nodeGraphTemplates[name] || nodeGraphTemplates["Default"];
+
+          setAllItemLogics((prevLogics) => ({
+            ...prevLogics,
+            [newItem.id]: graphTemplate, // 新しいIDに、選んだグラフを割り当て
+          }));
+          // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+          
           setSelectedItemId(newItem.id);
 
         } else if (itemType === ItemTypes.PLACED_ITEM) {
-          // --- アイテム移動 (アートボード上) ---
+          // --- アイテム移動 (変更なし) ---
           const delta = monitor.getDifferenceFromInitialOffset();
           if (!delta) return;
 
@@ -80,11 +93,10 @@ const Artboard: React.FC<ArtboardProps> = ({
           );
           setSelectedItemId(id);
         }
-        // (RESIZE_HANDLE の else if ブロックは削除)
       },
     }),
-    // 依存配列 (Stale State バグ修正済み)
-    [setPlacedItems, setSelectedItemId] 
+    // 依存配列に nodeGraphTemplates を追加
+    [setPlacedItems, setSelectedItemId, setAllItemLogics, nodeGraphTemplates] 
   );
 
   drop(artboardRef);
@@ -103,7 +115,6 @@ const Artboard: React.FC<ArtboardProps> = ({
           item={item}
           onSelect={() => setSelectedItemId(item.id)}
           isSelected={item.id === selectedItemId}
-          // (onResizeStop は削除)
         />
       ))}
     </div>

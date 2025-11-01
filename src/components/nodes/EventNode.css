@@ -1,0 +1,21 @@
+/* src/components/nodes/EventNode.css */
+
+.event-node {
+  /* 見た目 */
+  background: #c33a3a; /* イベントノードの専用色 (赤系) */
+  border: 1px solid #7a1b1b;
+  border-radius: 5px;
+  padding: 10px 15px;
+  
+  /* 文字 */
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* 右側のハンドル(接続点)のスタイルを少し調整 */
+.event-node .react-flow__handle-right {
+  right: -8px; /* 少し外側に */
+  background: #efefef;
+  border: 2px solid #c33a3a;
+}
