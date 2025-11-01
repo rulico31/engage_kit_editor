@@ -1,0 +1,66 @@
+/* src/components/nodes/IfNode.css */
+
+.if-node {
+  background: #3a8a4a; /* ロジックノードの色 (緑系) */
+  border: 1px solid #1b5e2a;
+  border-radius: 5px;
+  padding: 10px 15px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  width: 180px;
+}
+
+.if-node-label {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: center;
+  font-weight: bold;
+}
+
+/* ↓↓↓↓↓↓↓↓↓↓ (修正) 条件入力欄 (Flex に) ↓↓↓↓↓↓↓↓↓↓ */
+.if-node-condition {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* ラベルとセレクトの隙間 */
+  margin-bottom: 15px;
+  font-size: 12px;
+  text-align: left; /* ラベルを左寄せ */
+}
+.if-node-condition label {
+  margin-top: 6px; /* 2つのセレクトの間に隙間を空ける */
+}
+
+/* (input ではなく select のスタイル) */
+.if-node-select {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 3px;
+  border: 1px solid #1b5e2a;
+  background-color: #f0f0f0;
+  color: #333;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
+
+/* 出力グループ (True / False) */
+.if-node-output-group {
+  text-align: right;
+  padding-right: 15px;
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+/* (ハンドルスタイルは変更なし) */
+.if-node .react-flow__handle-left {
+  left: -8px;
+  background: #efefef;
+  border: 2px solid #3a8a4a;
+}
+.if-node .react-flow__handle-right {
+  right: -8px;
+  background: #efefef;
+  border: 2px solid #3a8a4a;
+}

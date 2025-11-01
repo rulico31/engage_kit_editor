@@ -1,6 +1,6 @@
 // src/App.tsx
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Panel,
   PanelGroup,
@@ -15,11 +15,9 @@ import {
   type OnEdgesChange,
   applyNodeChanges,
   applyEdgeChanges,
-  // ↓↓↓↓↓↓↓↓↓↓ (1) 接続用の関数と型をインポート ↓↓↓↓↓↓↓↓↓↓
   addEdge,
   type Connection,
   type OnConnect,
-  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
 } from "reactflow";
 
 import Artboard from "./components/Artboard";
@@ -28,47 +26,71 @@ import PropertiesPanel from "./components/PropertiesPanel";
 import NodeEditor from "./components/NodeEditor";
 import type { PlacedItemType } from "./types";
 
-// (型定義は変更なし)
+// ↓↓↓↓↓↓↓↓↓↓ (1) 【最重要】この型定義が正しい位置に必要です ↓↓↓↓↓↓↓↓↓↓
 export interface NodeGraph {
   nodes: Node[];
   edges: Edge[];
 }
+// ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+
+// (テンプレート定義)
 const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
   "ボタン": {
-    nodes: [{ id: "btn-click", type: "eventNode", data: { label: "🎬 イベント: ボタンがクリックされた時" }, position: { x: 50, y: 50 }, }, ],
+    nodes: [{
+      id: "btn-click",
+      type: "eventNode",
+      data: { label: "🎬 イベント: ボタンがクリックされた時" },
+      position: { x: 50, y: 50 },
+    }],
     edges: [],
   },
   "テキスト": {
-    nodes: [{ id: "text-load", type: "eventNode", data: { label: "🎬 イベント: テキスト表示時" }, position: { x: 50, y: 50 }, }, ],
+    nodes: [{
+      id: "text-load",
+      type: "eventNode",
+      data: { label: "🎬 イベント: テキスト表示時" },
+      position: { x: 50, y: 50 },
+    }],
     edges: [],
   },
   "画像": {
-    nodes: [{ id: "img-load", type: "eventNode", data: { label: "🎬 イベント: 画像読み込み完了時" }, position: { x: 50, y: 50 }, }, ],
+    nodes: [{
+      id: "img-load",
+      type: "eventNode",
+      data: { label: "🎬 イベント: 画像読み込み完了時" },
+      position: { x: 50, y: 50 },
+    }],
     edges: [],
   },
   "Default": {
-    nodes: [{ id: "default-load", type: "eventNode", data: { label: "🎬 イベント: ページ読み込み時" }, position: { x: 50, y: 50 }, }, ],
+    nodes: [{
+      id: "default-load",
+      type: "eventNode",
+      data: { label: "🎬 イベント: ページ読み込み時" },
+      position: { x: 50, y: 50 },
+    }],
     edges: [],
   },
 };
 
 
 function App() {
-  // --- State (変更なし) ---
+  // --- State ---
   const [placedItems, setPlacedItems] = useState<PlacedItemType[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [allItemLogics, setAllItemLogics] = useState<Record<string, NodeGraph>>(
     {}
   );
 
-  // --- 選択中アイテムの情報を計算 (変更なし) ---
+  // --- 選択中アイテムの計算 ---
   const selectedItem =
     placedItems.find((item) => item.id === selectedItemId) || null;
+  
   const currentGraph: NodeGraph | undefined = selectedItemId
     ? allItemLogics[selectedItemId]
     : undefined;
 
-  // --- 更新用関数 (変更なし) ---
+  // --- 更新用関数 ---
   const handleItemUpdate = (
     itemId: string,
     updatedProps: Partial<PlacedItemType>
@@ -108,29 +130,24 @@ function App() {
     });
   }, [selectedItemId]);
 
-  // ↓↓↓↓↓↓↓↓↓↓ (2) onConnect ハンドラを新設 ↓↓↓↓↓↓↓↓↓↓
   const onConnect: OnConnect = useCallback((connection: Connection) => {
-    if (!selectedItemId) return; // 選択中でなければ何もしない
+    if (!selectedItemId) return; 
 
     setAllItemLogics((prevLogics) => {
       const currentGraph = prevLogics[selectedItemId];
       if (!currentGraph) return prevLogics;
-
-      // addEdge ユーティリティを使って、新しい接続線を edges 配列に追加
       const newEdges = addEdge(connection, currentGraph.edges);
-
       return {
         ...prevLogics,
         [selectedItemId]: {
           ...currentGraph,
-          edges: newEdges, // 更新された edges をセット
+          edges: newEdges,
         },
       };
     });
   }, [selectedItemId]);
-  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
 
-  // (削除機能・useEffect は変更なし)
+  // (削除機能)
   const handleDeleteItem = useCallback(() => {
     if (!selectedItemId) return; 
     setPlacedItems((prevItems) =>
@@ -144,6 +161,7 @@ function App() {
     setSelectedItemId(null);
   }, [selectedItemId]);
 
+  // (キーボードリスナー)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
@@ -163,7 +181,7 @@ function App() {
     };
   }, [handleDeleteItem]);
 
-  // (ノード追加関数は変更なし)
+  // (ノード追加)
   const handleAddNode = useCallback((newNode: Node) => {
     if (!selectedItemId) return;
 
@@ -180,13 +198,46 @@ function App() {
       };
     });
   }, [selectedItemId]);
+  
+  // (ノード内部データ変更)
+  const handleNodeDataChange = useCallback(
+    (nodeId: string, dataUpdate: any) => {
+      if (!selectedItemId) return;
+
+      setAllItemLogics((prevLogics) => {
+        const currentGraph = prevLogics[selectedItemId];
+        if (!currentGraph) return prevLogics;
+
+        const newNodes = currentGraph.nodes.map((node) => { // (エラー Ln70 はここで発生)
+          if (node.id === nodeId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                ...dataUpdate, 
+              },
+            };
+          }
+          return node;
+        });
+
+        return {
+          ...prevLogics,
+          [selectedItemId]: {
+            ...currentGraph,
+            nodes: newNodes,
+          },
+        };
+      });
+    },
+    [selectedItemId]
+  );
 
   return (
     <PanelGroup direction="vertical" className="container">
-      {/* (A-1) 上部メインエリア */}
+      {/* ( ... 上部パネル (変更なし) ... ) */}
       <Panel defaultSize={75} minSize={30}>
         <PanelGroup direction="horizontal">
-          {/* (B-1) 左エリア */}
           <Panel defaultSize={20} minSize={15} className="panel-column">
             <PanelGroup direction="vertical">
               <Panel defaultSize={40} minSize={20} className="panel-content">
@@ -203,10 +254,7 @@ function App() {
               </Panel>
             </PanelGroup>
           </Panel>
-
           <PanelResizeHandle className="resize-handle" />
-
-          {/* (B-2) 中央エリア (キャンバス) */}
           <Panel defaultSize={55} minSize={30} className="panel-content">
             <div className="panel-header">キャンバス</div>
             <div className="canvas-viewport">
@@ -220,8 +268,6 @@ function App() {
               />
             </div>
           </Panel>
-
-          {/* (B-3) 右エリア (プロパティ) */}
           <Panel defaultSize={25} minSize={15} className="panel-content">
             <div className="panel-header">プロパティ</div>
             <PropertiesPanel
@@ -238,16 +284,16 @@ function App() {
       <Panel defaultSize={25} minSize={15} className="panel-content">
         <div className="panel-header">ノードエディタ</div>
         
-        {/* ↓↓↓↓↓↓↓↓↓↓ (3) onConnect を NodeEditor に渡す ↓↓↓↓↓↓↓↓↓↓ */}
         <NodeEditor
-          nodes={currentGraph?.nodes}
-          edges={currentGraph?.edges}
+          nodes={currentGraph?.nodes} // (エラー Ln110 はここで発生)
+          edges={currentGraph?.edges} // (エラー Ln111 はここで発生)
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeAdd={handleAddNode}
-          onConnect={onConnect} // (新しく追加)
+          onConnect={onConnect}
+          placedItems={placedItems} 
+          onNodeDataChange={handleNodeDataChange}
         />
-        {/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */}
       </Panel>
     </PanelGroup>
   );

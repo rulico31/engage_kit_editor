@@ -1,6 +1,6 @@
 // src/components/NodeEditor.tsx
 
-import React, { useRef, useCallback, useEffect } from "react";
+import React, { useRef, useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -10,22 +10,20 @@ import ReactFlow, {
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,
+  type NodeProps, // (NodeProps をインポート)
 } from "reactflow";
 
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import NodeToolboxItem from "./NodeToolboxItem";
+import type { PlacedItemType } from "../types";
 
 import "reactflow/dist/style.css";
 import "./NodeEditor.css";
 
 import EventNode from "./nodes/EventNode";
 import ActionNode from "./nodes/ActionNode";
-
-const nodeTypes = {
-  eventNode: EventNode,
-  actionNode: ActionNode,
-};
+import IfNode from "./nodes/IfNode"; // (IfNode をインポート)
 
 // --- Props の型定義 ---
 interface NodeEditorProps {
@@ -35,6 +33,8 @@ interface NodeEditorProps {
   onEdgesChange: OnEdgesChange;
   onNodeAdd: (newNode: Node) => void;
   onConnect: OnConnect;
+  placedItems: PlacedItemType[];
+  onNodeDataChange: (nodeId: string, dataUpdate: any) => void;
 }
 
 // (ドラッグアイテムの型)
@@ -50,30 +50,25 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   onEdgesChange,
   onNodeAdd,
   onConnect,
+  placedItems,
+  onNodeDataChange,
 }) => {
+  // (フック定義は変更なし)
   const { fitView, project } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
-
-  // ↓↓↓↓↓↓↓↓↓↓ (最重要) useDropフックの構文を修正 ↓↓↓↓↓↓↓↓↓↓
   const [{ isOver }, drop] = useDrop(
-    // (1) 第1引数: 設定を返す関数
     () => ({
       accept: ItemTypes.NODE_TOOL,
-      collect: (monitor: DropTargetMonitor) => ({ // (monitor に型を追加)
-        isOver: !!monitor.isOver(),
-      }),
+      collect: (monitor: DropTargetMonitor) => ({ isOver: !!monitor.isOver() }),
       drop: (item: NodeToolDragItem, monitor: DropTargetMonitor) => {
         const { nodeType, nodeName } = item;
-        
         const clientOffset = monitor.getClientOffset();
         if (!clientOffset || !dropRef.current) return;
-        
         const position = project({
           x: clientOffset.x - (dropRef.current.getBoundingClientRect().left ?? 0),
           y: clientOffset.y - (dropRef.current.getBoundingClientRect().top ?? 0),
         });
-
         const newNode: Node = {
           id: `node-${Date.now()}`,
           type: nodeType,
@@ -83,21 +78,45 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         onNodeAdd(newNode);
       },
     }),
-    // (2) 第2引数: 依存配列
     [project, onNodeAdd]
   );
-  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
-
-  drop(dropRef); // drop コネクタを ref に接続
-
-  // (useEffect は変更なし)
+  drop(dropRef);
   useEffect(() => {
     if (nodes && nodes.length > 0) {
       fitView({ duration: 200 });
     }
   }, [nodes ? nodes[0]?.id : undefined, fitView]);
 
-  // (placeholder の return)
+  // (nodeTypes の useMemo)
+  const nodeTypes = useMemo(() => {
+    const wrappedEventNode = (props: NodeProps) => (
+      <EventNode {...props} />
+    );
+    const wrappedActionNode = (props: NodeProps) => (
+      <ActionNode
+        {...props} 
+        placedItems={placedItems}
+        onDataChange={onNodeDataChange} 
+      />
+    );
+    // ↓↓↓↓↓↓↓↓↓↓ (修正) IfNode にも props を渡す ↓↓↓↓↓↓↓↓↓↓
+    const wrappedIfNode = (props: NodeProps) => (
+      <IfNode 
+        {...props} 
+        placedItems={placedItems}
+        onDataChange={onNodeDataChange} 
+      />
+    );
+    // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+
+    return {
+      eventNode: wrappedEventNode,
+      actionNode: wrappedActionNode,
+      ifNode: wrappedIfNode, // (IfNode を登録)
+    };
+  }, [placedItems, onNodeDataChange]);
+
+  // (placeholder の return は変更なし)
   if (!nodes || !edges) {
     return (
       <div className="node-editor-placeholder">
@@ -106,7 +125,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     );
   }
 
-  // (メインの return)
+  // (メインの return は変更なし)
   return (
     <div className="node-editor-wrapper" ref={reactFlowWrapper}>
       {/* ツールボックス */}
@@ -119,7 +138,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           ⚡ 表示/非表示
         </NodeToolboxItem>
         <NodeToolboxItem
-          nodeType="actionNode"
+          nodeType="ifNode"
           nodeName="🧠 ロジック: もし〜なら"
         >
           🧠 もし〜なら
@@ -141,7 +160,6 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         >
           <Background />
           <Controls className="rf-controls-dark" />
-          {/* <MiniMap /> (削除済み) */}
         </ReactFlow>
         {isOver && <div className="react-flow-drop-overlay" />}
       </div>
@@ -149,9 +167,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   );
 };
 
-// (Wrapper)
+// (Wrapper は変更なし)
 import { ReactFlowProvider } from "reactflow";
-
 const NodeEditorWrapper: React.FC<NodeEditorProps> = (props) => {
   return (
     <ReactFlowProvider>

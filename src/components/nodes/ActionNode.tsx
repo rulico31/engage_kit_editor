@@ -1,26 +1,75 @@
 // src/components/nodes/ActionNode.tsx
 
 import React, { memo } from "react";
-// Handle (接続点) と Position (位置) をインポート
 import { Handle, Position, type NodeProps } from "reactflow";
-import "./ActionNode.css"; // 専用のスタイルを読み込む
+import "./ActionNode.css";
+import type { PlacedItemType } from "../../types";
 
-const ActionNode: React.FC<NodeProps> = ({ data }) => {
+interface ActionNodeProps extends NodeProps {
+  placedItems: PlacedItemType[];
+  onDataChange: (nodeId: string, dataUpdate: any) => void;
+}
+
+const ActionNode: React.FC<ActionNodeProps> = ({
+  id,
+  data,
+  placedItems,
+  onDataChange,
+}) => {
+  // (1) ターゲットID変更ハンドラ
+  const handleTargetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onDataChange(id, { targetItemId: e.target.value });
+  };
+
+  // ↓↓↓↓↓↓↓↓↓↓ (2) モード変更ハンドラを新設 ↓↓↓↓↓↓↓↓↓↓
+  const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onDataChange(id, { mode: e.target.value }); // (例: { mode: 'show' })
+  };
+  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+
   return (
     <div className="action-node">
-      {/* Handle (入力/Target)
-        - type="target" (線を受け取る側)
-        - position={Position.Left} (左側に配置)
-      */}
+      {/* (入力ハンドル) */}
       <Handle type="target" position={Position.Left} />
 
       {/* ノードの本文 */}
       <div className="action-node-label">{data.label || "アクション"}</div>
 
-      {/* Handle (出力/Source)
-        - type="source" (線を出す側)
-        - position={Position.Right} (右側に配置)
-      */}
+      {/* (3) ターゲット選択用ドロップダウン */}
+      <div className="action-node-select-wrapper">
+        <label>ターゲット:</label>
+        <select
+          className="action-node-select"
+          value={data.targetItemId || ""}
+          onChange={handleTargetChange}
+          onMouseDown={(e) => e.stopPropagation()} 
+        >
+          <option value="">-- アイテムを選択 --</option>
+          {placedItems.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* ↓↓↓↓↓↓↓↓↓↓ (4) モード選択用ドロップダウンを追加 ↓↓↓↓↓↓↓↓↓↓ */}
+      <div className="action-node-select-wrapper">
+        <label>モード:</label>
+        <select
+          className="action-node-select"
+          value={data.mode || "show"} // (デフォルトは 'show')
+          onChange={handleModeChange}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <option value="show">表示する</option>
+          <option value="hide">非表示にする</option>
+          <option value="toggle">切り替える</option>
+        </select>
+      </div>
+      {/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */}
+
+      {/* (出力ハンドル) */}
       <Handle type="source" position={Position.Right} />
     </div>
   );
