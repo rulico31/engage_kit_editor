@@ -6,57 +6,59 @@ import { ItemTypes } from "../ItemTypes";
 import PlacedItem from "./PlacedItem";
 import type { PlacedItemType } from "../types";
 import "./Artboard.css";
-
 import type { NodeGraph } from "../App";
 
-// (型定義は変更なし)
-interface ToolDragItem { name: string; }
-interface PlacedDragItem { id: string; x: number; y: number; }
+// --- 型定義 ---
+interface ToolDragItem { 
+  name: string;
+}
+interface PlacedDragItem { 
+  id: string; 
+  x: number;
+  y: number;
+}
 type AllDragItems = ToolDragItem | PlacedDragItem;
 
+// --- (1) (タスク2) Props の型を変更 ---
 interface ArtboardProps {
   placedItems: PlacedItemType[];
   setPlacedItems: React.Dispatch<React.SetStateAction<PlacedItemType[]>>;
-  setSelectedItemId: (id: string | null) => void;
   selectedItemId: string | null;
-  
-  // ↓↓↓↓↓↓↓↓↓↓ 受け取る Props を変更 ↓↓↓↓↓↓↓↓↓↓
   setAllItemLogics: React.Dispatch<React.SetStateAction<Record<string, NodeGraph>>>;
-  nodeGraphTemplates: Record<string, NodeGraph>; // (initialNodeGraph ではなく)
-  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+  nodeGraphTemplates: Record<string, NodeGraph>;
+  // (App.tsx から渡される新しいコールバック)
+  onItemSelect: (id: string) => void;
+  onBackgroundClick: () => void;
 }
 
 const Artboard: React.FC<ArtboardProps> = ({
   placedItems,
   setPlacedItems,
-  setSelectedItemId,
   selectedItemId,
-  // (Props を展開)
   setAllItemLogics,
-  nodeGraphTemplates, // (名前を変更)
+  nodeGraphTemplates,
+  onItemSelect, // (受け取る)
+  onBackgroundClick, // (受け取る)
 }) => {
   const artboardRef = useRef<HTMLDivElement>(null);
 
   const [, drop] = useDrop(
     () => ({
-      accept: [
-        ItemTypes.TOOL,
-        ItemTypes.PLACED_ITEM,
-      ],
-
+      accept: [ ItemTypes.TOOL, ItemTypes.PLACED_ITEM ],
+      
       drop: (item: AllDragItems, monitor: DropTargetMonitor) => {
         if (!artboardRef.current) return;
         const itemType = monitor.getItemType();
 
-        // --- 新規作成 (ツールボックスから) ---
         if (itemType === ItemTypes.TOOL) {
+          // --- 新規作成 ---
           const clientOffset = monitor.getClientOffset();
           if (!clientOffset) return;
           const artboardRect = artboardRef.current.getBoundingClientRect();
           const x = clientOffset.x - artboardRect.left;
           const y = clientOffset.y - artboardRect.top;
-
-          const { name } = item as ToolDragItem; // (例: "ボタン")
+          
+          const { name } = item as ToolDragItem;
           const newItem: PlacedItemType = {
             id: `item-${Date.now()}`,
             name: name, x: x, y: y, width: 100, height: 40,
@@ -64,24 +66,19 @@ const Artboard: React.FC<ArtboardProps> = ({
           
           setPlacedItems((prevItems) => [...prevItems, newItem]);
           
-          // ↓↓↓↓↓↓↓↓↓↓ (重要) アイテム名に応じたグラフをセット ↓↓↓↓↓↓↓↓↓↓
-          
-          // テンプレートから該当のグラフを探す (該当がなければ "Default" を使う)
           const graphTemplate = nodeGraphTemplates[name] || nodeGraphTemplates["Default"];
-
           setAllItemLogics((prevLogics) => ({
-            ...prevLogics,
-            [newItem.id]: graphTemplate, // 新しいIDに、選んだグラフを割り当て
+            ...prevLogics, [newItem.id]: graphTemplate,
           }));
-          // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
           
-          setSelectedItemId(newItem.id);
+          // (2) (タスク2) 選択ハンドラを呼ぶ
+          onItemSelect(newItem.id);
 
         } else if (itemType === ItemTypes.PLACED_ITEM) {
-          // --- アイテム移動 (変更なし) ---
+          // --- アイテム移動 ---
           const delta = monitor.getDifferenceFromInitialOffset();
           if (!delta) return;
-
+          
           const { id, x: originalX, y: originalY } = item as PlacedDragItem;
           const newX = originalX + delta.x;
           const newY = originalY + delta.y;
@@ -91,19 +88,21 @@ const Artboard: React.FC<ArtboardProps> = ({
               pi.id === id ? { ...pi, x: newX, y: newY } : pi
             )
           );
-          setSelectedItemId(id);
+          
+          // (3) (タスク2) 選択ハンドラを呼ぶ
+          onItemSelect(id);
         }
       },
     }),
-    // 依存配列に nodeGraphTemplates を追加
-    [setPlacedItems, setSelectedItemId, setAllItemLogics, nodeGraphTemplates] 
+    [setPlacedItems, setAllItemLogics, nodeGraphTemplates, onItemSelect] 
   );
+  
+  drop(artboardRef); // ref を dnd に接続
 
-  drop(artboardRef);
-
+  // (4) (タスク2) 背景クリックハンドラ
   const handleArtboardClick = (e: React.MouseEvent) => {
     if (e.target === artboardRef.current) {
-      setSelectedItemId(null);
+      onBackgroundClick(); // App.tsx のハンドラを呼ぶ
     }
   };
 
@@ -113,7 +112,8 @@ const Artboard: React.FC<ArtboardProps> = ({
         <PlacedItem
           key={item.id}
           item={item}
-          onSelect={() => setSelectedItemId(item.id)}
+          // (5) (タスク2) onSelect ハンドラ
+          onSelect={() => onItemSelect(item.id)}
           isSelected={item.id === selectedItemId}
         />
       ))}

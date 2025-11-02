@@ -1,93 +1,6 @@
 /* src/components/nodes/ActionNode.css */
 
 .action-node {
-  /* 見た目 */
-  background: #3a6ec3; /* アクションノードの色 (青系) */
-  border: 1px solid #1b3a7a;
-  border-radius: 5px;
-  padding: 10px 15px;
-  
-  /* 文字 */
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  
-  /* サイズ */
-  min-width: 150px;
-  text-align: center;
-}
-
-/* 左側のハンドル(入力)のスタイル */
-.action-node .react-flow__handle-left {
-  left: -8px; /* 少し外側に */
-  background: #efefef;
-  border: 2px solid #3a6ec3;
-}
-
-/* 右側のハンドル(出力)のスタイル */
-.action-node .react-flow__handle-right {
-  right: -8px;
-  background: #efefef;
-  border: 2px solid #3a6ec3;
-}
-
-/* src/components/nodes/ActionNode.css */
-
-.action-node {
-  background: #3a6ec3;
-  border: 1px solid #1b3a7a;
-  border-radius: 5px;
-  padding: 10px 15px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  min-width: 170px; /* 最小幅を少し広げる */
-  text-align: center;
-}
-
-/* (ハンドルスタイルは変更なし) */
-.action-node .react-flow__handle-left {
-  left: -8px;
-  background: #efefef;
-  border: 2px solid #3a6ec3;
-}
-.action-node .react-flow__handle-right {
-  right: -8px;
-  background: #efefef;
-  border: 2px solid #3a6ec3;
-}
-
-/* ↓↓↓↓↓↓↓↓↓↓ (5) ドロップダウン用のスタイルを追記 ↓↓↓↓↓↓↓↓↓↓ */
-
-.action-node-label {
-  /* ラベルとセレクトの間に線を引く */
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.action-node-select-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  text-align: left;
-  font-size: 12px;
-}
-
-.action-node-select {
-  width: 100%;
-  padding: 4px 6px;
-  border-radius: 3px;
-  border: 1px solid #1b3a7a;
-  background-color: #f0f0f0;
-  color: #333;
-  font-size: 13px;
-}
-/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
-
-/* src/components/nodes/ActionNode.css */
-
-.action-node {
   background: #3a6ec3;
   border: 1px solid #1b3a7a;
   border-radius: 5px;
@@ -99,14 +12,23 @@
   text-align: center;
 }
 
-/* (ハンドルスタイルは変更なし) */
-.action-node .react-flow__handle-left { /* ... */ }
-.action-node .react-flow__handle-right { /* ... */ }
+/* (ハンドルスタイル) */
+.action-node .react-flow__handle-left {
+  left: -8px;
+  background: #efefef;
+  border: 2px solid #3a6ec3;
+}
+.action-node .react-flow__handle-right {
+  right: -8px;
+  background: #efefef;
+  border: 2px solid #3a6ec3;
+}
 
 .action-node-label {
   padding-bottom: 8px;
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: bold;
 }
 
 .action-node-select-wrapper {
@@ -115,10 +37,7 @@
   gap: 4px;
   text-align: left;
   font-size: 12px;
-  
-  /* ↓↓↓↓↓↓↓↓↓↓ (修正) ドロップダウン間のマージン ↓↓↓↓↓↓↓↓↓↓ */
   margin-top: 10px;
-  /* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
 }
 
 .action-node-select {

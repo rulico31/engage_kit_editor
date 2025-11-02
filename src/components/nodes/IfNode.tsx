@@ -3,25 +3,20 @@
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import "./IfNode.css";
-// ↓↓↓↓↓↓↓↓↓↓ (1) 必要な型をインポート ↓↓↓↓↓↓↓↓↓↓
 import type { PlacedItemType } from "../../types";
-// ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
 
-// ↓↓↓↓↓↓↓↓↓↓ (2) NodeEditor から注入される Props を定義 ↓↓↓↓↓↓↓↓↓↓
+// (NodeEditor から注入される Props)
 interface IfNodeProps extends NodeProps {
   placedItems: PlacedItemType[];
   onDataChange: (nodeId: string, dataUpdate: any) => void;
 }
-// ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
 
 const IfNode: React.FC<IfNodeProps> = ({
-  id, // ノード自身のID
-  data, // data.label, data.conditionTargetId など
+  id,
+  data,
   placedItems,
   onDataChange,
 }) => {
-
-  // --- (3) ハンドラを定義 ---
   const handleTargetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     onDataChange(id, { conditionTargetId: e.target.value });
   };
@@ -38,15 +33,14 @@ const IfNode: React.FC<IfNodeProps> = ({
       {/* ノードの本文 */}
       <div className="if-node-label">{data.label || "もし〜なら"}</div>
       
-      {/* ↓↓↓↓↓↓↓↓↓↓ (4) 条件入力をドロップダウンに変更 ↓↓↓↓↓↓↓↓↓↓ */}
+      {/* (2) 条件入力をドロップダウンに変更 */}
       <div className="if-node-condition">
         <label>IF (もし):</label>
-        {/* どのアイテムを条件にするか */}
         <select 
           className="if-node-select" 
-          value={data.conditionTargetId || ""} // 保存された値
+          value={data.conditionTargetId || ""}
           onChange={handleTargetChange}
-          onMouseDown={(e) => e.stopPropagation()} // ドラッグを止める
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <option value="">-- アイテムを選択 --</option>
           {placedItems.map((item) => (
@@ -56,29 +50,26 @@ const IfNode: React.FC<IfNodeProps> = ({
           ))}
         </select>
         
-        {/* どういう条件か */}
         <label>IS (が):</label>
         <select 
           className="if-node-select" 
-          value={data.conditionType || "isVisible"} // 保存された値
+          value={data.conditionType || "isVisible"}
           onChange={handleConditionChange}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <option value="isVisible">表示されている (True)</option>
           <option value="isHidden">非表示である (False)</option>
-          {/* (将来的に「クリックされた」などのトリガーも追加可能) */}
         </select>
       </div>
-      {/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */}
 
-      {/* (5) 出力ハンドル (True / False) - 変更なし */}
+      {/* (3) 出力ハンドル (True / False) */}
       <div className="if-node-output-group">
         <div className="if-node-output-label">True (真)</div>
         <Handle
           type="source"
           position={Position.Right}
-          id="true" // Handleに一意のIDを付与
-          style={{ top: "auto", bottom: 40 }} // 位置調整
+          id="true"
+          style={{ top: "auto", bottom: 40 }}
         />
       </div>
       
@@ -87,8 +78,8 @@ const IfNode: React.FC<IfNodeProps> = ({
         <Handle
           type="source"
           position={Position.Right}
-          id="false" // Handleに一意のIDを付与
-          style={{ top: "auto", bottom: 15 }} // 位置調整
+          id="false"
+          style={{ top: "auto", bottom: 15 }}
         />
       </div>
     </div>
