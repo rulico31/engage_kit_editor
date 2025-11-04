@@ -156,4 +156,40 @@
 .io-button.home-button {
   background-color: #4a4a4a;
 }
-/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
+
+/* (ここから新規追加) */
+/* (5) プレビューモード用のボタン */
+.io-button.preview-button {
+  background-color: #2a8a4a; /* 緑系 */
+  border-color: #2a8a4a;
+  color: #fff;
+}
+.io-button.preview-button:hover {
+  background-color: #3aa05a;
+}
+
+/* (6) 編集モードに戻るボタン */
+.io-button.edit-button {
+  background-color: #007acc; /* 青系 (プライマリ) */
+  border-color: #007acc;
+  color: #fff;
+}
+.io-button.edit-button:hover {
+  background-color: #008be6;
+}
+
+/* (7) プレビューホストのコンテナ */
+.preview-host-container {
+  width: 100%;
+  flex-grow: 1; /* ツールバー以外の残りの高さをすべて占める */
+  background-color: #222; /* エディタのビューポートと同じ背景色 */
+  overflow: auto; /* Artboard が大きければスクロール */
+  display: flex; /* (Artboard を中央寄せするために flex を使用) */
+  /* Artboard.css の margin: 20px auto; を再現 */
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* (ここまで新規追加) */

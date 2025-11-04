@@ -24,9 +24,12 @@ import Artboard from "./components/Artboard";
 import ToolboxItem from "./components/ToolboxItem";
 import PropertiesPanel from "./components/PropertiesPanel";
 import NodeEditor from "./components/NodeEditor";
-import type { PlacedItemType } from "./types";
+// (types から PreviewState と PreviewItemState をインポート)
+import type { PlacedItemType, PreviewState, PreviewItemState } from "./types";
 import HomeScreen from "./components/HomeScreen";
 import ProjectNameModal from "./components/ProjectNameModal";
+// (プレビュー用のコンポーネントをインポート)
+import PreviewHost from "./components/PreviewHost";
 
 // (型定義)
 export interface NodeGraph {
@@ -82,16 +85,18 @@ const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
 function App() {
   // --- (2) State (モーダルとプロジェクト名を追加) ---
   const [isProjectLoaded, setIsProjectLoaded] = useState(false);
-  // ↓↓↓↓↓↓↓↓↓↓ (修正) setlsNameModalOpen -> setIsNameModalOpen ↓↓↓↓↓↓↓↓↓↓
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [projectName, setProjectName] = useState<string>("Untitled Project");
-  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
   
   const [placedItems, setPlacedItems] = useState<PlacedItemType[]>([]);
   const [allItemLogics, setAllItemLogics] = useState<Record<string, NodeGraph>>({});
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeLogicGraphId, setActiveLogicGraphId] = useState<string | null>(null);
+
+  // --- (プレビューモード用の State を追加) ---
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewItemsState, setPreviewItemsState] = useState<PreviewState>({});
 
   // --- (3) 選択中アイテム/ノードの情報を計算 (変更なし) ---
   const selectedItem =
@@ -173,6 +178,8 @@ function App() {
   }, [selectedItemId]);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // (プレビュー中はキー操作を無効化)
+      if (isPreviewing) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) { return; }
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault(); 
@@ -183,7 +190,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [handleDeleteItem]);
+  }, [handleDeleteItem, isPreviewing]); // (isPreviewing を依存配列に追加)
 
   // --- (5) 選択/ナビゲーション関数 (変更なし) ---
   const handleItemSelect = (itemId: string) => {
@@ -202,6 +209,8 @@ function App() {
   };
   const handleGoHome = () => {
     setIsProjectLoaded(false);
+    // (ホームに戻る時にプレビューモードを解除)
+    setIsPreviewing(false);
     setSelectedItemId(null);
     setSelectedNodeId(null);
     setActiveLogicGraphId(null);
@@ -211,14 +220,12 @@ function App() {
   
   // (A) ホーム画面の「新規作成」ボタンが押された時
   const handleNewProjectClick = () => {
-    // ↓↓↓↓↓↓↓↓↓↓ (修正) setlsNameModalOpen -> setIsNameModalOpen ↓↓↓↓↓↓↓↓↓↓
     setIsNameModalOpen(true);
   };
 
   // (B) モーダルが閉じられた時
   const handleCloseModal = () => {
     setIsNameModalOpen(false);
-    // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
   };
   
   // (C) モーダルの「作成」ボタンが押された時
@@ -228,16 +235,22 @@ function App() {
     setSelectedItemId(null);
     setSelectedNodeId(null);
     setActiveLogicGraphId(null);
-    // ↓↓↓↓↓↓↓↓↓↓ (修正) setProjectName を使用 ↓↓↓↓↓↓↓↓↓↓
     setProjectName(name); 
     setIsNameModalOpen(false);
     setIsProjectLoaded(true);
-    // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+    // (プレビューモードもリセット)
+    setIsPreviewing(false);
+    setPreviewItemsState({});
   };
 
 
   // --- (7) 保存・読み込み関数 (変更なし) ---
   const handleExportProject = useCallback(() => {
+    // (プレビュー中は保存不可)
+    if (isPreviewing) {
+      alert("編集モードに戻ってから保存してください。");
+      return;
+    }
     const projectData: ProjectData = {
       placedItems: placedItems,
       allItemLogics: allItemLogics,
@@ -252,7 +265,7 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [placedItems, allItemLogics, projectName]);
+  }, [placedItems, allItemLogics, projectName, isPreviewing]); // (isPreviewing を依存配列に追加)
 
   const handleImportProject = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -272,8 +285,10 @@ function App() {
           setSelectedNodeId(null);
           setActiveLogicGraphId(null);
           setProjectName(file.name.replace(/\.json$/, ""));
-          // ↓↓↓↓↓↓↓↓↓↓ (修正) setProjectLoaded -> setIsProjectLoaded ↓↓↓↓↓↓↓↓↓↓
           setIsProjectLoaded(true); 
+          // (読み込み時もプレビューをリセット)
+          setIsPreviewing(false);
+          setPreviewItemsState({});
         } else {
           alert("無効なプロジェクトファイルです。");
         }
@@ -284,19 +299,47 @@ function App() {
     reader.readAsText(file);
     event.target.value = "";
   };
+
+  // --- (プレビューモード切替ロジック) ---
+  const handleTogglePreview = () => {
+    if (isPreviewing) {
+      // 編集モードに戻る
+      setIsPreviewing(false);
+      // プレビューの状態はリセット
+      setPreviewItemsState({});
+    } else {
+      // プレビューモードに入る
+      // 1. 編集中の選択をすべて解除
+      setSelectedItemId(null);
+      setSelectedNodeId(null);
+      setActiveLogicGraphId(null);
+      
+      // 2. placedItems からプレビュー用の初期状態を生成
+      const initialState: PreviewState = {};
+      for (const item of placedItems) {
+        initialState[item.id] = {
+          isVisible: true, // デフォルトはすべて表示
+        };
+      }
+      setPreviewItemsState(initialState);
+      
+      // 3. プレビューモードに切り替え
+      setIsPreviewing(true);
+      
+      // (将来的に、"OnPageLoad" イベントを持つノードをここで実行する)
+    }
+  };
   
   // --- (8) メインの return (画面切り替え) ---
   return (
     <div className="app-container">
       {/* (A) ホーム画面 or エディタ画面 */}
-      {/* ↓↓↓↓↓↓↓↓↓↓ (修正) isProjectLoaded を使用 ↓↓↓↓↓↓↓↓↓↓ */}
       {!isProjectLoaded ? (
         <HomeScreen 
-          onNewProject={handleNewProjectClick} // (handleNewProject -> handleNewProjectClick)
+          onNewProject={handleNewProjectClick}
           onLoadProject={handleImportProject}
         />
       ) : (
-      // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
         // (B) エディタ画面
         <div className="editor-container">
           {/* (B-1) トップツールバー */}
@@ -305,96 +348,124 @@ function App() {
               Engage-Kit <span>/ {projectName}</span>
             </div>
             <div className="editor-toolbar-buttons">
+              {/* (プレビュー中も「ホームに戻る」は表示) */}
               <button onClick={handleGoHome} className="io-button home-button">
                 ホームに戻る
               </button>
-              <button onClick={handleExportProject} className="io-button">
-                保存 (JSON)
+              
+              {/* (プレビュー中は保存/読込ボタンを非表示) */}
+              {!isPreviewing && (
+                <>
+                  <button onClick={handleExportProject} className="io-button">
+                    保存 (JSON)
+                  </button>
+                  <input
+                    type="file"
+                    id="import-project-input-editor"
+                    accept=".json,application/json"
+                    style={{ display: "none" }}
+                    onChange={handleImportProject}
+                  />
+                  <label htmlFor="import-project-input-editor" className="io-button">
+                    読込 (JSON)
+                  </label>
+                </>
+              )}
+              
+              {/* (プレビュー切替ボタン) */}
+              <button 
+                onClick={handleTogglePreview} 
+                className={`io-button ${isPreviewing ? 'edit-button' : 'preview-button'}`}
+              >
+                {isPreviewing ? "⏹ 編集に戻る" : "▶ プレビュー"}
               </button>
-              <input
-                type="file"
-                id="import-project-input-editor"
-                accept=".json,application/json"
-                style={{ display: "none" }}
-                onChange={handleImportProject}
-              />
-              <label htmlFor="import-project-input-editor" className="io-button">
-                読込 (JSON)
-              </label>
             </div>
           </header>
           
-          {/* (B-2) 5パネルエディタ本体 */}
-          <PanelGroup direction="vertical" className="container">
-            {/* (A-1) 上部メインエリア */}
-            <Panel defaultSize={75} minSize={30}>
-              <PanelGroup direction="horizontal">
-                {/* (B-1) 左エリア */}
-                <Panel defaultSize={20} minSize={15} className="panel-column">
-                  <PanelGroup direction="vertical">
-                    <Panel defaultSize={40} minSize={20} className="panel-content">
-                      <div className="panel-header">ツールボックス</div>
-                      <div className="tool-list">
-                        <ToolboxItem name="テキスト" />
-                        <ToolboxItem name="ボタン" />
-                        <ToolboxItem name="画像" />
-                      </div>
-                    </Panel>
-                    <PanelResizeHandle className="resize-handle" />
-                    <Panel defaultSize={60} minSize={20} className="panel-content">
-                      <div className="panel-header">コンテンツブラウザ</div>
-                    </Panel>
-                  </PanelGroup>
-                </Panel>
-                <PanelResizeHandle className="resize-handle" />
-                {/* (B-2) 中央エリア (キャンバス) */}
-                <Panel defaultSize={55} minSize={30} className="panel-content">
-                  <div className="panel-header">キャンバス</div>
-                  <div className="canvas-viewport">
-                    <Artboard
-                      placedItems={placedItems}
-                      setPlacedItems={setPlacedItems}
-                      onItemSelect={handleItemSelect}
-                      onBackgroundClick={handleBackgroundClick}
-                      selectedItemId={selectedItemId}
-                      setAllItemLogics={setAllItemLogics}
-                      nodeGraphTemplates={NODE_GRAPH_TEMPLATES}
-                    />
-                  </div>
-                </Panel>
-                <PanelResizeHandle className="resize-handle" />
-                {/* (B-3) 右エリア (プロパティ) */}
-                <Panel defaultSize={25} minSize={15} className="panel-content">
-                  <div className="panel-header">プロパティ</div>
-                  <PropertiesPanel
-                    selectedItemId={selectedItemId}
-                    selectedNodeId={selectedNodeId}
-                    activeLogicGraphId={activeLogicGraphId}
-                    placedItems={placedItems}
-                    allItemLogics={allItemLogics}
-                    onItemUpdate={handleItemUpdate}
-                    onNodeDataChange={handleNodeDataChange}
-                  />
-                </Panel>
-              </PanelGroup>
-            </Panel>
-            {/* (A-2) 下部エリア (ノードエディタ) */}
-            <PanelResizeHandle className="resize-handle" />
-            <Panel defaultSize={25} minSize={15} className="panel-content">
-              <div className="panel-header">ノードエディタ</div>
-              <NodeEditor
-                nodes={currentGraph?.nodes}
-                edges={currentGraph?.edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onNodeAdd={handleAddNode}
-                onConnect={onConnect}
-                placedItems={placedItems} 
-                onNodeDataChange={handleNodeDataChange}
-                onNodeClick={handleNodeClick}
+          {/* (B-2) 編集モード or プレビューモード */}
+          {isPreviewing ? (
+            // --- プレビューモード ---
+            <div className="preview-host-container">
+              <PreviewHost
+                placedItems={placedItems}
+                previewState={previewItemsState}
+                setPreviewState={setPreviewItemsState}
+                allItemLogics={allItemLogics}
               />
-            </Panel>
-          </PanelGroup>
+            </div>
+          ) : (
+            // --- 編集モード (5パネルエディタ) ---
+            <PanelGroup direction="vertical" className="container">
+              {/* (A-1) 上部メインエリア */}
+              <Panel defaultSize={75} minSize={30}>
+                <PanelGroup direction="horizontal">
+                  {/* (B-1) 左エリア */}
+                  <Panel defaultSize={20} minSize={15} className="panel-column">
+                    <PanelGroup direction="vertical">
+                      <Panel defaultSize={40} minSize={20} className="panel-content">
+                        <div className="panel-header">ツールボックス</div>
+                        <div className="tool-list">
+                          <ToolboxItem name="テキスト" />
+                          <ToolboxItem name="ボタン" />
+                          <ToolboxItem name="画像" />
+                        </div>
+                      </Panel>
+                      <PanelResizeHandle className="resize-handle" />
+                      <Panel defaultSize={60} minSize={20} className="panel-content">
+                        <div className="panel-header">コンテンツブラウザ</div>
+                      </Panel>
+                    </PanelGroup>
+                  </Panel>
+                  <PanelResizeHandle className="resize-handle" />
+                  {/* (B-2) 中央エリア (キャンバス) */}
+                  <Panel defaultSize={55} minSize={30} className="panel-content">
+                    <div className="panel-header">キャンバス</div>
+                    <div className="canvas-viewport">
+                      <Artboard
+                        placedItems={placedItems}
+                        setPlacedItems={setPlacedItems}
+                        onItemSelect={handleItemSelect}
+                        onBackgroundClick={handleBackgroundClick}
+                        selectedItemId={selectedItemId}
+                        setAllItemLogics={setAllItemLogics}
+                        nodeGraphTemplates={NODE_GRAPH_TEMPLATES}
+                      />
+                    </div>
+                  </Panel>
+                  <PanelResizeHandle className="resize-handle" />
+                  {/* (B-3) 右エリア (プロパティ) */}
+                  <Panel defaultSize={25} minSize={15} className="panel-content">
+                    <div className="panel-header">プロパティ</div>
+                    <PropertiesPanel
+                      selectedItemId={selectedItemId}
+                      selectedNodeId={selectedNodeId}
+                      activeLogicGraphId={activeLogicGraphId}
+                      placedItems={placedItems}
+                      allItemLogics={allItemLogics}
+                      onItemUpdate={handleItemUpdate}
+                      onNodeDataChange={handleNodeDataChange}
+                    />
+                  </Panel>
+                </PanelGroup>
+              </Panel>
+              {/* (A-2) 下部エリア (ノードエディタ) */}
+              <PanelResizeHandle className="resize-handle" />
+              <Panel defaultSize={25} minSize={15} className="panel-content">
+                <div className="panel-header">ノードエディタ</div>
+                <NodeEditor
+                  nodes={currentGraph?.nodes}
+                  edges={currentGraph?.edges}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  onNodeAdd={handleAddNode}
+                  onConnect={onConnect}
+                  placedItems={placedItems} 
+                  onNodeDataChange={handleNodeDataChange}
+                  onNodeClick={handleNodeClick}
+                />
+              </Panel>
+            </PanelGroup>
+          )}
         </div>
       )}
 

@@ -14,40 +14,65 @@ const HomeScreen: React.FC<HomeScreenProps> = ({
   onLoadProject,
 }) => {
   return (
-    <div className="home-screen-container">
-      <div className="home-screen-box">
-        <h1 className="home-screen-title">
+    // (1) コンテナ名を変更し、中央寄せスタイルをCSS側で解除
+    <div className="home-dashboard-container">
+      {/* (2) ヘッダーを追加 */}
+      <header className="home-header">
+        <h1 className="home-header-title">
           Engage-Kit 🧩
         </h1>
-        <p className="home-screen-subtitle">
-          インタラクティブコンテンツ作成プラットフォーム
-        </p>
+        {/* (将来的にユーザーアイコンなどを配置) */}
+      </header>
 
-        <div className="home-screen-buttons">
-          {/* 1. 新規作成ボタン */}
-          <button
-            className="home-button primary"
-            onClick={onNewProject}
-          >
-            🚀 プロジェクトを新規作成
-          </button>
+      {/* (3) メインコンテンツエリア */}
+      <main className="home-main-content">
+        
+        {/* (A) ウェルカム/アクションエリア */}
+        <section className="home-action-section">
+          <h2>ようこそ、Engage-Kitへ</h2>
+          <p>
+            さっそく新しいプロジェクトを作成するか、
+            <br />
+            既存のプロジェクトを読み込んで編集を始めましょう。
+          </p>
+          
+          {/* (既存のボタンをこちらに移動) */}
+          <div className="home-action-buttons">
+            <button
+              className="home-button primary"
+              onClick={onNewProject}
+            >
+              🚀 プロジェクトを新規作成
+            </button>
 
-          {/* 2. 読み込みボタン (隠しinputと連携) */}
-          <input
-            type="file"
-            id="import-project-input-home" // (App.tsxとIDを区別)
-            accept=".json,application/json"
-            style={{ display: "none" }}
-            onChange={onLoadProject} // App.tsx の関数を呼ぶ
-          />
-          <label
-            htmlFor="import-project-input-home"
-            className="home-button"
-          >
-            📁 プロジェクトを読み込む
-          </label>
-        </div>
-      </div>
+            <input
+              type="file"
+              id="import-project-input-home"
+              accept=".json,application/json"
+              style={{ display: "none" }}
+              onChange={onLoadProject}
+            />
+            <label
+              htmlFor="import-project-input-home"
+              className="home-button"
+            >
+              📁 プロジェクトを読み込む
+            </label>
+          </div>
+        </section>
+
+        {/* (B) 将来のプロジェクト一覧エリア (プレースホルダー) */}
+        <section className="home-projects-section">
+          <div className="home-projects-header">
+            <h3>最近のプロジェクト</h3>
+            {/* (将来的に検索バーなどを配置) */}
+          </div>
+          <div className="home-projects-list-placeholder">
+            <p>（ここには将来的に、保存されたプロジェクトの一覧がカード形式で表示されます）</p>
+          </div>
+        </section>
+
+      </main>
     </div>
   );
 };

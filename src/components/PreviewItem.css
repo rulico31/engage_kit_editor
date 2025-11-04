@@ -1,0 +1,34 @@
+/* src/components/PreviewItem.css */
+
+.preview-item {
+  background-color: #f0f0f0;
+  border: 2px solid #ccc;
+  padding: 8px 12px;
+  border-radius: 4px;
+  user-select: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+  
+  /* 編集用スタイル（cursor: move）は削除 */
+  /* デフォルトのカーソル */
+  cursor: default; 
+}
+
+/* ボタンタイプのアイテムのみ、クリック可能なカーソルに変更 */
+.preview-item[data-item-type="ボタン"] {
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+/* ボタンタイプをホバーした時のスタイル */
+.preview-item[data-item-type="ボタン"]:hover {
+  background-color: #e0e0e0;
+  border-color: #aaa;
+}
+
+/* ボタンタイプをクリックした時のスタイル */
+.preview-item[data-item-type="ボタン"]:active {
+  transform: translateY(1px);
+}
+
+/* (選択状態のスタイル .is-selected はプレビューに不要なため削除) */
