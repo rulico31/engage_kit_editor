@@ -1,0 +1,67 @@
+/* src/components/HomeScreen.css */
+
+.home-screen-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  background-color: #2a2a2a; /* エディタのパネル色と合わせる */
+  color: #eee;
+  font-family: sans-serif;
+}
+
+.home-screen-box {
+  background-color: #1e1e1e; /* エディタの背景色 */
+  padding: 40px 60px;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.home-screen-title {
+  font-size: 3em;
+  color: #fff;
+  margin: 0 0 10px 0;
+}
+
+.home-screen-subtitle {
+  font-size: 1.1em;
+  color: #aaa;
+  margin-top: 0;
+  margin-bottom: 40px;
+}
+
+.home-screen-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.home-button {
+  font-size: 1.1em;
+  font-weight: bold;
+  background-color: #3a3a3a;
+  color: #ccc;
+  border: 1px solid #555;
+  padding: 12px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.home-button:hover {
+  background-color: #4a4a4a;
+  color: #fff;
+  border-color: #777;
+}
+
+.home-button.primary {
+  background-color: #007acc;
+  border-color: #007acc;
+  color: #fff;
+}
+.home-button.primary:hover {
+  background-color: #008be6;
+}

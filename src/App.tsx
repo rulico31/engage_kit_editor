@@ -25,12 +25,20 @@ import ToolboxItem from "./components/ToolboxItem";
 import PropertiesPanel from "./components/PropertiesPanel";
 import NodeEditor from "./components/NodeEditor";
 import type { PlacedItemType } from "./types";
+import HomeScreen from "./components/HomeScreen";
+import ProjectNameModal from "./components/ProjectNameModal";
 
+// (型定義)
 export interface NodeGraph {
   nodes: Node[];
   edges: Edge[];
 }
+export interface ProjectData {
+  placedItems: PlacedItemType[];
+  allItemLogics: Record<string, NodeGraph>;
+}
 
+// (テンプレート定義は変更なし)
 const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
   "ボタン": {
     nodes: [{
@@ -72,28 +80,28 @@ const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
 
 
 function App() {
-  // --- (1) (タスク1) State の拡張 ---
+  // --- (2) State (モーダルとプロジェクト名を追加) ---
+  const [isProjectLoaded, setIsProjectLoaded] = useState(false);
+  // ↓↓↓↓↓↓↓↓↓↓ (修正) setlsNameModalOpen -> setIsNameModalOpen ↓↓↓↓↓↓↓↓↓↓
+  const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [projectName, setProjectName] = useState<string>("Untitled Project");
+  // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+  
   const [placedItems, setPlacedItems] = useState<PlacedItemType[]>([]);
   const [allItemLogics, setAllItemLogics] = useState<Record<string, NodeGraph>>({});
-  
-  // (新) 選択状態
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null); // アートボード上の選択
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null); // ノードエディタ上の選択
-  const [activeLogicGraphId, setActiveLogicGraphId] = useState<string | null>(null); // 現在開いているグラフのID
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [activeLogicGraphId, setActiveLogicGraphId] = useState<string | null>(null);
 
-  // --- (2) 選択中アイテム/ノードの情報を計算 ---
+  // --- (3) 選択中アイテム/ノードの情報を計算 (変更なし) ---
   const selectedItem =
     placedItems.find((item) => item.id === selectedItemId) || null;
-  
   const currentGraph: NodeGraph | undefined = activeLogicGraphId
     ? allItemLogics[activeLogicGraphId]
     : undefined;
 
-  // --- (3) 更新用コールバック関数 ---
-  const handleItemUpdate = (
-    itemId: string,
-    updatedProps: Partial<PlacedItemType>
-  ) => {
+  // --- (4) 更新用コールバック関数 (変更なし) ---
+  const handleItemUpdate = (itemId: string, updatedProps: Partial<PlacedItemType>) => {
     setPlacedItems((prevItems) =>
       prevItems.map((item) =>
         item.id === itemId
@@ -102,7 +110,6 @@ function App() {
       )
     );
   };
-
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     if (!activeLogicGraphId) return;
     setAllItemLogics((prevLogics) => {
@@ -112,7 +119,6 @@ function App() {
       return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, nodes: newNodes } };
     });
   }, [activeLogicGraphId]);
-
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
     if (!activeLogicGraphId) return;
     setAllItemLogics((prevLogics) => {
@@ -122,7 +128,6 @@ function App() {
       return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, edges: newEdges } };
     });
   }, [activeLogicGraphId]);
-
   const onConnect: OnConnect = useCallback((connection: Connection) => {
     if (!activeLogicGraphId) return; 
     setAllItemLogics((prevLogics) => {
@@ -132,7 +137,6 @@ function App() {
       return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, edges: newEdges } };
     });
   }, [activeLogicGraphId]);
-
   const handleAddNode = useCallback((newNode: Node) => {
     if (!activeLogicGraphId) return;
     setAllItemLogics((prevLogics) => {
@@ -141,8 +145,6 @@ function App() {
       return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, nodes: [...currentGraph.nodes, newNode] } };
     });
   }, [activeLogicGraphId]);
-  
-  // (タスク1) ノード内部データ変更用コールバック
   const handleNodeDataChange = useCallback((nodeId: string, dataUpdate: any) => {
       if (!activeLogicGraphId) return;
       setAllItemLogics((prevLogics) => {
@@ -157,7 +159,6 @@ function App() {
         return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, nodes: newNodes } };
       });
     }, [activeLogicGraphId]);
-
   const handleDeleteItem = useCallback(() => {
     if (!selectedItemId) return;
     setPlacedItems((prevItems) => prevItems.filter((item) => item.id !== selectedItemId));
@@ -170,7 +171,6 @@ function App() {
     setSelectedNodeId(null);
     setActiveLogicGraphId(null);
   }, [selectedItemId]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) { return; }
@@ -185,104 +185,227 @@ function App() {
     };
   }, [handleDeleteItem]);
 
-  // --- (4) (タスク2) 相互排他ロジック ---
+  // --- (5) 選択/ナビゲーション関数 (変更なし) ---
   const handleItemSelect = (itemId: string) => {
     setSelectedItemId(itemId);
     setSelectedNodeId(null);
     setActiveLogicGraphId(itemId);
   };
-
   const handleBackgroundClick = () => {
     setSelectedItemId(null);
     setSelectedNodeId(null);
     setActiveLogicGraphId(null);
   };
-
-  // (onNodeClick)
   const handleNodeClick = (nodeId: string) => {
-    setSelectedItemId(null); // アイテム選択を解除
+    setSelectedItemId(null);
     setSelectedNodeId(nodeId);
-    // (activeLogicGraphId は変更しない)
+  };
+  const handleGoHome = () => {
+    setIsProjectLoaded(false);
+    setSelectedItemId(null);
+    setSelectedNodeId(null);
+    setActiveLogicGraphId(null);
   };
   
+  // --- (6) 新規プロジェクトのロジック ---
+  
+  // (A) ホーム画面の「新規作成」ボタンが押された時
+  const handleNewProjectClick = () => {
+    // ↓↓↓↓↓↓↓↓↓↓ (修正) setlsNameModalOpen -> setIsNameModalOpen ↓↓↓↓↓↓↓↓↓↓
+    setIsNameModalOpen(true);
+  };
+
+  // (B) モーダルが閉じられた時
+  const handleCloseModal = () => {
+    setIsNameModalOpen(false);
+    // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+  };
+  
+  // (C) モーダルの「作成」ボタンが押された時
+  const handleConfirmNewProject = (name: string) => {
+    setPlacedItems([]);
+    setAllItemLogics({});
+    setSelectedItemId(null);
+    setSelectedNodeId(null);
+    setActiveLogicGraphId(null);
+    // ↓↓↓↓↓↓↓↓↓↓ (修正) setProjectName を使用 ↓↓↓↓↓↓↓↓↓↓
+    setProjectName(name); 
+    setIsNameModalOpen(false);
+    setIsProjectLoaded(true);
+    // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+  };
+
+
+  // --- (7) 保存・読み込み関数 (変更なし) ---
+  const handleExportProject = useCallback(() => {
+    const projectData: ProjectData = {
+      placedItems: placedItems,
+      allItemLogics: allItemLogics,
+    };
+    const jsonString = JSON.stringify(projectData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectName || "engage-kit-project"}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [placedItems, allItemLogics, projectName]);
+
+  const handleImportProject = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const projectData: ProjectData = JSON.parse(text);
+
+        if (projectData && projectData.placedItems && projectData.allItemLogics) {
+          setPlacedItems(projectData.placedItems);
+          setAllItemLogics(projectData.allItemLogics);
+          setSelectedItemId(null);
+          setSelectedNodeId(null);
+          setActiveLogicGraphId(null);
+          setProjectName(file.name.replace(/\.json$/, ""));
+          // ↓↓↓↓↓↓↓↓↓↓ (修正) setProjectLoaded -> setIsProjectLoaded ↓↓↓↓↓↓↓↓↓↓
+          setIsProjectLoaded(true); 
+        } else {
+          alert("無効なプロジェクトファイルです。");
+        }
+      } catch (error) {
+        alert("プロジェクトファイルの読み込みに失敗しました。");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  };
+  
+  // --- (8) メインの return (画面切り替え) ---
   return (
-    <PanelGroup direction="vertical" className="container">
-      {/* (A-1) 上部メインエリア */}
-      <Panel defaultSize={75} minSize={30}>
-        <PanelGroup direction="horizontal">
-          {/* (B-1) 左エリア */}
-          <Panel defaultSize={20} minSize={15} className="panel-column">
-            <PanelGroup direction="vertical">
-              <Panel defaultSize={40} minSize={20} className="panel-content">
-                <div className="panel-header">ツールボックス</div>
-                <div className="tool-list">
-                  <ToolboxItem name="テキスト" />
-                  <ToolboxItem name="ボタン" />
-                  <ToolboxItem name="画像" />
-                </div>
-              </Panel>
-              <PanelResizeHandle className="resize-handle" />
-              <Panel defaultSize={60} minSize={20} className="panel-content">
-                <div className="panel-header">コンテンツブラウザ</div>
-              </Panel>
-            </PanelGroup>
-          </Panel>
-          <PanelResizeHandle className="resize-handle" />
-
-          {/* (B-2) 中央エリア (キャンバス) */}
-          <Panel defaultSize={55} minSize={30} className="panel-content">
-            <div className="panel-header">キャンバス</div>
-            <div className="canvas-viewport">
-              {/* (5) Artboard に新しいハンドラを渡す */}
-              <Artboard
-                placedItems={placedItems}
-                setPlacedItems={setPlacedItems}
-                onItemSelect={handleItemSelect}
-                onBackgroundClick={handleBackgroundClick}
-                selectedItemId={selectedItemId}
-                setAllItemLogics={setAllItemLogics}
-                nodeGraphTemplates={NODE_GRAPH_TEMPLATES}
-              />
-            </div>
-          </Panel>
-
-          <PanelResizeHandle className="resize-handle" />
-
-          {/* (B-3) 右エリア (プロパティ) */}
-          <Panel defaultSize={25} minSize={15} className="panel-content">
-            <div className="panel-header">プロパティ</div>
-            {/* (6) (タスク3) PropertiesPanel にすべてを渡す */}
-            <PropertiesPanel
-              selectedItemId={selectedItemId}
-              selectedNodeId={selectedNodeId}
-              activeLogicGraphId={activeLogicGraphId}
-              placedItems={placedItems}
-              allItemLogics={allItemLogics}
-              onItemUpdate={handleItemUpdate}
-              onNodeDataChange={handleNodeDataChange}
-            />
-          </Panel>
-        </PanelGroup>
-      </Panel>
-
-      <PanelResizeHandle className="resize-handle" />
-
-      {/* (A-2) 下部エリア (ノードエディタ) */}
-      <Panel defaultSize={25} minSize={15} className="panel-content">
-        <div className="panel-header">ノードエディタ</div>
-        <NodeEditor
-          nodes={currentGraph?.nodes}
-          edges={currentGraph?.edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeAdd={handleAddNode}
-          onConnect={onConnect}
-          placedItems={placedItems} 
-          onNodeDataChange={handleNodeDataChange}
-          onNodeClick={handleNodeClick} // (onNodeClick を渡す)
+    <div className="app-container">
+      {/* (A) ホーム画面 or エディタ画面 */}
+      {/* ↓↓↓↓↓↓↓↓↓↓ (修正) isProjectLoaded を使用 ↓↓↓↓↓↓↓↓↓↓ */}
+      {!isProjectLoaded ? (
+        <HomeScreen 
+          onNewProject={handleNewProjectClick} // (handleNewProject -> handleNewProjectClick)
+          onLoadProject={handleImportProject}
         />
-      </Panel>
-    </PanelGroup>
+      ) : (
+      // ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑
+        // (B) エディタ画面
+        <div className="editor-container">
+          {/* (B-1) トップツールバー */}
+          <header className="editor-toolbar">
+            <div className="toolbar-title">
+              Engage-Kit <span>/ {projectName}</span>
+            </div>
+            <div className="editor-toolbar-buttons">
+              <button onClick={handleGoHome} className="io-button home-button">
+                ホームに戻る
+              </button>
+              <button onClick={handleExportProject} className="io-button">
+                保存 (JSON)
+              </button>
+              <input
+                type="file"
+                id="import-project-input-editor"
+                accept=".json,application/json"
+                style={{ display: "none" }}
+                onChange={handleImportProject}
+              />
+              <label htmlFor="import-project-input-editor" className="io-button">
+                読込 (JSON)
+              </label>
+            </div>
+          </header>
+          
+          {/* (B-2) 5パネルエディタ本体 */}
+          <PanelGroup direction="vertical" className="container">
+            {/* (A-1) 上部メインエリア */}
+            <Panel defaultSize={75} minSize={30}>
+              <PanelGroup direction="horizontal">
+                {/* (B-1) 左エリア */}
+                <Panel defaultSize={20} minSize={15} className="panel-column">
+                  <PanelGroup direction="vertical">
+                    <Panel defaultSize={40} minSize={20} className="panel-content">
+                      <div className="panel-header">ツールボックス</div>
+                      <div className="tool-list">
+                        <ToolboxItem name="テキスト" />
+                        <ToolboxItem name="ボタン" />
+                        <ToolboxItem name="画像" />
+                      </div>
+                    </Panel>
+                    <PanelResizeHandle className="resize-handle" />
+                    <Panel defaultSize={60} minSize={20} className="panel-content">
+                      <div className="panel-header">コンテンツブラウザ</div>
+                    </Panel>
+                  </PanelGroup>
+                </Panel>
+                <PanelResizeHandle className="resize-handle" />
+                {/* (B-2) 中央エリア (キャンバス) */}
+                <Panel defaultSize={55} minSize={30} className="panel-content">
+                  <div className="panel-header">キャンバス</div>
+                  <div className="canvas-viewport">
+                    <Artboard
+                      placedItems={placedItems}
+                      setPlacedItems={setPlacedItems}
+                      onItemSelect={handleItemSelect}
+                      onBackgroundClick={handleBackgroundClick}
+                      selectedItemId={selectedItemId}
+                      setAllItemLogics={setAllItemLogics}
+                      nodeGraphTemplates={NODE_GRAPH_TEMPLATES}
+                    />
+                  </div>
+                </Panel>
+                <PanelResizeHandle className="resize-handle" />
+                {/* (B-3) 右エリア (プロパティ) */}
+                <Panel defaultSize={25} minSize={15} className="panel-content">
+                  <div className="panel-header">プロパティ</div>
+                  <PropertiesPanel
+                    selectedItemId={selectedItemId}
+                    selectedNodeId={selectedNodeId}
+                    activeLogicGraphId={activeLogicGraphId}
+                    placedItems={placedItems}
+                    allItemLogics={allItemLogics}
+                    onItemUpdate={handleItemUpdate}
+                    onNodeDataChange={handleNodeDataChange}
+                  />
+                </Panel>
+              </PanelGroup>
+            </Panel>
+            {/* (A-2) 下部エリア (ノードエディタ) */}
+            <PanelResizeHandle className="resize-handle" />
+            <Panel defaultSize={25} minSize={15} className="panel-content">
+              <div className="panel-header">ノードエディタ</div>
+              <NodeEditor
+                nodes={currentGraph?.nodes}
+                edges={currentGraph?.edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onNodeAdd={handleAddNode}
+                onConnect={onConnect}
+                placedItems={placedItems} 
+                onNodeDataChange={handleNodeDataChange}
+                onNodeClick={handleNodeClick}
+              />
+            </Panel>
+          </PanelGroup>
+        </div>
+      )}
+
+      {/* (C) モーダル (isNameModalOpen が true の時だけ表示) */}
+      {isNameModalOpen && (
+        <ProjectNameModal
+          onClose={handleCloseModal}
+          onConfirm={handleConfirmNewProject}
+        />
+      )}
+    </div>
   );
 }
 

@@ -67,10 +67,10 @@
   gap: 8px; /* 各アイテム間の隙間 */
 }
 
-/* ツールボックスの各アイテム */
+/* (★修正) ツールボックスの各アイテム */
 .tool-item {
   background-color: #3a3a3a;
-  border: 1px solid #555;
+  border: 1px solid #777; /* (★修正) #555から#777に変更し、枠線を明るく */
   padding: 10px 14px;
   border-radius: 4px;
   font-weight: 500;
@@ -79,20 +79,81 @@
 }
 .tool-item:hover {
   background-color: #4a4a4a;
-  border-color: #777;
+  border-color: #aaa; /* (★修正) #777から#aaaに変更 */
 }
 .tool-item:active {
   cursor: grabbing;
 }
 
-/* キャンバスのビューポート（アートボードの親） */
+/* アートボードのビューポート（アートボードの親） */
 .canvas-viewport {
-  height: calc(100% - 45px);
+  height: calc(100% - 45px); /* (45px = .panel-header の大体の高さ) */
   width: 100%;
-  background-color: #222;
-  overflow: auto;
+  background-color: #222; /* アートボードの外側の色 */
+  overflow: auto; /* アートボードが大きければスクロール */
   border-radius: 4px;
   box-sizing: border-box;
 }
 
-/* ( .resize-hitbox 関連のスタイルはすべて削除 ) */
+/* ↓↓↓↓↓↓↓↓↓↓ (修正) .panel-header-wrapper 関連を削除し、以下を追記 ↓↓↓↓↓↓↓↓↓↓ */
+
+/* (1) アプリ全体のコンテナ */
+.app-container {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* (2) エディタ全体のコンテナ */
+.editor-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* (3) 新しいトップツールバー */
+.editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #1e1e1e;
+  padding: 0 15px;
+  height: 40px;
+  border-bottom: 1px solid #444;
+  flex-shrink: 0;
+}
+
+.editor-toolbar .toolbar-title {
+  font-weight: bold;
+  color: #eee;
+}
+.editor-toolbar .toolbar-title span {
+  font-weight: normal;
+  color: #aaa;
+}
+
+.editor-toolbar-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* (4) ツールバー用のボタン (io-button) */
+.io-button {
+  font-size: 13px;
+  font-weight: 500;
+  background-color: #3a3a3a;
+  color: #ccc;
+  border: 1px solid #555;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+.io-button:hover {
+  background-color: #4a4a4a;
+  color: #fff;
+}
+.io-button.home-button {
+  background-color: #4a4a4a;
+}
+/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
