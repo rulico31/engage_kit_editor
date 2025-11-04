@@ -16,17 +16,31 @@
   margin: 2px;
 }
 
+/* ★ 追記: コンテンツブラウザ用 (パディングなし) */
+.panel-content-nopad {
+  box-sizing: border-box;
+  overflow: hidden; /* スクロールは子要素に任せる */
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  margin: 2px;
+  /* (padding: 0; はデフォルトなので不要) */
+}
+
 /* 左側の上下パネル用（マージン調整） */
-.panel-column .panel-content {
+.panel-column .panel-content,
+.panel-column .panel-content-nopad {
   margin-left: 4px;
   margin-right: 4px;
 }
-.panel-column .panel-content:first-child {
+.panel-column .panel-content:first-child,
+.panel-column .panel-content-nopad:first-child {
   margin-top: 4px;
 }
-.panel-column .panel-content:last-child {
+.panel-column .panel-content:last-child,
+.panel-column .panel-content-nopad:last-child {
   margin-bottom: 4px;
 }
+
 
 /* リサイズハンドルのスタイル */
 .resize-handle {
@@ -60,6 +74,13 @@
   color: #eee; /* タイトル文字を少し明るく */
 }
 
+/* ★ 追記: コンテンツブラウザ用のヘッダー (マージン調整) */
+.page-browser-header {
+  margin-left: 12px;
+  margin-right: 12px;
+  margin-top: 12px;
+}
+
 /* ツールボックスのアイテム一覧 */
 .tool-list {
   display: flex;
@@ -67,10 +88,9 @@
   gap: 8px; /* 各アイテム間の隙間 */
 }
 
-/* (★修正) ツールボックスの各アイテム */
 .tool-item {
   background-color: #3a3a3a;
-  border: 1px solid #777; /* (★修正) #555から#777に変更し、枠線を明るく */
+  border: 1px solid #777;
   padding: 10px 14px;
   border-radius: 4px;
   font-weight: 500;
@@ -79,7 +99,7 @@
 }
 .tool-item:hover {
   background-color: #4a4a4a;
-  border-color: #aaa; /* (★修正) #777から#aaaに変更 */
+  border-color: #aaa;
 }
 .tool-item:active {
   cursor: grabbing;
@@ -94,8 +114,6 @@
   border-radius: 4px;
   box-sizing: border-box;
 }
-
-/* ↓↓↓↓↓↓↓↓↓↓ (修正) .panel-header-wrapper 関連を削除し、以下を追記 ↓↓↓↓↓↓↓↓↓↓ */
 
 /* (1) アプリ全体のコンテナ */
 .app-container {
@@ -157,39 +175,30 @@
   background-color: #4a4a4a;
 }
 
-/* (ここから新規追加) */
-/* (5) プレビューモード用のボタン */
-.io-button.preview-button {
-  background-color: #2a8a4a; /* 緑系 */
+/* (★ 追記: プレビュー/編集ボタンの色分け) */
+.preview-button {
+  background-color: #2a8a4a;
   border-color: #2a8a4a;
   color: #fff;
 }
-.io-button.preview-button:hover {
-  background-color: #3aa05a;
+.preview-button:hover {
+  background-color: #3a9a5a;
 }
-
-/* (6) 編集モードに戻るボタン */
-.io-button.edit-button {
-  background-color: #007acc; /* 青系 (プライマリ) */
-  border-color: #007acc;
+.edit-button {
+  background-color: #c33a3a;
+  border-color: #c33a3a;
   color: #fff;
 }
-.io-button.edit-button:hover {
-  background-color: #008be6;
+.edit-button:hover {
+  background-color: #d34a4a;
 }
 
-/* (7) プレビューホストのコンテナ */
+/* (★ 追記: プレビューホストのコンテナ) */
 .preview-host-container {
+  flex-grow: 1; /* 残りの高さをすべて使う */
+  background-color: #222; /* canvas-viewport と同じ背景色 */
+  overflow: auto; /* プレビューが大きければスクロール */
   width: 100%;
-  flex-grow: 1; /* ツールバー以外の残りの高さをすべて占める */
-  background-color: #222; /* エディタのビューポートと同じ背景色 */
-  overflow: auto; /* Artboard が大きければスクロール */
-  display: flex; /* (Artboard を中央寄せするために flex を使用) */
-  /* Artboard.css の margin: 20px auto; を再現 */
-  justify-content: center;
-  align-items: flex-start;
-  padding: 20px;
-  box-sizing: border-box;
+  height: calc(100vh - 40px); /* ツールバーの高さを引く */
 }
 
-/* (ここまで新規追加) */

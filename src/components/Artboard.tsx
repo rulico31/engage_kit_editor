@@ -4,9 +4,10 @@ import React, { useRef } from "react";
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import PlacedItem from "./PlacedItem";
-import type { PlacedItemType } from "../types";
+// (★ 修正: NodeGraph を App.tsx からではなく types.ts からインポート)
+import type { PlacedItemType, NodeGraph } from "../types";
 import "./Artboard.css";
-import type { NodeGraph } from "../App";
+// (★ 修正: App.tsx からの NodeGraph インポートを削除)
 
 // --- 型定義 ---
 interface ToolDragItem { 
@@ -19,14 +20,15 @@ interface PlacedDragItem {
 }
 type AllDragItems = ToolDragItem | PlacedDragItem;
 
-// --- (1) (タスク2) Props の型を変更 ---
+// --- (★ 修正: Props の型定義を変更) ---
 interface ArtboardProps {
   placedItems: PlacedItemType[];
-  setPlacedItems: React.Dispatch<React.SetStateAction<PlacedItemType[]>>;
+  // (App.tsx のラッパー関数に型を合わせる)
+  setPlacedItems: (newItems: PlacedItemType[] | ((prev: PlacedItemType[]) => PlacedItemType[])) => void;
   selectedItemId: string | null;
-  setAllItemLogics: React.Dispatch<React.SetStateAction<Record<string, NodeGraph>>>;
+  // (App.tsx のラッパー関数に型を合わせる)
+  setAllItemLogics: (newLogics: Record<string, NodeGraph> | ((prev: Record<string, NodeGraph>) => Record<string, NodeGraph>)) => void;
   nodeGraphTemplates: Record<string, NodeGraph>;
-  // (App.tsx から渡される新しいコールバック)
   onItemSelect: (id: string) => void;
   onBackgroundClick: () => void;
 }
@@ -71,7 +73,6 @@ const Artboard: React.FC<ArtboardProps> = ({
             ...prevLogics, [newItem.id]: graphTemplate,
           }));
           
-          // (2) (タスク2) 選択ハンドラを呼ぶ
           onItemSelect(newItem.id);
 
         } else if (itemType === ItemTypes.PLACED_ITEM) {
@@ -89,7 +90,6 @@ const Artboard: React.FC<ArtboardProps> = ({
             )
           );
           
-          // (3) (タスク2) 選択ハンドラを呼ぶ
           onItemSelect(id);
         }
       },
@@ -99,7 +99,6 @@ const Artboard: React.FC<ArtboardProps> = ({
   
   drop(artboardRef); // ref を dnd に接続
 
-  // (4) (タスク2) 背景クリックハンドラ
   const handleArtboardClick = (e: React.MouseEvent) => {
     if (e.target === artboardRef.current) {
       onBackgroundClick(); // App.tsx のハンドラを呼ぶ
@@ -112,7 +111,6 @@ const Artboard: React.FC<ArtboardProps> = ({
         <PlacedItem
           key={item.id}
           item={item}
-          // (5) (タスク2) onSelect ハンドラ
           onSelect={() => onItemSelect(item.id)}
           isSelected={item.id === selectedItemId}
         />
@@ -122,3 +120,4 @@ const Artboard: React.FC<ArtboardProps> = ({
 };
 
 export default Artboard;
+

@@ -1,17 +1,17 @@
 // src/components/PreviewHost.tsx
 
 import React from "react";
-import type { PlacedItemType, PreviewState } from "../types";
-import type { NodeGraph } from "../App";
-import { executeLogicGraph } from "../utils/logicEngine";
+import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import PreviewItem from "./PreviewItem";
-// Artboard のスタイルを流用
-import "./Artboard.css"; 
+import "./Artboard.css"; // (Artboard のスタイルを流用)
 
 interface PreviewHostProps {
   placedItems: PlacedItemType[];
   previewState: PreviewState;
-  setPreviewState: React.Dispatch<React.SetStateAction<PreviewState>>;
+  // (★ 修正: App.tsx のラッパー関数に型を合わせる)
+  setPreviewState: (
+    newState: PreviewState | ((prev: PreviewState) => PreviewState)
+  ) => void;
   allItemLogics: Record<string, NodeGraph>;
 }
 
@@ -21,46 +21,25 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
   setPreviewState,
   allItemLogics,
 }) => {
-  
-  // イベント（クリックなど）を処理するハンドラ
-  const handleEvent = (itemId: string, eventType: "onClick") => {
-    const graph = allItemLogics[itemId];
-    if (!graph) return;
-
-    // "ボタンがクリックされた時" に対応するEventNodeを探す
-    // (将来的に "onLoad" など他のイベントタイプも考慮)
-    let startNodeId: string | undefined = undefined;
-    if (eventType === "onClick") {
-      const clickEventNode = graph.nodes.find(
-        (n) => n.type === "eventNode" && n.data?.label?.includes("クリック")
-      );
-      startNodeId = clickEventNode?.id;
-    }
-    
-    // 対応するイベントノードが見つかったら、ロジックエンジンを実行
-    if (startNodeId) {
-      executeLogicGraph(startNodeId, graph, previewState, setPreviewState);
-    }
-  };
-
   return (
-    // Artboard と同じスタイルを適用
+    // Artboard と同じクラス名とレイアウトを使用
     <div className="artboard">
       {placedItems.map((item) => {
         const itemState = previewState[item.id];
-        // 状態が未定義の場合はフォールバック (表示)
-        if (!itemState) {
-          console.warn(`Preview state for item ${item.id} not found.`);
+        
+        // アイテムが非表示状態なら null を返す
+        if (!itemState || !itemState.isVisible) {
           return null;
         }
-        
+
+        // 表示状態なら PreviewItem を描画
         return (
           <PreviewItem
             key={item.id}
             item={item}
-            state={itemState}
-            // "ボタン" がクリックされた時にロジック実行をトリガー
-            onClick={() => handleEvent(item.id, "onClick")}
+            previewState={previewState}
+            setPreviewState={setPreviewState}
+            allItemLogics={allItemLogics}
           />
         );
       })}
@@ -69,3 +48,4 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
 };
 
 export default PreviewHost;
+

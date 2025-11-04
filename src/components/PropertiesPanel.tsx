@@ -1,8 +1,9 @@
 // src/components/PropertiesPanel.tsx
 
 import React, { useState, useEffect } from "react";
-import type { PlacedItemType } from "../types";
-import type { NodeGraph } from "../App";
+// (★ 修正: NodeGraph も ../types からインポート)
+import type { PlacedItemType, NodeGraph } from "../types";
+// (★ 修正: App.tsx からの NodeGraph インポートを削除)
 import type { Node } from "reactflow";
 import "./PropertiesPanel.css";
 import "./NodePropertiesEditor.css";
@@ -110,11 +111,11 @@ const NodePropertiesEditor: React.FC<{
     <div className="properties-panel-content">
       <div className="prop-group">
         <label className="prop-label">Node Type</label>
-        <div className="prop-value">{node.type}</div>
+        <div className="prop-value-display">{node.type}</div>
       </div>
       <div className="prop-group">
         <label className="prop-label">Node Name</label>
-        <div className="prop-value">{node.data.label}</div>
+        <div className="prop-value-display">{node.data.label}</div>
       </div>
       {editorUI}
     </div>
@@ -246,11 +247,14 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       </div>
     );
   } 
-  // (2) ノードが選択されている場合 (変更なし)
+  // (2) ノードが選択されている場合
   else if (selectedNodeId && activeLogicGraphId) {
     const logicTree = allItemLogics[activeLogicGraphId];
     if (!logicTree) return <div className="placeholder-text">ロジックツリーが見つかりません</div>;
-    const node = logicTree.nodes.find((n) => n.id === selectedNodeId);
+    
+    // (★ 修正: (n) を (n: Node) に変更)
+    const node = logicTree.nodes.find((n: Node) => n.id === selectedNodeId);
+    
     if (!node) return <div className="placeholder-text">ノードが見つかりません</div>;
 
     return (
@@ -272,3 +276,4 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 };
 
 export default PropertiesPanel;
+

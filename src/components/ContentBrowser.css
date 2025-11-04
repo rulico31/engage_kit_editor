@@ -1,0 +1,75 @@
+/* src/components/ContentBrowser.css */
+
+/* パネル全体（ヘッダーを除く） */
+.page-browser-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 45px); /* ヘッダーの高さを引く */
+}
+
+/* ページリスト本体 */
+.page-list {
+  flex-grow: 1; /* 残りの高さをすべて使う */
+  overflow-y: auto; /* ページが増えたらスクロール */
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.page-list-item {
+  padding: 12px 15px;
+  color: #ccc;
+  cursor: pointer;
+  border-bottom: 1px solid #3a3a3a;
+  transition: background-color 0.15s ease;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-list-item:hover {
+  background-color: #3a3a3a;
+}
+
+/* 選択中のページのスタイル */
+.page-list-item.is-selected {
+  background-color: #007acc;
+  color: #fff;
+  border-left: 4px solid #009aff;
+  padding-left: 11px; /* 枠線分(4px)を引く */
+}
+.page-list-item.is-selected:hover {
+  background-color: #008be6;
+}
+
+/* ページ追加ボタンのコンテナ */
+.page-add-footer {
+  flex-shrink: 0; /* 高さを固定 */
+  padding: 10px;
+  border-top: 1px solid #444;
+  background-color: #2a2a2a;
+}
+
+.page-add-button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 1em;
+  font-weight: bold;
+  
+  background-color: #3a3a3a;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-add-button:hover {
+  background-color: #4a4a4a;
+  color: #fff;
+  border-color: #777;
+}
+

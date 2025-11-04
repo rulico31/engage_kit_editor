@@ -1,5 +1,7 @@
 // src/types.ts
 
+import type { Node, Edge } from "reactflow";
+
 // アートボードに配置されたアイテムが持つデータの型
 export interface PlacedItemType {
   id: string;
@@ -10,13 +12,37 @@ export interface PlacedItemType {
   height: number;
 }
 
-// (ここから新規追加)
-// プレビューモード中の各アイテムが持つ状態の型
+// (プレビュー用) アイテムごとの状態
 export interface PreviewItemState {
   isVisible: boolean;
-  // (将来的に text: string など他の状態も追加可能)
+}
+// (プレビュー用) ページ全体のプレビュー状態 (アイテムIDがキー)
+export type PreviewState = Record<string, PreviewItemState>;
+
+
+// (ノードグラフの型)
+export interface NodeGraph {
+  nodes: Node[];
+  edges: Edge[];
 }
 
-// プレビュー状態全体（アイテムIDと状態のマップ）
-export type PreviewState = Record<string, PreviewItemState>;
-// (ここまで新規追加)
+// (単一ページが持つデータ)
+export interface PageData {
+  id: string;
+  name: string;
+  placedItems: PlacedItemType[];
+  allItemLogics: Record<string, NodeGraph>;
+}
+
+// (プロジェクト全体のデータ: 保存/読込用)
+export interface ProjectData {
+  pages: Record<string, PageData>;
+  pageOrder: string[];
+}
+
+// (コンテンツブラウザに渡す用の、軽量なページ情報)
+export interface PageInfo {
+  id: string;
+  name: string;
+}
+

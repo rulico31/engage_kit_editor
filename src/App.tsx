@@ -1,6 +1,6 @@
 // src/App.tsx
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react"; // (useMemo をインポート)
 import {
   Panel,
   PanelGroup,
@@ -25,21 +25,23 @@ import ToolboxItem from "./components/ToolboxItem";
 import PropertiesPanel from "./components/PropertiesPanel";
 import NodeEditor from "./components/NodeEditor";
 // (types から PreviewState と PreviewItemState をインポート)
-import type { PlacedItemType, PreviewState, PreviewItemState } from "./types";
+import type {
+  PlacedItemType,
+  PreviewState,
+  PreviewItemState,
+  NodeGraph, // (型をインポート)
+  PageData, // (型をインポート)
+  ProjectData, // (型をインポート)
+  PageInfo, // (型をインポート)
+} from "./types";
 import HomeScreen from "./components/HomeScreen";
 import ProjectNameModal from "./components/ProjectNameModal";
 // (プレビュー用のコンポーネントをインポート)
 import PreviewHost from "./components/PreviewHost";
+// (コンテンツブラウザをインポート)
+import ContentBrowser from "./components/ContentBrowser";
 
-// (型定義)
-export interface NodeGraph {
-  nodes: Node[];
-  edges: Edge[];
-}
-export interface ProjectData {
-  placedItems: PlacedItemType[];
-  allItemLogics: Record<string, NodeGraph>;
-}
+// (型定義は types.ts に移動)
 
 // (テンプレート定義は変更なし)
 const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
@@ -81,33 +83,126 @@ const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
   },
 };
 
+// (新規) デフォルトのページを作成するヘルパー関数
+const createDefaultPage = (name: string): PageData => {
+  const pageId = `page-${Date.now()}`;
+  return {
+    id: pageId,
+    name: name,
+    placedItems: [],
+    allItemLogics: {},
+  };
+};
 
 function App() {
   // --- (2) State (モーダルとプロジェクト名を追加) ---
   const [isProjectLoaded, setIsProjectLoaded] = useState(false);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [projectName, setProjectName] = useState<string>("Untitled Project");
+
+  // --- (State構造を全面的に変更) ---
+  // const [placedItems, setPlacedItems] = useState<PlacedItemType[]>([]);
+  // const [allItemLogics, setAllItemLogics] = useState<Record<string, NodeGraph>>({});
   
-  const [placedItems, setPlacedItems] = useState<PlacedItemType[]>([]);
-  const [allItemLogics, setAllItemLogics] = useState<Record<string, NodeGraph>>({});
+  // (新) ページデータ本体 (IDをキーにしたマップ)
+  const [pages, setPages] = useState<Record<string, PageData>>({});
+  // (新) ページの順序を管理する配列
+  const [pageOrder, setPageOrder] = useState<string[]>([]);
+  // (新) 現在選択されているページID
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
+
+  // (選択状態の State は変更なし)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeLogicGraphId, setActiveLogicGraphId] = useState<string | null>(null);
 
-  // --- (プレビューモード用の State を追加) ---
+  // --- (プレビューモード用の State を変更) ---
   const [isPreviewing, setIsPreviewing] = useState(false);
-  const [previewItemsState, setPreviewItemsState] = useState<PreviewState>({});
+  // (プレビュー状態をページIDごとにネスト)
+  const [previewItemsState, setPreviewItemsState] = useState<Record<string, PreviewState>>({});
 
-  // --- (3) 選択中アイテム/ノードの情報を計算 (変更なし) ---
-  const selectedItem =
-    placedItems.find((item) => item.id === selectedItemId) || null;
-  const currentGraph: NodeGraph | undefined = activeLogicGraphId
-    ? allItemLogics[activeLogicGraphId]
+  // --- (3) 選択中ページ/アイテム/ノードの情報を計算 (変更) ---
+  
+  // (新) 現在のページデータを取得
+  const currentPageData: PageData | undefined = selectedPageId
+    ? pages[selectedPageId]
     : undefined;
 
-  // --- (4) 更新用コールバック関数 (変更なし) ---
+  // (新) コンテンツブラウザに渡すためのページ情報リスト
+  const pageInfoList: PageInfo[] = useMemo(() => {
+    return pageOrder.map((id) => ({ id: id, name: pages[id]?.name || "Error" }));
+  }, [pages, pageOrder]);
+
+  // (既存の変数を、currentPageData から派生させる)
+  const currentPlacedItems = currentPageData?.placedItems;
+  const currentAllItemLogics = currentPageData?.allItemLogics;
+  
+  const selectedItem =
+    currentPlacedItems?.find((item) => item.id === selectedItemId) || null;
+  const currentGraph: NodeGraph | undefined = activeLogicGraphId
+    ? currentAllItemLogics?.[activeLogicGraphId]
+    : undefined;
+  
+  // (新) プレビュー用の現在のページの状態
+  const currentPreviewState: PreviewState | undefined = selectedPageId
+    ? previewItemsState[selectedPageId]
+    : undefined;
+
+
+  // --- (4) 更新用コールバック関数 (全面的な書き換え) ---
+
+  // (新) Artboard.tsx に渡すラッパー関数 (setPlacedItems の代わり)
+  const handlePlacedItemsChange = useCallback(
+    (newItems: PlacedItemType[] | ((prev: PlacedItemType[]) => PlacedItemType[])) => {
+      if (!selectedPageId) return;
+
+      setPages((prevPages) => {
+        const currentPage = prevPages[selectedPageId];
+        if (!currentPage) return prevPages;
+        
+        const oldItems = currentPage.placedItems;
+        const updatedItems = typeof newItems === "function" ? newItems(oldItems) : newItems;
+
+        return {
+          ...prevPages,
+          [selectedPageId]: {
+            ...currentPage,
+            placedItems: updatedItems,
+          },
+        };
+      });
+    },
+    [selectedPageId] // 依存配列
+  );
+  
+  // (新) Artboard.tsx に渡すラッパー関数 (setAllItemLogics の代わり)
+  const handleAllItemLogicsChange = useCallback(
+    (newLogics: Record<string, NodeGraph> | ((prev: Record<string, NodeGraph>) => Record<string, NodeGraph>)) => {
+      if (!selectedPageId) return;
+
+      setPages((prevPages) => {
+        const currentPage = prevPages[selectedPageId];
+        if (!currentPage) return prevPages;
+        
+        const oldLogics = currentPage.allItemLogics;
+        const updatedLogics = typeof newLogics === "function" ? newLogics(oldLogics) : newLogics;
+
+        return {
+          ...prevPages,
+          [selectedPageId]: {
+            ...currentPage,
+            allItemLogics: updatedLogics,
+          },
+        };
+      });
+    },
+    [selectedPageId] // 依存配列
+  );
+
+  // (既存のコールバックを、新しい State 構造に合わせて書き換え)
   const handleItemUpdate = (itemId: string, updatedProps: Partial<PlacedItemType>) => {
-    setPlacedItems((prevItems) =>
+    // (ラッパー関数 handlePlacedItemsChange を使う)
+    handlePlacedItemsChange((prevItems) =>
       prevItems.map((item) =>
         item.id === itemId
           ? { ...item, ...updatedProps }
@@ -115,70 +210,173 @@ function App() {
       )
     );
   };
+  
   const onNodesChange: OnNodesChange = useCallback((changes) => {
-    if (!activeLogicGraphId) return;
-    setAllItemLogics((prevLogics) => {
-      const currentGraph = prevLogics[activeLogicGraphId];
-      if (!currentGraph) return prevLogics;
+    if (!activeLogicGraphId || !selectedPageId) return;
+    
+    setPages((prevPages) => {
+      const currentPage = prevPages[selectedPageId];
+      const currentGraph = currentPage?.allItemLogics[activeLogicGraphId];
+      if (!currentGraph) return prevPages;
+      
       const newNodes = applyNodeChanges(changes, currentGraph.nodes);
-      return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, nodes: newNodes } };
+      
+      return {
+        ...prevPages,
+        [selectedPageId]: {
+          ...currentPage,
+          allItemLogics: {
+            ...currentPage.allItemLogics,
+            [activeLogicGraphId]: {
+              ...currentGraph,
+              nodes: newNodes,
+            },
+          },
+        },
+      };
     });
-  }, [activeLogicGraphId]);
+  }, [activeLogicGraphId, selectedPageId]);
+  
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
-    if (!activeLogicGraphId) return;
-    setAllItemLogics((prevLogics) => {
-      const currentGraph = prevLogics[activeLogicGraphId];
-      if (!currentGraph) return prevLogics;
+    if (!activeLogicGraphId || !selectedPageId) return;
+
+    setPages((prevPages) => {
+      const currentPage = prevPages[selectedPageId];
+      const currentGraph = currentPage?.allItemLogics[activeLogicGraphId];
+      if (!currentGraph) return prevPages;
+      
       const newEdges = applyEdgeChanges(changes, currentGraph.edges);
-      return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, edges: newEdges } };
+
+      return {
+        ...prevPages,
+        [selectedPageId]: {
+          ...currentPage,
+          allItemLogics: {
+            ...currentPage.allItemLogics,
+            [activeLogicGraphId]: {
+              ...currentGraph,
+              edges: newEdges,
+            },
+          },
+        },
+      };
     });
-  }, [activeLogicGraphId]);
+  }, [activeLogicGraphId, selectedPageId]);
+  
   const onConnect: OnConnect = useCallback((connection: Connection) => {
-    if (!activeLogicGraphId) return; 
-    setAllItemLogics((prevLogics) => {
-      const currentGraph = prevLogics[activeLogicGraphId];
-      if (!currentGraph) return prevLogics;
+    if (!activeLogicGraphId || !selectedPageId) return; 
+    
+    setPages((prevPages) => {
+      const currentPage = prevPages[selectedPageId];
+      const currentGraph = currentPage?.allItemLogics[activeLogicGraphId];
+      if (!currentGraph) return prevPages;
+      
       const newEdges = addEdge(connection, currentGraph.edges);
-      return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, edges: newEdges } };
+
+      return {
+        ...prevPages,
+        [selectedPageId]: {
+          ...currentPage,
+          allItemLogics: {
+            ...currentPage.allItemLogics,
+            [activeLogicGraphId]: {
+              ...currentGraph,
+              edges: newEdges,
+            },
+          },
+        },
+      };
     });
-  }, [activeLogicGraphId]);
+  }, [activeLogicGraphId, selectedPageId]);
+  
   const handleAddNode = useCallback((newNode: Node) => {
-    if (!activeLogicGraphId) return;
-    setAllItemLogics((prevLogics) => {
-      const currentGraph = prevLogics[activeLogicGraphId];
-      if (!currentGraph) return prevLogics;
-      return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, nodes: [...currentGraph.nodes, newNode] } };
+    if (!activeLogicGraphId || !selectedPageId) return;
+
+    setPages((prevPages) => {
+      const currentPage = prevPages[selectedPageId];
+      const currentGraph = currentPage?.allItemLogics[activeLogicGraphId];
+      if (!currentGraph) return prevPages;
+      
+      return {
+        ...prevPages,
+        [selectedPageId]: {
+          ...currentPage,
+          allItemLogics: {
+            ...currentPage.allItemLogics,
+            [activeLogicGraphId]: {
+              ...currentGraph,
+              nodes: [...currentGraph.nodes, newNode],
+            },
+          },
+        },
+      };
     });
-  }, [activeLogicGraphId]);
+  }, [activeLogicGraphId, selectedPageId]);
+  
   const handleNodeDataChange = useCallback((nodeId: string, dataUpdate: any) => {
-      if (!activeLogicGraphId) return;
-      setAllItemLogics((prevLogics) => {
-        const currentGraph = prevLogics[activeLogicGraphId];
-        if (!currentGraph) return prevLogics;
+      if (!activeLogicGraphId || !selectedPageId) return;
+
+      setPages((prevPages) => {
+        const currentPage = prevPages[selectedPageId];
+        const currentGraph = currentPage?.allItemLogics[activeLogicGraphId];
+        if (!currentGraph) return prevPages;
+
         const newNodes = currentGraph.nodes.map((node) => {
           if (node.id === nodeId) {
             return { ...node, data: { ...node.data, ...dataUpdate } };
           }
           return node;
         });
-        return { ...prevLogics, [activeLogicGraphId]: { ...currentGraph, nodes: newNodes } };
+
+        return {
+          ...prevPages,
+          [selectedPageId]: {
+            ...currentPage,
+            allItemLogics: {
+              ...currentPage.allItemLogics,
+              [activeLogicGraphId]: {
+                ...currentGraph,
+                nodes: newNodes,
+              },
+            },
+          },
+        };
       });
-    }, [activeLogicGraphId]);
+    }, [activeLogicGraphId, selectedPageId]);
+    
   const handleDeleteItem = useCallback(() => {
-    if (!selectedItemId) return;
-    setPlacedItems((prevItems) => prevItems.filter((item) => item.id !== selectedItemId));
-    setAllItemLogics((prevLogics) => {
-      const newLogics = { ...prevLogics };
+    if (!selectedItemId || !selectedPageId) return;
+
+    setPages((prevPages) => {
+      const currentPage = prevPages[selectedPageId];
+      if (!currentPage) return prevPages;
+      
+      // 1. アイテムを削除
+      const newPlacedItems = currentPage.placedItems.filter(
+        (item) => item.id !== selectedItemId
+      );
+      // 2. アイテムに紐づくロジックを削除
+      const newLogics = { ...currentPage.allItemLogics };
       delete newLogics[selectedItemId];
-      return newLogics;
+
+      return {
+        ...prevPages,
+        [selectedPageId]: {
+          ...currentPage,
+          placedItems: newPlacedItems,
+          allItemLogics: newLogics,
+        },
+      };
     });
+    
+    // (選択状態をリセット)
     setSelectedItemId(null);
     setSelectedNodeId(null);
     setActiveLogicGraphId(null);
-  }, [selectedItemId]);
+  }, [selectedItemId, selectedPageId]);
+  
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // (プレビュー中はキー操作を無効化)
       if (isPreviewing) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) { return; }
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -190,9 +388,37 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [handleDeleteItem, isPreviewing]); // (isPreviewing を依存配列に追加)
+  }, [handleDeleteItem, isPreviewing]);
 
-  // --- (5) 選択/ナビゲーション関数 (変更なし) ---
+  // --- (5) 選択/ナビゲーション関数 (変更) ---
+  
+  // (新) ページ選択ハンドラ
+  const handleSelectPage = (pageId: string) => {
+    if (pageId === selectedPageId) return; // 同じページなら何もしない
+    setSelectedPageId(pageId);
+    
+    // ページを切り替えたら、アイテムとノードの選択は解除
+    setSelectedItemId(null);
+    setSelectedNodeId(null);
+    setActiveLogicGraphId(null);
+  };
+  
+  // (ここから4つの関数定義を追記)
+  // (新) ページ追加ハンドラ
+  const handleAddNewPage = () => {
+    const newPageCount = pageOrder.length + 1;
+    const newPage = createDefaultPage(`Page ${newPageCount}`);
+    
+    setPages((prev) => ({
+      ...prev,
+      [newPage.id]: newPage,
+    }));
+    setPageOrder((prev) => [...prev, newPage.id]);
+    
+    // 作成したページを自動的に選択
+    handleSelectPage(newPage.id);
+  };
+
   const handleItemSelect = (itemId: string) => {
     setSelectedItemId(itemId);
     setSelectedNodeId(null);
@@ -207,53 +433,60 @@ function App() {
     setSelectedItemId(null);
     setSelectedNodeId(nodeId);
   };
+  // (ここまで追記)
+
   const handleGoHome = () => {
     setIsProjectLoaded(false);
-    // (ホームに戻る時にプレビューモードを解除)
     setIsPreviewing(false);
+    // (State をすべてリセット)
+    setPages({});
+    setPageOrder([]);
+    setSelectedPageId(null);
     setSelectedItemId(null);
     setSelectedNodeId(null);
     setActiveLogicGraphId(null);
+    setPreviewItemsState({});
   };
   
-  // --- (6) 新規プロジェクトのロジック ---
+  // --- (6) 新規プロジェクトのロジック (変更) ---
   
-  // (A) ホーム画面の「新規作成」ボタンが押された時
   const handleNewProjectClick = () => {
     setIsNameModalOpen(true);
   };
 
-  // (B) モーダルが閉じられた時
   const handleCloseModal = () => {
     setIsNameModalOpen(false);
   };
   
-  // (C) モーダルの「作成」ボタンが押された時
   const handleConfirmNewProject = (name: string) => {
-    setPlacedItems([]);
-    setAllItemLogics({});
+    // (デフォルトの Page 1 を作成)
+    const defaultPage = createDefaultPage("Page 1");
+    
+    setPages({ [defaultPage.id]: defaultPage });
+    setPageOrder([defaultPage.id]);
+    setSelectedPageId(defaultPage.id); // 最初のページを選択状態にする
+    
     setSelectedItemId(null);
     setSelectedNodeId(null);
     setActiveLogicGraphId(null);
     setProjectName(name); 
     setIsNameModalOpen(false);
     setIsProjectLoaded(true);
-    // (プレビューモードもリセット)
     setIsPreviewing(false);
     setPreviewItemsState({});
   };
 
 
-  // --- (7) 保存・読み込み関数 (変更なし) ---
+  // --- (7) 保存・読み込み関数 (変更) ---
   const handleExportProject = useCallback(() => {
-    // (プレビュー中は保存不可)
     if (isPreviewing) {
       alert("編集モードに戻ってから保存してください。");
       return;
     }
+    // (新しい ProjectData 構造で保存)
     const projectData: ProjectData = {
-      placedItems: placedItems,
-      allItemLogics: allItemLogics,
+      pages: pages,
+      pageOrder: pageOrder,
     };
     const jsonString = JSON.stringify(projectData, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
@@ -265,7 +498,7 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [placedItems, allItemLogics, projectName, isPreviewing]); // (isPreviewing を依存配列に追加)
+  }, [pages, pageOrder, projectName, isPreviewing]); // (pages, pageOrder に変更)
 
   const handleImportProject = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -278,15 +511,19 @@ function App() {
         const text = e.target?.result as string;
         const projectData: ProjectData = JSON.parse(text);
 
-        if (projectData && projectData.placedItems && projectData.allItemLogics) {
-          setPlacedItems(projectData.placedItems);
-          setAllItemLogics(projectData.allItemLogics);
+        // (新しい ProjectData 構造を読み込む)
+        if (projectData && projectData.pages && projectData.pageOrder) {
+          setPages(projectData.pages);
+          setPageOrder(projectData.pageOrder);
+          
+          // 最初のページを選択状態にする
+          setSelectedPageId(projectData.pageOrder[0] || null); 
+          
           setSelectedItemId(null);
           setSelectedNodeId(null);
           setActiveLogicGraphId(null);
           setProjectName(file.name.replace(/\.json$/, ""));
           setIsProjectLoaded(true); 
-          // (読み込み時もプレビューをリセット)
           setIsPreviewing(false);
           setPreviewItemsState({});
         } else {
@@ -300,7 +537,25 @@ function App() {
     event.target.value = "";
   };
 
-  // --- (プレビューモード切替ロジック) ---
+  // --- (プレビューモード切替ロジック) (変更) ---
+  
+  // (新) プレビューの State を更新するためのラッパー関数
+  const setCurrentPreviewState = useCallback(
+    (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => {
+      if (!selectedPageId) return;
+      
+      setPreviewItemsState((prevAllStates) => {
+        const oldState = prevAllStates[selectedPageId] || {};
+        const updatedState = typeof newState === 'function' ? newState(oldState) : newState;
+        return {
+          ...prevAllStates,
+          [selectedPageId]: updatedState,
+        };
+      });
+    }, 
+    [selectedPageId]
+  );
+  
   const handleTogglePreview = () => {
     if (isPreviewing) {
       // 編集モードに戻る
@@ -309,24 +564,31 @@ function App() {
       setPreviewItemsState({});
     } else {
       // プレビューモードに入る
+      if (!selectedPageId || !currentPlacedItems) {
+        alert("ページが選択されていません。");
+        return;
+      }
+      
       // 1. 編集中の選択をすべて解除
       setSelectedItemId(null);
       setSelectedNodeId(null);
       setActiveLogicGraphId(null);
       
-      // 2. placedItems からプレビュー用の初期状態を生成
+      // 2. "現在選択中のページ" の placedItems からプレビュー用の初期状態を生成
       const initialState: PreviewState = {};
-      for (const item of placedItems) {
+      for (const item of currentPlacedItems) {
         initialState[item.id] = {
           isVisible: true, // デフォルトはすべて表示
         };
       }
-      setPreviewItemsState(initialState);
+      
+      // (プレビュー State を、現在のページIDをキーとして保存)
+      setPreviewItemsState({
+        [selectedPageId]: initialState
+      });
       
       // 3. プレビューモードに切り替え
       setIsPreviewing(true);
-      
-      // (将来的に、"OnPageLoad" イベントを持つノードをここで実行する)
     }
   };
   
@@ -348,12 +610,10 @@ function App() {
               Engage-Kit <span>/ {projectName}</span>
             </div>
             <div className="editor-toolbar-buttons">
-              {/* (プレビュー中も「ホームに戻る」は表示) */}
               <button onClick={handleGoHome} className="io-button home-button">
                 ホームに戻る
               </button>
               
-              {/* (プレビュー中は保存/読込ボタンを非表示) */}
               {!isPreviewing && (
                 <>
                   <button onClick={handleExportProject} className="io-button">
@@ -372,7 +632,6 @@ function App() {
                 </>
               )}
               
-              {/* (プレビュー切替ボタン) */}
               <button 
                 onClick={handleTogglePreview} 
                 className={`io-button ${isPreviewing ? 'edit-button' : 'preview-button'}`}
@@ -386,12 +645,17 @@ function App() {
           {isPreviewing ? (
             // --- プレビューモード ---
             <div className="preview-host-container">
-              <PreviewHost
-                placedItems={placedItems}
-                previewState={previewItemsState}
-                setPreviewState={setPreviewItemsState}
-                allItemLogics={allItemLogics}
-              />
+              {/* (currentPreviewState と currentAllItemLogics を渡す) */}
+              {(currentPreviewState && currentPlacedItems && currentAllItemLogics) ? (
+                <PreviewHost
+                  placedItems={currentPlacedItems}
+                  previewState={currentPreviewState}
+                  setPreviewState={setCurrentPreviewState} // (ラッパー関数を渡す)
+                  allItemLogics={currentAllItemLogics}
+                />
+              ) : (
+                <div>プレビューの読み込みに失敗しました。</div>
+              )}
             </div>
           ) : (
             // --- 編集モード (5パネルエディタ) ---
@@ -403,6 +667,7 @@ function App() {
                   <Panel defaultSize={20} minSize={15} className="panel-column">
                     <PanelGroup direction="vertical">
                       <Panel defaultSize={40} minSize={20} className="panel-content">
+                        {/* (ヘッダーの padding が変わったため、ヘッダーをパネル内に移動) */}
                         <div className="panel-header">ツールボックス</div>
                         <div className="tool-list">
                           <ToolboxItem name="テキスト" />
@@ -411,23 +676,35 @@ function App() {
                         </div>
                       </Panel>
                       <PanelResizeHandle className="resize-handle" />
-                      <Panel defaultSize={60} minSize={20} className="panel-content">
-                        <div className="panel-header">コンテンツブラウザ</div>
+                      {/* (panel-content-nopad を使用) */}
+                      <Panel defaultSize={60} minSize={20} className="panel-content-nopad">
+                        <div className="panel-header page-browser-header">コンテンツブラウザ</div>
+                        <ContentBrowser
+                          pages={pageInfoList}
+                          selectedPageId={selectedPageId}
+                          onSelectPage={handleSelectPage}
+                          onAddPage={handleAddNewPage}
+                        />
                       </Panel>
                     </PanelGroup>
                   </Panel>
                   <PanelResizeHandle className="resize-handle" />
                   {/* (B-2) 中央エリア (キャンバス) */}
                   <Panel defaultSize={55} minSize={30} className="panel-content">
-                    <div className="panel-header">キャンバス</div>
+                    <div className="panel-header">
+                      {/* (キャンバスヘッダーに現在のページ名を表示) */}
+                      キャンバス ({currentPageData?.name || "N/A"})
+                    </div>
                     <div className="canvas-viewport">
                       <Artboard
-                        placedItems={placedItems}
-                        setPlacedItems={setPlacedItems}
+                        // (currentPlacedItems とラッパー関数を渡す)
+                        placedItems={currentPlacedItems || []}
+                        setPlacedItems={handlePlacedItemsChange}
                         onItemSelect={handleItemSelect}
                         onBackgroundClick={handleBackgroundClick}
                         selectedItemId={selectedItemId}
-                        setAllItemLogics={setAllItemLogics}
+                        // (currentAllItemLogics とラッパー関数を渡す)
+                        setAllItemLogics={handleAllItemLogicsChange}
                         nodeGraphTemplates={NODE_GRAPH_TEMPLATES}
                       />
                     </div>
@@ -440,8 +717,9 @@ function App() {
                       selectedItemId={selectedItemId}
                       selectedNodeId={selectedNodeId}
                       activeLogicGraphId={activeLogicGraphId}
-                      placedItems={placedItems}
-                      allItemLogics={allItemLogics}
+                      // (currentPlacedItems と currentAllItemLogics を渡す)
+                      placedItems={currentPlacedItems || []}
+                      allItemLogics={currentAllItemLogics || {}}
                       onItemUpdate={handleItemUpdate}
                       onNodeDataChange={handleNodeDataChange}
                     />
@@ -451,7 +729,10 @@ function App() {
               {/* (A-2) 下部エリア (ノードエディタ) */}
               <PanelResizeHandle className="resize-handle" />
               <Panel defaultSize={25} minSize={15} className="panel-content">
-                <div className="panel-header">ノードエディタ</div>
+                <div className="panel-header">
+                  {/* (ノードエディタヘッダーに選択中アイテム名を表示) */}
+                  ノードエディタ {selectedItem ? `(${selectedItem.name})` : ""}
+                </div>
                 <NodeEditor
                   nodes={currentGraph?.nodes}
                   edges={currentGraph?.edges}
@@ -459,7 +740,8 @@ function App() {
                   onEdgesChange={onEdgesChange}
                   onNodeAdd={handleAddNode}
                   onConnect={onConnect}
-                  placedItems={placedItems} 
+                  // (currentPlacedItems を渡す)
+                  placedItems={currentPlacedItems || []} 
                   onNodeDataChange={handleNodeDataChange}
                   onNodeClick={handleNodeClick}
                 />
@@ -481,3 +763,4 @@ function App() {
 }
 
 export default App;
+

@@ -12,7 +12,6 @@ import ReactFlow, {
   type OnConnect,
   type NodeProps,
   ReactFlowProvider,
-  // --- (1) OnNodeClick を import から削除 ---
 } from "reactflow";
 
 import { useDrop, type DropTargetMonitor } from "react-dnd";
@@ -35,7 +34,7 @@ interface NodeEditorProps {
   onEdgesChange: OnEdgesChange;
   onNodeAdd: (newNode: Node) => void;
   onConnect: OnConnect;
-  placedItems: PlacedItemType[];
+  placedItems: PlacedItemType[]; // (★ App.tsx 側で || [] するので型は変更なし)
   onNodeDataChange: (nodeId: string, dataUpdate: any) => void;
   onNodeClick: (nodeId: string) => void;
 }
@@ -46,7 +45,6 @@ interface NodeToolDragItem {
   nodeName: string;
 }
 
-// --- (2) Nodeクリックハンドラ型定義（React Flow v11以降対応）---
 type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
 
 const NodeEditor: React.FC<NodeEditorProps> = ({
@@ -56,7 +54,7 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   onEdgesChange,
   onNodeAdd,
   onConnect,
-  placedItems,
+  placedItems, // (受け取る)
   onNodeDataChange,
   onNodeClick,
 }) => {
@@ -106,21 +104,21 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     }
   }, [nodes ? nodes[0]?.id : undefined, fitView]);
 
-  // (ユーザー要望) nodeTypes の useMemo (props を中継)
+  // nodeTypes の useMemo (props を中継)
   const nodeTypes = useMemo(() => {
     const wrappedEventNode = (props: NodeProps) => <EventNode {...props} />;
     
     const wrappedActionNode = (props: NodeProps) => (
       <ActionNode
         {...props} 
-        placedItems={placedItems}
+        placedItems={placedItems} // (★ ここで placedItems を渡す)
         onDataChange={onNodeDataChange} 
       />
     );
     const wrappedIfNode = (props: NodeProps) => (
       <IfNode 
         {...props} 
-        placedItems={placedItems}
+        placedItems={placedItems} // (★ ここで placedItems を渡す)
         onDataChange={onNodeDataChange} 
       />
     );
@@ -130,9 +128,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       actionNode: wrappedActionNode,
       ifNode: wrappedIfNode,
     };
-  }, [placedItems, onNodeDataChange]);
+  }, [placedItems, onNodeDataChange]); // (★ 依存配列に placedItems を追加)
 
-  // --- (3) handleNodeClick の型注釈を修正 ---
   const handleNodeClick: NodeClickHandler = (event, node) => {
     onNodeClick(node.id);
   };
@@ -196,3 +193,4 @@ const NodeEditorWrapper: React.FC<NodeEditorProps> = (props) => {
 };
 
 export default NodeEditorWrapper;
+
