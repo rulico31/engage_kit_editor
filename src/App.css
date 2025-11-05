@@ -16,14 +16,13 @@
   margin: 2px;
 }
 
-/* ★ 追記: コンテンツブラウザ用 (パディングなし) */
+/* ★ 修正: コンテンツブラウザ用 (パディングなし) */
 .panel-content-nopad {
   box-sizing: border-box;
   overflow: hidden; /* スクロールは子要素に任せる */
   background-color: #2a2a2a;
   border-radius: 4px;
   margin: 2px;
-  /* (padding: 0; はデフォルトなので不要) */
 }
 
 /* 左側の上下パネル用（マージン調整） */
@@ -64,28 +63,14 @@
   height: 4px;
 }
 
-/* 各パネルのヘッダー（タイトル） */
-.panel-header {
-  font-weight: bold;
-  font-size: 1.1em;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #444;
-  padding-bottom: 8px;
-  color: #eee; /* タイトル文字を少し明るく */
-}
-
-/* ★ 追記: コンテンツブラウザ用のヘッダー (マージン調整) */
-.page-browser-header {
-  margin-left: 12px;
-  margin-right: 12px;
-  margin-top: 12px;
-}
+/* (★ 削除: .panel-header, .page-browser-header スタイルを削除) */
 
 /* ツールボックスのアイテム一覧 */
 .tool-list {
   display: flex;
   flex-direction: column;
   gap: 8px; /* 各アイテム間の隙間 */
+  padding-top: 10px;
 }
 
 .tool-item {
@@ -107,7 +92,7 @@
 
 /* アートボードのビューポート（アートボードの親） */
 .canvas-viewport {
-  height: calc(100% - 45px); /* (45px = .panel-header の大体の高さ) */
+  height: 100%;
   width: 100%;
   background-color: #222; /* アートボードの外側の色 */
   overflow: auto; /* アートボードが大きければスクロール */
@@ -121,7 +106,7 @@
   height: 100vh;
 }
 
-/* (2) エディタ全体のコンテナ */
+/* (2) エディタ全体のコンテナ (★ 高さを 100vh に修正) */
 .editor-container {
   width: 100vw;
   height: 100vh;
@@ -129,76 +114,16 @@
   flex-direction: column;
 }
 
-/* (3) 新しいトップツールバー */
-.editor-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #1e1e1e;
-  padding: 0 15px;
-  height: 40px;
-  border-bottom: 1px solid #444;
-  flex-shrink: 0;
-}
+/* (★ 削除: .editor-toolbar, .toolbar-button 関連のスタイルをすべて削除) */
+/* (★ CSS移行に伴い、.io-button 関連のスタイルもすべて削除) */
 
-.editor-toolbar .toolbar-title {
-  font-weight: bold;
-  color: #eee;
-}
-.editor-toolbar .toolbar-title span {
-  font-weight: normal;
-  color: #aaa;
-}
 
-.editor-toolbar-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-/* (4) ツールバー用のボタン (io-button) */
-.io-button {
-  font-size: 13px;
-  font-weight: 500;
-  background-color: #3a3a3a;
-  color: #ccc;
-  border: 1px solid #555;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-}
-.io-button:hover {
-  background-color: #4a4a4a;
-  color: #fff;
-}
-.io-button.home-button {
-  background-color: #4a4a4a;
-}
-
-/* (★ 追記: プレビュー/編集ボタンの色分け) */
-.preview-button {
-  background-color: #2a8a4a;
-  border-color: #2a8a4a;
-  color: #fff;
-}
-.preview-button:hover {
-  background-color: #3a9a5a;
-}
-.edit-button {
-  background-color: #c33a3a;
-  border-color: #c33a3a;
-  color: #fff;
-}
-.edit-button:hover {
-  background-color: #d34a4a;
-}
-
-/* (★ 追記: プレビューホストのコンテナ) */
+/* (プレビューホストのコンテナ (★ 高さを修正) */
 .preview-host-container {
-  flex-grow: 1; /* 残りの高さをすべて使う */
-  background-color: #222; /* canvas-viewport と同じ背景色 */
-  overflow: auto; /* プレビューが大きければスクロール */
+  flex-grow: 1; 
+  background-color: #222; 
+  overflow: auto; 
   width: 100%;
-  height: calc(100vh - 40px); /* ツールバーの高さを引く */
+  /* (★ 修正: 40px -> 44px (Headerの高さ)) */
+  height: calc(100vh - 44px); 
 }
-

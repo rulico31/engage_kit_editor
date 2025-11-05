@@ -148,7 +148,8 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     <div className="node-editor-wrapper" ref={reactFlowWrapper}>
       {/* ツールボックス */}
       <aside className="node-toolbox">
-        <div className="toolbox-header">ロジックノード</div>
+        {/* (★ 修正: このヘッダーを削除) */}
+        {/* <div className="toolbox-header">ロジックノード</div> */}
         <NodeToolboxItem
           nodeType="actionNode"
           nodeName="⚡ アクション: 表示/非表示"
@@ -193,4 +194,3 @@ const NodeEditorWrapper: React.FC<NodeEditorProps> = (props) => {
 };
 
 export default NodeEditorWrapper;
-

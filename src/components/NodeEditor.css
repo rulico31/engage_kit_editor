@@ -11,25 +11,22 @@
 .node-editor-wrapper {
   display: flex;
   width: 100%;
-  height: calc(100% - 45px); /* (45px = .panel-header の大体の高さ) */
+  /* (★ 修正: ヘッダー削除に伴い、高さを100%に変更) */
+  height: 100%;
 }
 
-/* ↓↓↓↓↓↓↓↓↓↓ (2) 新しいドロップターゲットラッパー ↓↓↓↓↓↓↓↓↓↓ */
 .react-flow-drop-target {
   flex-grow: 1; /* 残りのスペースすべてを使う */
   height: 100%;
   position: relative; /* オーバーレイの基準点 */
 }
-/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
 
-/* (react-flow-canvas のサイズ指定を修正) */
 .react-flow-canvas {
   width: 100%; /* 親(.drop-target)の 100% */
   height: 100%;
   background-color: #1a1a1a;
 }
 
-/* ↓↓↓↓↓↓↓↓↓↓ (3) ドラッグオーバー時のハイライト (任意) ↓↓↓↓↓↓↓↓↓↓ */
 .react-flow-drop-overlay {
   position: absolute;
   top: 0;
@@ -41,7 +38,6 @@
   box-sizing: border-box;
   pointer-events: none; /* マウスイベントを透過 */
 }
-/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */
 
 /* (ツールボックスのスタイルは変更なし) */
 .node-toolbox {
@@ -56,6 +52,9 @@
   flex-direction: column;
   gap: 10px;
 }
+
+/* (★ 修正: このスタイルブロックを削除) */
+/*
 .toolbox-header {
   font-weight: bold;
   color: #aaa;
@@ -63,6 +62,8 @@
   padding-bottom: 5px;
   border-bottom: 1px solid #444;
 }
+*/
+
 .toolbox-item {
   background-color: #3a3a3a;
   border: 1px solid #555;
@@ -80,38 +81,24 @@
   cursor: grabbing;
 }
 
-/* src/components/NodeEditor.css */
-
-/* ( ... 既存のスタイル ... ) */
-.toolbox-item:active {
-  cursor: grabbing;
-}
-
-/* ↓↓↓↓↓↓↓↓↓↓ (2) このブロックを末尾に追記 ↓↓↓↓↓↓↓↓↓↓ */
-
 /* コントロールパネルのダークテーマ */
 .rf-controls-dark {
-  /* ボックス自体のスタイル */
   background-color: #3a3a3a;
   border-radius: 4px;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
-/* 個々のボタン（+, -, fit, lock） */
 .rf-controls-dark .react-flow__controls-button {
   background-color: #3a3a3a;
   border: none;
   color: #aaa; /* アイコンの色 */
 }
 
-/* ボタンをホバーした時 */
 .rf-controls-dark .react-flow__controls-button:hover {
   background-color: #4a4a4a;
   color: #eee;
 }
 
-/* ボタン間の区切り線 */
 .rf-controls-dark .react-flow__controls-button + .react-flow__controls-button {
   border-top: 1px solid #555;
 }
-/* ↑↑↑↑↑↑↑↑↑↑ ここまで ↑↑↑↑↑↑↑↑↑↑ */

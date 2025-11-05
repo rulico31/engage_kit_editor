@@ -4,7 +4,8 @@
 .page-browser-content {
   display: flex;
   flex-direction: column;
-  height: calc(100% - 45px); /* ヘッダーの高さを引く */
+  /* (★ 修正: ヘッダー削除に伴い、高さを100%に変更) */
+  height: 100%;
 }
 
 /* ページリスト本体 */
@@ -14,6 +15,8 @@
   padding: 0;
   margin: 0;
   list-style: none;
+  /* (★ 追記: ヘッダー削除に伴い、パディングを追加) */
+  padding-top: 10px;
 }
 
 .page-list-item {
@@ -72,4 +75,3 @@
   color: #fff;
   border-color: #777;
 }
-
