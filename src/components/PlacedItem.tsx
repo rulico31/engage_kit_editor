@@ -12,12 +12,21 @@ interface PlacedItemProps {
   item: PlacedItemType;
   onSelect: () => void;
   isSelected: boolean;
+  
+  // プレビュー用Props
+  isPreviewing: boolean;
+  isVisible: boolean; // (プレビュー状態から渡される)
+  onItemEvent: (eventName: string, itemId: string) => void;
 }
 
 const PlacedItem: React.FC<PlacedItemProps> = ({
   item,
   onSelect,
   isSelected,
+  // プレビュー用
+  isPreviewing,
+  isVisible,
+  onItemEvent,
 }) => {
   const { id, name, x, y, width, height } = item;
   
@@ -32,8 +41,9 @@ const PlacedItem: React.FC<PlacedItemProps> = ({
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging(),
       }),
+      canDrag: !isPreviewing, // プレビュー中はドラッグを無効化
     }),
-    [id, x, y] // 依存配列 (ジャンプバグ修正済み)
+    [id, x, y, isPreviewing] // 依存配列 (ジャンプバグ修正済み + isPreviewing)
   );
   drag(dragRef); // (A) ref を (1) に接続
 
@@ -42,10 +52,18 @@ const PlacedItem: React.FC<PlacedItemProps> = ({
   // クリックイベントハンドラ
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onSelect();
+    if (isPreviewing) {
+      // プレビューモード中: ロジックエンジンにイベントを送信
+      onItemEvent("click", id);
+    } else {
+      // 編集モード中: アイテムを選択
+      onSelect();
+    }
   };
 
-  const itemClassName = `placed-item ${isSelected ? "is-selected" : ""}`;
+  const itemClassName = `placed-item ${isSelected ? "is-selected" : ""} ${
+    isPreviewing ? "is-preview" : ""
+  }`;
 
   return (
     // (1) シンプルな Div 構造に戻す
@@ -60,8 +78,10 @@ const PlacedItem: React.FC<PlacedItemProps> = ({
         height: `${height}px`,
         opacity: isDragging ? 0 : 1, // 移動中は非表示
         zIndex: isSelected ? 1 : 0,
+        // プレビュー中の表示/非表示を制御
+        display: isVisible ? "flex" : "none",
       }}
-      onClick={handleClick} // (C) 選択用
+      onClick={handleClick} // (C) 選択 or イベント発火
     >
       {name}
       {/* (リサイズハンドルは削除) */}

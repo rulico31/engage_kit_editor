@@ -24,3 +24,13 @@
 /* .placed-item { ... } のスタイルは
   PlacedItem.css に移動したので、ここからは削除します。
 */
+
+/* プレビュー中のスタイル */
+/* プレビューモードの .artboard は、
+  .preview-viewport の子要素になります。
+  中央揃えを維持するためにマージンを再度設定します。
+*/
+.artboard.is-preview {
+  margin: 20px auto;
+  cursor: default;
+}

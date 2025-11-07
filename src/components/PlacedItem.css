@@ -16,6 +16,11 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   
   /* (注) position: relative は不要 */
+  
+  /* PlacedItem.tsx の display: flex に対応 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 選択状態のスタイル */
@@ -23,4 +28,9 @@
   border-color: #007acc; /* 選択色 */
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.7); /* 影 */
   z-index: 1; /* 他のアイテムより手前に表示 */
+}
+
+/* プレビュー中のスタイル */
+.placed-item.is-preview {
+  cursor: pointer; /* (クリック可能であることを示す) */
 }

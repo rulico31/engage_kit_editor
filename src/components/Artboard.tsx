@@ -4,10 +4,8 @@ import React, { useRef } from "react";
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import PlacedItem from "./PlacedItem";
-// (★ 修正: NodeGraph を App.tsx からではなく types.ts からインポート)
-import type { PlacedItemType, NodeGraph } from "../types";
+import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./Artboard.css";
-// (★ 修正: App.tsx からの NodeGraph インポートを削除)
 
 // --- 型定義 ---
 interface ToolDragItem { 
@@ -20,17 +18,21 @@ interface PlacedDragItem {
 }
 type AllDragItems = ToolDragItem | PlacedDragItem;
 
-// --- (★ 修正: Props の型定義を変更) ---
+// --- (1) (タスク2) Props の型を変更 ---
 interface ArtboardProps {
   placedItems: PlacedItemType[];
-  // (App.tsx のラッパー関数に型を合わせる)
-  setPlacedItems: (newItems: PlacedItemType[] | ((prev: PlacedItemType[]) => PlacedItemType[])) => void;
+  setPlacedItems: React.Dispatch<React.SetStateAction<PlacedItemType[]>>;
   selectedItemId: string | null;
-  // (App.tsx のラッパー関数に型を合わせる)
-  setAllItemLogics: (newLogics: Record<string, NodeGraph> | ((prev: Record<string, NodeGraph>) => Record<string, NodeGraph>)) => void;
+  setAllItemLogics: React.Dispatch<React.SetStateAction<Record<string, NodeGraph>>>;
   nodeGraphTemplates: Record<string, NodeGraph>;
+  // (App.tsx から渡される新しいコールバック)
   onItemSelect: (id: string) => void;
   onBackgroundClick: () => void;
+
+  // プレビュー用Props
+  isPreviewing: boolean;
+  previewState: PreviewState;
+  onItemEvent: (eventName: string, itemId: string) => void;
 }
 
 const Artboard: React.FC<ArtboardProps> = ({
@@ -41,12 +43,16 @@ const Artboard: React.FC<ArtboardProps> = ({
   nodeGraphTemplates,
   onItemSelect, // (受け取る)
   onBackgroundClick, // (受け取る)
+  // プレビュー用
+  isPreviewing,
+  previewState,
+  onItemEvent,
 }) => {
   const artboardRef = useRef<HTMLDivElement>(null);
 
   const [, drop] = useDrop(
     () => ({
-      accept: [ ItemTypes.TOOL, ItemTypes.PLACED_ITEM ],
+      accept: isPreviewing ? [] : [ ItemTypes.TOOL, ItemTypes.PLACED_ITEM ],
       
       drop: (item: AllDragItems, monitor: DropTargetMonitor) => {
         if (!artboardRef.current) return;
@@ -68,11 +74,16 @@ const Artboard: React.FC<ArtboardProps> = ({
           
           setPlacedItems((prevItems) => [...prevItems, newItem]);
           
-          const graphTemplate = nodeGraphTemplates[name] || nodeGraphTemplates["Default"];
+          // "ボタン" の場合、クリックイベントを追加
+          const graphTemplate = (name === "ボタン")
+            ? nodeGraphTemplates["ボタン"]
+            : (nodeGraphTemplates[name] || nodeGraphTemplates["Default"]);
+          
           setAllItemLogics((prevLogics) => ({
             ...prevLogics, [newItem.id]: graphTemplate,
           }));
           
+          // (2) (タスク2) 選択ハンドラを呼ぶ
           onItemSelect(newItem.id);
 
         } else if (itemType === ItemTypes.PLACED_ITEM) {
@@ -90,34 +101,52 @@ const Artboard: React.FC<ArtboardProps> = ({
             )
           );
           
+          // (3) (タスク2) 選択ハンドラを呼ぶ
           onItemSelect(id);
         }
       },
     }),
-    [setPlacedItems, setAllItemLogics, nodeGraphTemplates, onItemSelect] 
+    [setPlacedItems, setAllItemLogics, nodeGraphTemplates, onItemSelect, isPreviewing] 
   );
   
   drop(artboardRef); // ref を dnd に接続
 
+  // (4) (タスク2) 背景クリックハンドラ
   const handleArtboardClick = (e: React.MouseEvent) => {
     if (e.target === artboardRef.current) {
-      onBackgroundClick(); // App.tsx のハンドラを呼ぶ
+      if (!isPreviewing) {
+        onBackgroundClick(); // App.tsx のハンドラを呼ぶ
+      }
     }
   };
 
   return (
-    <div className="artboard" ref={artboardRef} onClick={handleArtboardClick}>
-      {placedItems.map((item) => (
-        <PlacedItem
-          key={item.id}
-          item={item}
-          onSelect={() => onItemSelect(item.id)}
-          isSelected={item.id === selectedItemId}
-        />
-      ))}
+    <div 
+      className={`artboard ${isPreviewing ? "is-preview" : ""}`} 
+      ref={artboardRef} 
+      onClick={handleArtboardClick}
+    >
+      {placedItems.map((item) => {
+        // プレビュー状態を取得
+        const pState = previewState[item.id];
+        
+        return (
+          <PlacedItem
+            key={item.id}
+            item={item}
+            // (5) (タスク2) onSelect ハンドラ
+            onSelect={() => onItemSelect(item.id)}
+            isSelected={item.id === selectedItemId}
+            
+            // プレビュー用Props
+            isPreviewing={isPreviewing}
+            isVisible={pState?.isVisible ?? true} // デフォルトは表示
+            onItemEvent={onItemEvent}
+          />
+        );
+      })}
     </div>
   );
 };
 
 export default Artboard;
-

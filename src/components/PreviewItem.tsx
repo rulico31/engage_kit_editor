@@ -3,7 +3,7 @@
 import React from "react";
 // (★ 修正: NodeGraph も types からインポート)
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
-import { executeLogicGraph } from "../utils/logicEngine";
+import { executeLogicGraph } from "../logicEngine";
 import "./PreviewItem.css"; // (専用のCSSをインポート)
 
 // (★ 修正: Props の型定義を更新)

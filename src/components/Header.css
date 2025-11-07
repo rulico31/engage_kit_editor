@@ -1,121 +1,96 @@
 /* src/components/Header.css */
 
-/* (1) トップバー全体のコンテナ */
-.editor-header {
+.app-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #1e1e1e;
-  /* (高さを 44px に微調整) */
-  height: 44px;
-  border-bottom: 1px solid #444;
+  justify-content: space-between; /* (★) 左(left)と右(right)のグループを引き離す */
+  align-items: center; /* (★) 全体の高さを中央揃えにする */
+  background-color: #2a2a2a;
+  padding: 0 10px 0 20px;
+  height: 45px;
+  border-bottom: 1px solid #1e1e1e;
   flex-shrink: 0;
-  padding: 0 8px 0 16px;
-  user-select: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  z-index: 10;
 }
 
-/* (2) 左側エリア (タイトル) */
-.header-left {
+.header-left,
+.header-right {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: center; /* (★) 各グループ内の高さを中央揃えにする */
+  gap: 8px;
 }
 
 .header-title {
-  font-weight: bold;
-  color: #eee;
+  font-weight: 600;
   font-size: 1.1em;
+  color: #eee;
+  white-space: nowrap; /* (★) タイトルが改行しないように */
 }
 .header-title span {
-  font-weight: normal;
-  color: #888;
+  font-weight: 400;
+  color: #aaa;
+  margin-left: 4px;
 }
 
-/* (3) 中央エリア (将来用) */
-.header-center {
-  flex-grow: 1;
-  /* (将来的にここにページ名タブなどを配置) */
-}
-
-/* (4) 右側エリア (ボタン群) */
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* (5) ゴーストボタンの基本スタイル (★ご要望の仕様) */
+/* (★) ボタンとアイコンのスタイル */
 .header-button {
   display: flex;
   align-items: center;
   gap: 6px; /* アイコンとテキストの間隔 */
   font-size: 14px;
   font-weight: 500;
-  background-color: transparent;
+  background-color: transparent; /* (★ ゴーストボタン) */
   color: #ccc;
   border: none;
-  /* (高さを統一) */
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s;
-  line-height: 1; /* (アライメント統一のため) */
-  
-  /* (テキストが改行されないように) */
-  white-space: nowrap;
+  white-space: nowrap; /* (★ 改行防止) */
 }
-
-/* (5-a) ホバー時 */
 .header-button:hover {
-  background-color: #3a3a3a;
+  background-color: #3f3f3f;
   color: #fff;
 }
-/* (5-b) disabled 状態 (編集モード中のプレビューボタンなど) */
+.header-button:active {
+  background-color: #4a4a4a;
+}
 .header-button:disabled {
-  color: #666;
-  background-color: transparent;
+  color: #777;
   cursor: not-allowed;
+  background-color: transparent;
 }
 
-/* (5-c) ボタン内のアイコンのサイズをCSSで指定 */
-.header-button .header-icon {
-  width: 16px;  /* (w-4 に相当) */
-  height: 16px; /* (h-4 に相当) */
-  flex-shrink: 0; /* アイコンが縮まないように */
+/* (★) アイコンのサイズ指定 */
+.header-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
-
-/* (6) プレビュー/編集ボタンの特別な色分け */
+/* (★) プレビューボタンの特別色 */
 .header-button.preview-button {
   background-color: #2a8a4a;
   border-color: #2a8a4a;
   color: #fff;
 }
 .header-button.preview-button:hover {
-  background-color: #3a9a5a;
-}
-.header-button.preview-button:disabled {
-  background-color: #2a8a4a;
-  opacity: 0.5;
-  color: #fff;
-  cursor: not-allowed;
+  background-color: #3aa05a;
 }
 
 .header-button.edit-button {
-  background-color: #c33a3a;
-  border-color: #c33a3a;
+  background-color: #007acc;
+  border-color: #007acc;
   color: #fff;
 }
 .header-button.edit-button:hover {
-  background-color: #d34a4a;
+  background-color: #008be6;
 }
 
-/* (★ 修正: このブロックを追記) */
-/* (7) ボタングループ間のセパレーター */
+/* (★) セパレータ */
 .header-separator {
-  height: 20px;
   width: 1px;
-  background-color: #555;
-  margin: 0 6px;
+  height: 24px;
+  background-color: #444;
+  margin: 0 4px;
 }

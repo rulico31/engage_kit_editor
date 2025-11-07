@@ -6,6 +6,16 @@
   width: 100%; /* 親要素( #root )の幅 100% */
 }
 
+/* プレビューモード用ビューポート */
+.preview-viewport {
+  height: calc(100vh - 45px); /* (Headerの高さ 45px を引く) */
+  width: 100%;
+  background-color: #222;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+
 /* 各パネルの基本スタイル */
 .panel-content {
   padding: 12px;
@@ -16,30 +26,17 @@
   margin: 2px;
 }
 
-/* ★ 修正: コンテンツブラウザ用 (パディングなし) */
-.panel-content-nopad {
-  box-sizing: border-box;
-  overflow: hidden; /* スクロールは子要素に任せる */
-  background-color: #2a2a2a;
-  border-radius: 4px;
-  margin: 2px;
-}
-
 /* 左側の上下パネル用（マージン調整） */
-.panel-column .panel-content,
-.panel-column .panel-content-nopad {
+.panel-column .panel-content {
   margin-left: 4px;
   margin-right: 4px;
 }
-.panel-column .panel-content:first-child,
-.panel-column .panel-content-nopad:first-child {
+.panel-column .panel-content:first-child {
   margin-top: 4px;
 }
-.panel-column .panel-content:last-child,
-.panel-column .panel-content-nopad:last-child {
+.panel-column .panel-content:last-child {
   margin-bottom: 4px;
 }
-
 
 /* リサイズハンドルのスタイル */
 .resize-handle {
@@ -63,19 +60,17 @@
   height: 4px;
 }
 
-/* (★ 削除: .panel-header, .page-browser-header スタイルを削除) */
-
 /* ツールボックスのアイテム一覧 */
 .tool-list {
   display: flex;
   flex-direction: column;
   gap: 8px; /* 各アイテム間の隙間 */
-  padding-top: 10px;
 }
 
+/* ツールボックスの各アイテム */
 .tool-item {
   background-color: #3a3a3a;
-  border: 1px solid #777;
+  border: 1px solid #555;
   padding: 10px 14px;
   border-radius: 4px;
   font-weight: 500;
@@ -84,46 +79,20 @@
 }
 .tool-item:hover {
   background-color: #4a4a4a;
-  border-color: #aaa;
+  border-color: #777;
 }
 .tool-item:active {
   cursor: grabbing;
 }
 
-/* アートボードのビューポート（アートボードの親） */
+/* キャンバスのビューポート（アートボードの親） */
 .canvas-viewport {
   height: 100%;
   width: 100%;
-  background-color: #222; /* アートボードの外側の色 */
-  overflow: auto; /* アートボードが大きければスクロール */
+  background-color: #222;
+  overflow: auto;
   border-radius: 4px;
   box-sizing: border-box;
 }
 
-/* (1) アプリ全体のコンテナ */
-.app-container {
-  width: 100vw;
-  height: 100vh;
-}
-
-/* (2) エディタ全体のコンテナ (★ 高さを 100vh に修正) */
-.editor-container {
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* (★ 削除: .editor-toolbar, .toolbar-button 関連のスタイルをすべて削除) */
-/* (★ CSS移行に伴い、.io-button 関連のスタイルもすべて削除) */
-
-
-/* (プレビューホストのコンテナ (★ 高さを修正) */
-.preview-host-container {
-  flex-grow: 1; 
-  background-color: #222; 
-  overflow: auto; 
-  width: 100%;
-  /* (★ 修正: 40px -> 44px (Headerの高さ)) */
-  height: calc(100vh - 44px); 
-}
+/* ( .resize-hitbox 関連のスタイルはすべて削除 ) */
