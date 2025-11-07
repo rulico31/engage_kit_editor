@@ -1,78 +1,65 @@
 // src/components/HomeScreen.tsx
-
-import React from "react";
+import React, { useRef } from "react";
 import "./HomeScreen.css";
+import { UploadIcon } from "./icons/UploadIcon";
 
-// App.tsx から渡される関数の型
 interface HomeScreenProps {
+  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) (projectName: string) => void から () => void へ変更 ↓↓↓↓↓↓↓↓↓↓
   onNewProject: () => void;
-  onLoadProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
+  onImportProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
   onNewProject,
-  onLoadProject,
+  onImportProject,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleNewClick = () => {
+    // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) promptロジックを削除し、コールバックを引数なしで呼び出す ↓↓↓↓↓↓↓↓↓↓
+    // const projectName = prompt("新しいプロジェクト名を入力してください:", "新規プロジェクト");
+    // if (projectName) {
+    //   onNewProject(projectName);
+    // }
+    onNewProject();
+    // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
+  };
+
+  const handleLoadClick = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
-    // (1) コンテナ名を変更し、中央寄せスタイルをCSS側で解除
-    <div className="home-dashboard-container">
-      {/* (2) ヘッダーを追加 */}
+    <div className="home-screen-wrapper">
       <header className="home-header">
-        <h1 className="home-header-title">
-          Engage-Kit 🧩
-        </h1>
-        {/* (将来的にユーザーアイコンなどを配置) */}
+        <h1>Engage-Kit</h1>
+        <p>インタラクティブコンテンツ・プラットフォーム</p>
       </header>
-
-      {/* (3) メインコンテンツエリア */}
       <main className="home-main-content">
-        
-        {/* (A) ウェルカム/アクションエリア */}
-        <section className="home-action-section">
-          <h2>ようこそ、Engage-Kitへ</h2>
-          <p>
-            さっそく新しいプロジェクトを作成するか、
-            <br />
-            既存のプロジェクトを読み込んで編集を始めましょう。
-          </p>
-          
-          {/* (既存のボタンをこちらに移動) */}
-          <div className="home-action-buttons">
-            <button
-              className="home-button primary"
-              onClick={onNewProject}
-            >
-              🚀 プロジェクトを新規作成
-            </button>
+        <h2>プロジェクト管理</h2>
+        <div className="project-actions">
+          <button className="action-card new-project" onClick={handleNewClick}>
+            <h3>+ 新規プロジェクト作成</h3>
+            <p>新しいプロジェクトを開始します。</p>
+          </button>
 
-            <input
-              type="file"
-              id="import-project-input-home"
-              accept=".json,application/json"
-              style={{ display: "none" }}
-              onChange={onLoadProject}
-            />
-            <label
-              htmlFor="import-project-input-home"
-              className="home-button"
-            >
-              📁 プロジェクトを読み込む
-            </label>
-          </div>
-        </section>
-
-        {/* (B) 将来のプロジェクト一覧エリア (プレースホルダー) */}
-        <section className="home-projects-section">
-          <div className="home-projects-header">
-            <h3>最近のプロジェクト</h3>
-            {/* (将来的に検索バーなどを配置) */}
-          </div>
-          <div className="home-projects-list-placeholder">
-            <p>（ここには将来的に、保存されたプロジェクトの一覧がカード形式で表示されます）</p>
-          </div>
-        </section>
-
+          <button className="action-card load-project" onClick={handleLoadClick}>
+            <UploadIcon className="header-icon" />
+            <h3>プロジェクトを読込</h3>
+            <p>ローカルの .json ファイルから作業を再開します。</p>
+          </button>
+        </div>
       </main>
+
+      {/* 読込ボタン用の非表示ファイル入力 */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: "none" }}
+        accept=".json,application/json"
+        onChange={onImportProject}
+      />
     </div>
   );
 };
