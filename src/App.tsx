@@ -61,6 +61,16 @@ const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
     }],
     edges: [],
   },
+  // (★ 変更なし) テキスト入力欄のノード
+  "テキスト入力欄": {
+    nodes: [{
+      id: "input-change",
+      type: "eventNode",
+      data: { label: "🎬 イベント: 入力値が変更された時", eventType: "onInputChanged" },
+      position: { x: 50, y: 50 },
+    }],
+    edges: [],
+  },
   "Default": {
     nodes: [{
       id: "default-load",
@@ -86,6 +96,10 @@ interface EditorViewProps {
   isPreviewing: boolean;
   previewState: PreviewState;
   onItemEvent: (eventName: string, itemId: string) => void;
+  
+  // (★ 変更なし) 変数関連のProps
+  variables: VariableState;
+  onVariableChange: (variableName: string, value: any) => void;
 
   // ページデータから導出されたProps
   placedItems: PlacedItemType[];
@@ -132,6 +146,10 @@ const EditorView: React.FC<EditorViewProps> = ({
   isPreviewing,
   previewState,
   onItemEvent,
+  
+  // (★ 変更なし) 変数関連のProps
+  variables,
+  onVariableChange,
 
   placedItems,
   allItemLogics,
@@ -184,6 +202,10 @@ const EditorView: React.FC<EditorViewProps> = ({
             isPreviewing={true}
             previewState={previewState}
             onItemEvent={onItemEvent}
+            
+            // (★ 変更なし) 変数関連のProps
+            variables={variables}
+            onVariableChange={onVariableChange}
           />
         </div>
       ) : (
@@ -200,6 +222,8 @@ const EditorView: React.FC<EditorViewProps> = ({
                       <ToolboxItem name="テキスト" />
                       <ToolboxItem name="ボタン" />
                       <ToolboxItem name="画像" />
+                      {/* (★ 変更なし) テキスト入力欄 */}
+                      <ToolboxItem name="テキスト入力欄" />
                     </div>
                   </Panel>
                   <PanelResizeHandle className="resize-handle" />
@@ -230,6 +254,10 @@ const EditorView: React.FC<EditorViewProps> = ({
                     isPreviewing={false}
                     previewState={previewState} // (空でも渡す)
                     onItemEvent={onItemEvent}
+                    
+                    // (★ 変更なし) 変数関連のProps (編集モードでも渡す)
+                    variables={variables}
+                    onVariableChange={onVariableChange}
                   />
                 </div>
               </Panel>
@@ -238,6 +266,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
               {/* (B-3) 右エリア (プロパティ) */}
               <Panel defaultSize={25} minSize={15} className="panel-content">
+                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) `setPlacedItems` を渡さない ↓↓↓↓↓↓↓↓↓↓ */}
                 <PropertiesPanel
                   selection={selection}
                   activeTabId={activeTabId}
@@ -250,6 +279,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                   onNodeDataChange={onNodeDataChange}
                   pageInfoList={pageInfoList}
                 />
+                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </Panel>
             </PanelGroup>
           </Panel>
@@ -338,7 +368,7 @@ function App() {
   }, [pages, selectedPageId, activeLogicGraphId]);
 
   const pageInfoList: PageInfo[] = useMemo(() => {
-    return pageOrder.map(id => ({ id, name: pages[id]?.name || "無題" }));
+    return pageOrder.map(id => ({ id: id, name: pages[id]?.name || "無題" }));
   }, [pages, pageOrder]);
 
 
@@ -385,7 +415,8 @@ function App() {
   }, [selectedPageId]);
 
   // (更新)
-  const handleItemUpdate = (
+  // (★ 変更なし) useCallback でラップ
+  const handleItemUpdate = useCallback((
     itemId: string,
     updatedProps: Partial<PlacedItemType>
   ) => {
@@ -398,6 +429,7 @@ function App() {
         item.id === itemId ? { ...item, ...updatedProps } : item
       );
 
+      // (★ 変更なし) "data" の変更ではタブ名は変更しない
       if (updatedProps.name) {
         setSelection(prevSel => prevSel.map(s => 
           s.id === itemId ? { ...s, label: `🔘 ${updatedProps.name}` } : s
@@ -409,7 +441,7 @@ function App() {
         [selectedPageId]: { ...currentPage, placedItems: newPlacedItems },
       };
     });
-  };
+  }, [selectedPageId]);
 
   // (更新)
   const onNodesChange: OnNodesChange = useCallback((changes) => {
@@ -583,7 +615,7 @@ function App() {
   }, [handleDeleteItem]);
 
   // (★ 変更なし) 選択ハンドラ
-  const handleItemSelect = (itemId: string) => {
+  const handleItemSelect = useCallback((itemId: string) => {
     const item = placedItems.find(p => p.id === itemId);
     if (!item) return;
     
@@ -597,13 +629,13 @@ function App() {
     
     setActiveTabId(itemId);
     setActiveLogicGraphId(itemId); 
-  };
+  }, [placedItems]);
 
-  const handleBackgroundClick = () => {
+  const handleBackgroundClick = useCallback(() => {
     setActiveTabId(null);
-  };
+  }, []);
 
-  const handleNodeClick = (nodeId: string) => {
+  const handleNodeClick = useCallback((nodeId: string) => {
     if (!currentGraph) return;
     const node = currentGraph.nodes.find(n => n.id === nodeId);
     if (!node) return;
@@ -617,7 +649,7 @@ function App() {
     });
     
     setActiveTabId(nodeId);
-  };
+  }, [currentGraph]);
 
 
   // --- (5) プロジェクト管理ハンドラ ---
@@ -637,7 +669,7 @@ function App() {
   };
 
   // (B) 新規プロジェクト作成 (HomeScreen ->)
-  const handleNewProject = () => {
+  const handleNewProject = useCallback(() => {
     const name = prompt("新しいプロジェクト名を入力してください:", "新規プロジェクト");
     if (!name) return; 
 
@@ -657,19 +689,19 @@ function App() {
     setSelectedPageId(initialPageId);
 
     setView("editor");
-  };
+  }, []);
 
   // (C) ホームに戻る (EditorView -> Header ->)
-  const handleGoHome = () => {
+  const handleGoHome = useCallback(() => {
     if (window.confirm("ホームに戻ると、保存していない変更は失われます。よろしいですか？")) {
       setView("home");
       setProjectName("");
       resetProjectState();
     }
-  };
+  }, []);
 
   // (D) プロジェクト保存 (EditorView -> Header ->)
-  const handleExportProject = () => {
+  const handleExportProject = useCallback(() => {
     const projectData: ProjectData = {
       projectName: projectName,
       pages: pages,
@@ -687,10 +719,10 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
+  }, [projectName, pages, pageOrder, variables]);
 
   // (E) プロジェクト読込 (HomeScreen -> | EditorView -> Header ->)
-  const handleImportProject = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportProject = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -725,11 +757,12 @@ function App() {
     reader.readAsText(file);
 
     event.target.value = "";
-  };
+  }, []);
+
 
   // --- (6) ページ管理ハンドラ ---
   
-  const handleAddPage = () => {
+  const handleAddPage = useCallback(() => {
     const newPageName = prompt("新しいページ名を入力してください:", `Page ${pageOrder.length + 1}`);
     if (!newPageName) return;
     
@@ -748,9 +781,9 @@ function App() {
     setSelection([]);
     setActiveTabId(null);
     setActiveLogicGraphId(null);
-  };
+  }, [pageOrder]);
 
-  const handleSelectPage = (pageId: string) => {
+  const handleSelectPage = useCallback((pageId: string) => {
     if (pageId === selectedPageId) return; 
     
     setSelectedPageId(pageId);
@@ -758,21 +791,21 @@ function App() {
     setSelection([]);
     setActiveTabId(null);
     setActiveLogicGraphId(null);
-  };
+  }, [selectedPageId]);
 
 
   // --- (7) タブ操作ハンドラ ---
 
-  const handleTabSelect = (tabId: string) => {
+  const handleTabSelect = useCallback((tabId: string) => {
     setActiveTabId(tabId);
     
     const entry = selection.find(s => s.id === tabId);
     if (entry && entry.type === 'item') {
       setActiveLogicGraphId(tabId);
     }
-  };
+  }, [selection]);
 
-  const handleCloseTab = (idToClose: string) => {
+  const handleCloseTab = useCallback((idToClose: string) => {
     const closedEntry = selection.find(s => s.id === idToClose);
     if (!closedEntry) return;
 
@@ -798,7 +831,7 @@ function App() {
     
     setSelection(newSelection);
     setActiveTabId(newActiveTabId);
-  };
+  }, [selection, activeTabId, activeLogicGraphId, allItemLogics]);
 
 
   // --- (8) プレビュー＆ロジック実行ハンドラ ---
@@ -806,7 +839,7 @@ function App() {
   /**
    * プレビュー実行時、ロジックエンジンからページ遷移が要求されたときに呼ばれる
    */
-  const handlePageChangeRequest = (targetPageId: string) => {
+  const handlePageChangeRequest = useCallback((targetPageId: string) => {
     if (!pages[targetPageId]) {
       console.warn(`[App] 存在しないページ (ID: ${targetPageId}) への遷移リクエスト`);
       return;
@@ -814,11 +847,9 @@ function App() {
     
     setSelectedPageId(targetPageId);
     
-    // (★ 変更) 遷移先のページの初期状態を生成
     const targetPageData = pages[targetPageId];
     const initialPreviewState: PreviewState = {};
     targetPageData.placedItems.forEach(item => {
-      // (★ 変更) 新しい PreviewItemState に合わせて初期化
       initialPreviewState[item.id] = {
         isVisible: true,
         x: item.x,
@@ -832,20 +863,18 @@ function App() {
     setPreviewState(initialPreviewState);
 
     // (TODO: "onLoad" イベントをトリガーする)
-  };
+  }, [pages]);
 
   /**
    * プレビューモードの切り替え
    */
-  const handleTogglePreview = () => {
+  const handleTogglePreview = useCallback(() => {
     setIsPreviewing((prev) => {
       const nextIsPreviewing = !prev;
       if (nextIsPreviewing) {
         // --- プレビュー開始 ---
-        // (★ 変更) placedItems から初期状態 (PreviewState) を生成
         const initialPreviewState: PreviewState = {};
         placedItems.forEach(item => {
-          // (★ 変更) 新しい PreviewItemState に合わせて初期化
           initialPreviewState[item.id] = {
             isVisible: true,
             x: item.x,
@@ -853,7 +882,7 @@ function App() {
             opacity: 1,
             scale: 1,
             rotation: 0,
-            transition: null, // (最初はアニメーションなし)
+            transition: null,
           };
         });
         setPreviewState(initialPreviewState);
@@ -866,12 +895,25 @@ function App() {
       }
       return nextIsPreviewing;
     });
-  };
+  }, [placedItems]);
+
+  // (★ 変更なし) Artboard の <input> から変数を更新するハンドラ
+  const handleVariableChangeFromItem = useCallback((variableName: string, value: any) => {
+    if (!variableName) return;
+    
+    const newVars = {
+      ...variablesRef.current,
+      [variableName]: value,
+    };
+    
+    variablesRef.current = newVars;
+    setVariables(newVars);
+  }, []);
 
   /**
    * Artboard 上のアイテムからイベントが発火されたときに呼ばれる
    */
-  const handleItemEvent = (eventName: string, itemId: string) => {
+  const handleItemEvent = useCallback((eventName: string, itemId: string) => {
     if (!selectedPageId) return;
     
     const targetGraph = pages[selectedPageId]?.allItemLogics[itemId];
@@ -879,8 +921,8 @@ function App() {
       console.warn(`[App] ${itemId} に紐づくロジックグラフがありません`);
       return;
     }
-
-    // ロジックエンジンに実行を依頼
+    
+    // (★ 変更なし) "onInputChanged" イベントもここで処理される
     triggerEvent(
       eventName,
       itemId,
@@ -892,7 +934,7 @@ function App() {
         setPreviewState(newState);
       },
       // (2) ページ遷移ハンドラ
-      handlePageChangeRequest,
+      handlePageChangeRequest, // (★) 安定化された
       // (3) VariableState ハンドラ
       () => variablesRef.current,
       (newVars: VariableState) => {
@@ -900,7 +942,7 @@ function App() {
         setVariables(newVars);
       }
     );
-  };
+  }, [selectedPageId, pages, handlePageChangeRequest]);
 
 
   // --- (9) ビューの切り替え ---
@@ -929,6 +971,10 @@ function App() {
       isPreviewing={isPreviewing}
       previewState={previewState}
       onItemEvent={handleItemEvent}
+      
+      // (★ 変更なし) 変数関連のProps
+      variables={variables}
+      onVariableChange={handleVariableChangeFromItem}
 
       // (派生データ)
       placedItems={placedItems}

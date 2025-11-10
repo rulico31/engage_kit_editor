@@ -10,6 +10,9 @@ export interface PlacedItemType {
   y: number;
   width: number;
   height: number;
+  // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) 画像のbase64データや将来的な設定を保持するため ↓↓↓↓↓↓↓↓↓↓
+  data?: Record<string, any>;
+  // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
 }
 
 // ↓↓↓↓↓↓↓↓↓↓ (★ 変更) PreviewItemState を大幅に拡張 ↓↓↓↓↓↓↓↓↓↓

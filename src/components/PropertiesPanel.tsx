@@ -54,7 +54,8 @@ const InspectorTabs: React.FC<InspectorTabsProps> = ({
       if (e.deltaX !== 0) return;
       if (e.deltaY !== 0) {
         e.preventDefault();
-        container.scrollLeft += e.deltaY;
+        // (★ 変更済) スクロール方向を反転
+        container.scrollLeft -= e.deltaY;
       }
     };
     container.addEventListener("wheel", handleWheel, { passive: false });
@@ -344,7 +345,6 @@ const NodePropertiesEditor: React.FC<{
       </AccordionSection>
     );
   }
-  // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) AnimateNode用のUI ↓↓↓↓↓↓↓↓↓↓
   // (5) アニメーションノード
   else if (node.type === "animateNode") {
     editorUI = (
@@ -450,7 +450,6 @@ const NodePropertiesEditor: React.FC<{
       </>
     );
   }
-  // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
   // (6) イベントノード (設定項目なし)
   else if (node.type === "eventNode") {
     editorUI = (
@@ -460,7 +459,7 @@ const NodePropertiesEditor: React.FC<{
     );
   }
   
-  // (★ 修正) ラッパーを変更
+  // (★ 変更なし) ラッパー
   return (
     <div className="properties-panel-content">
       <AccordionSection title="基本情報" defaultOpen={true}>
@@ -474,14 +473,14 @@ const NodePropertiesEditor: React.FC<{
         </div>
       </AccordionSection>
       
-      {/* (★ 修正) editorUI が複数のアコーディオンを含むため、そのままレンダリング */}
+      {/* (★ 変更なし) editorUI が複数のアコーディオンを含むため、そのままレンダリング */}
       {editorUI}
     </div>
   );
 };
 
 
-// --- (C) メインの PropertiesPanel (UIスイッチャー) (★ 変更なし) ---
+// --- (C) メインの PropertiesPanel (UIスイッチャー) ---
 const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   selection,
   activeTabId,
@@ -515,14 +514,137 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       const handleBlur = () => { /* (ロジックは不要になった) */ };
       const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.target.select(); };
 
+      // (★ 変更済) 画像アップロードハンドラ
+      const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith("image/")) {
+          alert("画像ファイルを選択してください (jpg, png, gifなど)");
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+          const base64data = loadEvent.target?.result;
+          if (typeof base64data === "string") {
+            onItemUpdate(item.id, {
+              data: { ...item.data, src: base64data, },
+            });
+          }
+        };
+        reader.onerror = () => {
+          alert("ファイルの読み込みに失敗しました。");
+        };
+        reader.readAsDataURL(file);
+        e.target.value = "";
+      };
+      const handleImageRemove = () => {
+        onItemUpdate(item.id, {
+          data: { ...item.data, src: null, },
+        });
+      };
+      
+      // (★ 変更済) テキスト入力欄用のデータハンドラ
+      const handleItemDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        onItemUpdate(item.id, {
+          data: {
+            ...item.data,
+            [e.target.name]: e.target.value,
+          },
+        });
+      };
+
       content = (
         <div className="properties-panel-content">
           <AccordionSection title="基本情報" defaultOpen={true}>
             <div className="prop-group">
               <div className="prop-label">Name</div>
-              <input type="text" className="prop-input" value={item.name} onChange={handleNameChange} onKeyDown={handleKeyDown} onBlur={handleBlur} onFocus={handleFocus} />
+              {/* (★ 変更済) disabled 属性を追加 */}
+              <input
+                type="text"
+                className="prop-input"
+                value={item.name}
+                onChange={handleNameChange} // (呼ばれなくなる)
+                onKeyDown={handleKeyDown}
+                onBlur={handleBlur}
+                onFocus={handleFocus}
+                disabled // (★) Name はアイテムの種類を示すため編集不可にする
+              />
             </div>
           </AccordionSection>
+
+          {/* (★ 変更済) 「画像」アイテムの時だけ表示するUI */}
+          {item.name.startsWith("画像") && (
+            <AccordionSection title="画像ソース" defaultOpen={true}>
+              <div className="prop-group">
+                <input
+                  type="file"
+                  id={`file-input-${item.id}`} // 複数アイテム対応
+                  style={{ display: "none" }}
+                  accept="image/*" // 画像ファイルのみ
+                  onChange={handleImageUpload}
+                />
+                <label
+                  htmlFor={`file-input-${item.id}`}
+                  className="prop-button"
+                >
+                  画像をアップロード
+                </label>
+              </div>
+              
+              {item.data?.src && (
+                <div className="prop-group">
+                  <label className="prop-label">プレビュー:</label>
+                  <img
+                    src={item.data.src}
+                    alt="アップロードプレビュー"
+                    className="prop-image-preview"
+                  />
+                  <button
+                    className="prop-button-danger"
+                    onClick={handleImageRemove}
+                  >
+                    画像を削除
+                  </button>
+                </div>
+              )}
+            </AccordionSection>
+          )}
+          
+          {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) ラベル名を変更 ↓↓↓↓↓↓↓↓↓↓ */}
+          {item.name.startsWith("テキスト入力欄") && (
+            <AccordionSection title="入力欄設定" defaultOpen={true}>
+              <div className="prop-group">
+                <div className="prop-label">入力値の保存名</div>
+                <input
+                  type="text"
+                  className="prop-input"
+                  name="variableName"
+                  value={item.data?.variableName || ""}
+                  onChange={handleItemDataChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleBlur}
+                  onFocus={handleFocus}
+                  placeholder="例: userName"
+                />
+              </div>
+              <div className="prop-group">
+                <div className="prop-label">プレースホルダー</div>
+                <input
+                  type="text"
+                  className="prop-input"
+                  name="placeholder"
+                  value={item.data?.placeholder || ""}
+                  onChange={handleItemDataChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleBlur}
+                  onFocus={handleFocus}
+                  placeholder="例: お名前を入力..."
+                />
+              </div>
+            </AccordionSection>
+          )}
+          {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
+
 
           <AccordionSection title="位置" defaultOpen={true}>
             <div className="prop-row">

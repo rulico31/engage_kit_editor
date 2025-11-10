@@ -21,9 +21,160 @@
   position: relative;
 }
 
-/* .placed-item { ... } のスタイルは
-  PlacedItem.css に移動したので、ここからは削除します。
+/* ( .placed-item { ... } のスタイルは
+   PlacedItem.css に移動したので、ここからは削除します。
+   )
+  ↓↓↓↓↓↓↓↓↓↓ (★ 変更) ここから ArtboardItem のスタイルを追加 ↓↓↓↓↓↓↓↓↓↓
 */
+
+/* アートボード上の全アイテムの基本スタイル */
+.artboard-item {
+  /* 位置 (Artboard.tsx の <div style={style}> で制御) */
+  position: absolute;
+  
+  /* (★ 変更) サイズと外観の指定 */
+  background-color: #f0f0f0;
+  border: 2px solid #ccc; /* 枠線を2pxに */
+  border-radius: 5px;
+  padding: 10px 16px; /* パディングを増やして大きくする */
+  
+  /* (★ 変更) フォントを大きくする */
+  font-size: 15px;
+  font-weight: 500;
+  color: #333; /* テキスト色を濃く */
+
+  /* 編集中の操作スタイル */
+  cursor: move;
+  user-select: none;
+  white-space: nowrap;
+  box-sizing: border-box;
+
+  /* アニメーション */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+              transform 0.2s ease, opacity 0.2s ease; /* (★) プレビュー用に transition を追加 */
+  
+  /* 子要素（テキストやボタン）を中央揃え */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 選択状態のスタイル */
+.artboard-item.selected {
+  border-color: #007acc; /* 選択色 */
+  box-shadow: 0 0 8px rgba(0, 122, 204, 0.7); /* 影を少し大きく */
+  z-index: 1; /* 他のアイテムより手前に表示 */
+}
+
+/* --- アイテム種別ごとのスタイル --- */
+
+.item-text-content {
+  /* (特に指定なし、.artboard-item のスタイルを継承) */
+  color: #333;
+}
+
+/* (★ 変更済) 画像コンテントのスタイル */
+.item-image-content {
+  color: #555;
+  font-style: italic;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.item-image-content.is-placeholder {
+  padding: 10px 16px;
+}
+.item-image-content img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; 
+  border-radius: 3px;
+}
+
+
+.item-button-content {
+  /* (★) ネイティブの <button> スタイルをリセット */
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit; /* 親 (.artboard-item) のフォント設定を継承 */
+  color: inherit;
+  cursor: inherit; /* 親 (.artboard-item) のカーソルを継承 */
+  outline: none;
+}
+.item-button-content:focus {
+  outline: none;
+}
+
+/* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) テキスト入力欄のスタイル ↓↓↓↓↓↓↓↓↓↓ */
+.item-input-content {
+  width: 100%;
+  height: 100%;
+  padding: 0; /* (★) 親のパディングをリセット */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.artboard-item-input {
+  width: 100%;
+  height: 100%;
+  
+  /* (★) 見た目をリセット */
+  border: none;
+  background: none;
+  outline: none;
+  
+  /* (★) 親 (.artboard-item) のスタイルを継承 */
+  font: inherit;
+  color: inherit;
+  
+  /* (★) 編集モードではドラッグカーソル、プレビューではテキストカーソル */
+  cursor: inherit;
+  
+  /* (★) パディングを .artboard-item と合わせる (枠線分を引く) */
+  padding: 8px 14px;
+  box-sizing: border-box; /* (★) これが重要 */
+}
+
+/* (★) 編集モードでは入力不可にし、ドラッグカーソルを強制 */
+.artboard-item:not(.preview) .artboard-item-input {
+  pointer-events: none; /* (★) マウスイベントを透過し、親の onMouseDown を発火 */
+}
+
+/* (★) プレビューモードではテキストカーソルにする */
+.artboard-item.preview .artboard-item-input {
+  cursor: text;
+  background-color: #fff; /* (★) 入力可能であることを示すため白背景に */
+  border-radius: 3px;
+}
+
+.artboard-item.preview.selected {
+  /* (★) プレビュー中は .selected スタイルを無効化 */
+  border-color: #ccc;
+  box-shadow: none;
+}
+/* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */
+
+
+/* --- Eート中のスタイル --- */
+
+/* プレビュー中のアイテムのカーソル */
+.artboard-item.preview {
+  cursor: default; /* デフォルトは矢印 */
+}
+
+/* プレビュー中のボタンのみ、カーソルをポインターに変更 */
+.artboard-item.preview .item-button-content {
+  cursor: pointer;
+}
+
+/* ↑↑↑↑↑↑↑↑↑↑ (★ 変更) ArtboardItem のスタイルここまで ↑↑↑↑↑↑↑↑↑↑ */
+
 
 /* プレビュー中のスタイル */
 /* プレビューモードの .artboard は、
