@@ -1,0 +1,31 @@
+/* src/components/nodes/SetVariableNode.css */
+
+.set-variable-node {
+  background: #c26a1d; /* (オレンジ系) */
+  border: 1px solid #a0500c;
+  border-radius: 5px;
+  padding: 10px 15px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 170px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+/* (ハンドルスタイル) */
+.set-variable-node .react-flow__handle {
+  background: #efefef;
+  border: 2px solid #c26a1d;
+}
+.set-variable-node .react-flow__handle-left {
+  left: -8px;
+}
+.set-variable-node .react-flow__handle-right {
+  right: -8px;
+}
+
+.set-variable-node-label {
+  font-weight: bold;
+}

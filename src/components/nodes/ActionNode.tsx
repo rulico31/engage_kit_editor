@@ -3,27 +3,24 @@
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import "./ActionNode.css";
-import type { PlacedItemType } from "../../types";
+// (★ 削除)
+// import type { PlacedItemType } from "../../types";
 
-// (NodeEditor から注入される Props)
+// (★ 変更) Props の型から不要なものを削除
 interface ActionNodeProps extends NodeProps {
-  placedItems: PlacedItemType[];
-  onDataChange: (nodeId: string, dataUpdate: any) => void;
+  // (★ 削除) placedItems: PlacedItemType[];
+  // (★ 削除) onDataChange: (nodeId: string, dataUpdate: any) => void;
 }
 
 const ActionNode: React.FC<ActionNodeProps> = ({
   id,
   data,
-  placedItems,
-  onDataChange,
+  // (★ 削除) placedItems,
+  // (★ 削除) onDataChange,
 }) => {
-  const handleTargetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onDataChange(id, { targetItemId: e.target.value });
-  };
-
-  const handleModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onDataChange(id, { mode: e.target.value });
-  };
+  // (★ 削除) すべてのハンドラを削除
+  // const handleTargetChange = ...
+  // const handleModeChange = ...
 
   return (
     <div className="action-node">
@@ -33,39 +30,23 @@ const ActionNode: React.FC<ActionNodeProps> = ({
       {/* ノードの本文 */}
       <div className="action-node-label">{data.label || "アクション"}</div>
 
-      {/* (ターゲット選択用ドロップダウン) */}
+      {/* (★ 削除) ここからドロップダウンUIをすべて削除 */}
+      {/*
       <div className="action-node-select-wrapper">
         <label>ターゲット:</label>
-        <select
-          className="action-node-select"
-          value={data.targetItemId || ""}
-          onChange={handleTargetChange}
-          onMouseDown={(e) => e.stopPropagation()} 
-        >
-          <option value="">-- アイテムを選択 --</option>
-          {placedItems.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
+        <select ... >
+          ...
         </select>
       </div>
-
-      {/* (モード選択用ドロップダウン) */}
       <div className="action-node-select-wrapper">
         <label>モード:</label>
-        <select
-          className="action-node-select"
-          value={data.mode || "show"}
-          onChange={handleModeChange}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <option value="show">表示する</option>
-          <option value="hide">非表示にする</option>
-          <option value="toggle">切り替える</option>
+        <select ... >
+          ...
         </select>
       </div>
-
+      */}
+      {/* (★ 削除) ここまで */}
+      
       {/* (出力ハンドル) */}
       <Handle type="source" position={Position.Right} />
     </div>

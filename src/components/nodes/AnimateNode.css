@@ -1,0 +1,31 @@
+/* src/components/nodes/AnimateNode.css */
+
+.animate-node {
+  background: #2a8a4a; /* (緑系) */
+  border: 1px solid #1e6b36;
+  border-radius: 5px;
+  padding: 10px 15px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 170px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+/* (ハンドルスタイル) */
+.animate-node .react-flow__handle {
+  background: #efefef;
+  border: 2px solid #2a8a4a;
+}
+.animate-node .react-flow__handle-left {
+  left: -8px;
+}
+.animate-node .react-flow__handle-right {
+  right: -8px;
+}
+
+.animate-node-label {
+  font-weight: bold;
+}

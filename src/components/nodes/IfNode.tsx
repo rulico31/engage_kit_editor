@@ -3,27 +3,24 @@
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import "./IfNode.css";
-import type { PlacedItemType } from "../../types";
+// (★ 削除)
+// import type { PlacedItemType } from "../../types";
 
-// (NodeEditor から注入される Props)
+// (★ 変更) Props の型から不要なものを削除
 interface IfNodeProps extends NodeProps {
-  placedItems: PlacedItemType[];
-  onDataChange: (nodeId: string, dataUpdate: any) => void;
+  // (★ 削除) placedItems: PlacedItemType[];
+  // (★ 削除) onDataChange: (nodeId: string, dataUpdate: any) => void;
 }
 
 const IfNode: React.FC<IfNodeProps> = ({
   id,
   data,
-  placedItems,
-  onDataChange,
+  // (★ 削除) placedItems,
+  // (★ 削除) onDataChange,
 }) => {
-  const handleTargetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onDataChange(id, { conditionTargetId: e.target.value });
-  };
-
-  const handleConditionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onDataChange(id, { conditionType: e.target.value });
-  };
+  // (★ 削除) すべてのハンドラを削除
+  // const handleTargetChange = ...
+  // const handleConditionChange = ...
 
   return (
     <div className="if-node">
@@ -33,34 +30,21 @@ const IfNode: React.FC<IfNodeProps> = ({
       {/* ノードの本文 */}
       <div className="if-node-label">{data.label || "もし〜なら"}</div>
       
-      {/* (2) 条件入力をドロップダウンに変更 */}
+      {/* (★ 削除) ここからドロップダウンUIをすべて削除 */}
+      {/*
       <div className="if-node-condition">
         <label>IF (もし):</label>
-        <select 
-          className="if-node-select" 
-          value={data.conditionTargetId || ""}
-          onChange={handleTargetChange}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <option value="">-- アイテムを選択 --</option>
-          {placedItems.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
+        <select ... >
+          ...
         </select>
         
         <label>IS (が):</label>
-        <select 
-          className="if-node-select" 
-          value={data.conditionType || "isVisible"}
-          onChange={handleConditionChange}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <option value="isVisible">表示されている (True)</option>
-          <option value="isHidden">非表示である (False)</option>
+        <select ... >
+          ...
         </select>
       </div>
+      */}
+      {/* (★ 削除) ここまで */}
 
       {/* (3) 出力ハンドル (True / False) */}
       <div className="if-node-output-group">

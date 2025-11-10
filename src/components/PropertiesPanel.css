@@ -1,9 +1,96 @@
 /* src/components/PropertiesPanel.css */
 
+/* (★ 変更なし) パネルのルートラッパー */
+.panel-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden; /* スクロールは .panel-content-scrollable で行う */
+}
+
+
+/* (★ 変更なし) タブUIのスタイル */
+.inspector-tabs-container {
+  display: flex;
+  flex-shrink: 0; /* タブは縮まない */
+  overflow-x: auto; /* タブが多すぎたら横スクロール */
+  background-color: #2a2a2a; /* パネル背景色 */
+  border-bottom: 1px solid #1e1e1e; /* 暗い区切り線 */
+  padding: 4px 4px 0 4px; /* 下だけパディング 0 */
+  
+  /* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) Firefox用スクロールバー ↓↓↓↓↓↓↓↓↓↓ */
+  scrollbar-width: thin;
+  scrollbar-color: #555 #1e1e1e; /* (thumb track) */
+  /* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */
+}
+
+.inspector-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #3a3a3a;
+  color: #aaa;
+  font-size: 0.9em;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 4px 4px 0 0; /* 上だけ角丸 */
+  border: 1px solid #444;
+  border-bottom: none; /* 下の線は消す */
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
+.inspector-tab:hover {
+  background-color: #4a4a4a;
+  color: #ccc;
+}
+
+.inspector-tab.is-active {
+  background-color: #2a2a2a; /* パネルのコンテンツ背景色と同じ */
+  color: #eee;
+  font-weight: bold;
+  /* アクティブなタブの下ボーダーを背景色で上書きして消す */
+  border-bottom: 1px solid #2a2a2a;
+  margin-bottom: -1px; /* 1px分だけ下に伸ばして、下の区切り線を隠す */
+}
+
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-close {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #aaa;
+  border-radius: 50%;
+  padding: 0 2px;
+}
+.tab-close:hover {
+  color: #fff;
+  background-color: #555;
+}
+
+
+/* (★ 変更なし) .panel-content を .panel-content-scrollable に変更 */
+.panel-content-scrollable {
+  flex-grow: 1; /* 残りの高さをすべて使う */
+  overflow-y: auto; /* コンテンツが多ければスクロール */
+  padding: 12px;
+  
+  /* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) Firefox用スクロールバー ↓↓↓↓↓↓↓↓↓↓ */
+  scrollbar-width: auto; /* (thin ではなく auto) */
+  scrollbar-color: #555 #2a2a2a; /* (thumb track) */
+  /* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */
+}
+
+
+/* .properties-panel-content はアコーディオンのラッパーとして残す */
 .properties-panel-content {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0;
   color: #eee;
 }
 
@@ -33,10 +120,10 @@
   padding: 6px 8px;
   border-radius: 4px;
   border: 1px solid #444;
-  color: #eee; /* 入力文字の色 */
-  font-family: inherit; /* フォントを親と合わせる */
-  width: 100%; /* 親要素の幅いっぱいに */
-  box-sizing: border-box; /* paddingを含めて幅を計算 */
+  color: #eee; 
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box; 
 }
 
 .prop-input:focus {
@@ -70,20 +157,88 @@
   padding-left: 2px;
 }
 
-/* (★ 追記: 編集不可の表示用スタイル) */
-.prop-value-display {
-  font-size: 1em;
-  font-weight: 500;
-  background-color: #2a2a2a;
-  padding: 6px 8px;
-  border-radius: 4px;
-  border: 1px solid #444;
-  color: #aaa; /* (編集不可なので少し暗く) */
-  font-family: inherit;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 30px; /* (inputの高さと合わせる) */
-  display: flex;
-  align-items: center;
+/* (★ 変更なし) アコーディオンUIのスタイル */
+.accordion-section {
+  border-bottom: 1px solid #444;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+}
+.accordion-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
+.accordion-header {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 4px; /* 開いている時のコンテンツとのマージン */
+}
+
+.accordion-title {
+  font-weight: bold;
+  color: #eee;
+  font-size: 1.05em;
+}
+
+.accordion-icon {
+  font-size: 0.8em;
+  color: #aaa;
+  margin-right: 6px;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.accordion-icon.is-open {
+  transform: rotate(0deg); /* 開 (▼) */
+}
+
+.accordion-icon:not(.is-open) {
+  transform: rotate(-90deg); /* 閉 (▶) */
+}
+
+.accordion-content {
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) スクロールバーのスタイル（ダークテーマ） ↓↓↓↓↓↓↓↓↓↓ */
+/* Webkit (Chrome, Safari, Edge) */
+.inspector-tabs-container::-webkit-scrollbar {
+  height: 6px; /* スクロールバーの高さ */
+}
+
+.inspector-tabs-container::-webkit-scrollbar-track {
+  /* (★ 修正) 背景色を #2a2a2a から #1e1e1e (より暗い色) に変更 */
+  background: #1e1e1e; 
+  border-radius: 3px;
+}
+
+.inspector-tabs-container::-webkit-scrollbar-thumb {
+  background-color: #555; /* つまみの色 */
+  border-radius: 3px;
+}
+
+.inspector-tabs-container::-webkit-scrollbar-thumb:hover {
+  background-color: #777; /* ホバー時のつまみの色 */
+}
+
+/* (★ 変更なし) .panel-content-scrollable の縦スクロールバー */
+.panel-content-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+.panel-content-scrollable::-webkit-scrollbar-track {
+  background: #2a2a2a;
+}
+.panel-content-scrollable::-webkit-scrollbar-thumb {
+  background-color: #555;
+  border-radius: 4px;
+  border: 2px solid #2a2a2a; /* パディングのように見せる */
+}
+.panel-content-scrollable::-webkit-scrollbar-thumb:hover {
+  background-color: #777;
+}
+/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */

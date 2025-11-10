@@ -1,0 +1,50 @@
+/* src/components/nodes/PageNode.css */
+
+.page-node {
+  background: #6a3ac3; /* (紫系) */
+  border: 1px solid #4a1b9a;
+  border-radius: 5px;
+  padding: 10px 15px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 170px;
+  text-align: center;
+  /* (★ 追加: z-index 対策) */
+  position: relative;
+  z-index: 10;
+}
+
+/* (ハンドルスタイル) */
+.page-node .react-flow__handle-left {
+  left: -8px;
+  background: #efefef;
+  border: 2px solid #6a3ac3;
+}
+/* (ページノードは出力ハンドルなし) */
+
+.page-node-label {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  font-weight: bold;
+}
+
+.page-node-select-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.page-node-select {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 3px;
+  border: 1px solid #4a1b9a;
+  background-color: #f0f0f0;
+  color: #333;
+  font-size: 13px;
+}

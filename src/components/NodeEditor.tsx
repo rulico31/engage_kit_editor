@@ -17,7 +17,7 @@ import ReactFlow, {
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import NodeToolboxItem from "./NodeToolboxItem";
-import type { PlacedItemType } from "../types";
+import type { PlacedItemType, PageInfo } from "../types";
 
 import "reactflow/dist/style.css";
 import "./NodeEditor.css";
@@ -25,6 +25,11 @@ import "./NodeEditor.css";
 import EventNode from "./nodes/EventNode";
 import ActionNode from "./nodes/ActionNode";
 import IfNode from "./nodes/IfNode";
+import PageNode from "./nodes/PageNode.tsx";
+import SetVariableNode from "./nodes/SetVariableNode.tsx";
+// ↓↓↓↓↓↓↓↓↓↓ (★ 追加) AnimateNode をインポート ↓↓↓↓↓↓↓↓↓↓
+import AnimateNode from "./nodes/AnimateNode.tsx";
+// ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
 
 // --- Props の型定義 ---
 interface NodeEditorProps {
@@ -34,9 +39,10 @@ interface NodeEditorProps {
   onEdgesChange: OnEdgesChange;
   onNodeAdd: (newNode: Node) => void;
   onConnect: OnConnect;
-  placedItems: PlacedItemType[]; // (★ App.tsx 側で || [] するので型は変更なし)
+  placedItems: PlacedItemType[];
   onNodeDataChange: (nodeId: string, dataUpdate: any) => void;
   onNodeClick: (nodeId: string) => void;
+  pageInfoList: PageInfo[];
 }
 
 // --- ドラッグアイテムの型 ---
@@ -45,6 +51,7 @@ interface NodeToolDragItem {
   nodeName: string;
 }
 
+// --- (2) Nodeクリックハンドラ型定義（React Flow v11以降対応）---
 type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
 
 const NodeEditor: React.FC<NodeEditorProps> = ({
@@ -54,9 +61,10 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
   onEdgesChange,
   onNodeAdd,
   onConnect,
-  placedItems, // (受け取る)
+  placedItems,
   onNodeDataChange,
   onNodeClick,
+  pageInfoList,
 }) => {
   const { fitView, project } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -104,32 +112,32 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     }
   }, [nodes ? nodes[0]?.id : undefined, fitView]);
 
-  // nodeTypes の useMemo (props を中継)
+  // (ユーザー要望) nodeTypes の useMemo (props を中継)
   const nodeTypes = useMemo(() => {
     const wrappedEventNode = (props: NodeProps) => <EventNode {...props} />;
-    
-    const wrappedActionNode = (props: NodeProps) => (
-      <ActionNode
-        {...props} 
-        placedItems={placedItems} // (★ ここで placedItems を渡す)
-        onDataChange={onNodeDataChange} 
-      />
+    const wrappedActionNode = (props: NodeProps) => ( <ActionNode {...props} /> );
+    const wrappedIfNode = (props: NodeProps) => ( <IfNode {...props} /> );
+    const wrappedPageNode = (props: NodeProps) => ( <PageNode {...props} /> );
+    const wrappedSetVariableNode = (props: NodeProps) => ( <SetVariableNode {...props} /> );
+    // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) AnimateNode を定義 ↓↓↓↓↓↓↓↓↓↓
+    const wrappedAnimateNode = (props: NodeProps) => (
+      <AnimateNode {...props} />
     );
-    const wrappedIfNode = (props: NodeProps) => (
-      <IfNode 
-        {...props} 
-        placedItems={placedItems} // (★ ここで placedItems を渡す)
-        onDataChange={onNodeDataChange} 
-      />
-    );
+    // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
 
     return {
       eventNode: wrappedEventNode,
       actionNode: wrappedActionNode,
       ifNode: wrappedIfNode,
+      pageNode: wrappedPageNode,
+      setVariableNode: wrappedSetVariableNode,
+      // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) animateNode を登録 ↓↓↓↓↓↓↓↓↓↓
+      animateNode: wrappedAnimateNode,
+      // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
     };
-  }, [placedItems, onNodeDataChange]); // (★ 依存配列に placedItems を追加)
+  }, []); // (★ 修正) 依存配列を空にする
 
+  // --- (3) handleNodeClick の型注釈を修正 ---
   const handleNodeClick: NodeClickHandler = (event, node) => {
     onNodeClick(node.id);
   };
@@ -148,13 +156,32 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     <div className="node-editor-wrapper" ref={reactFlowWrapper}>
       {/* ツールボックス */}
       <aside className="node-toolbox">
-        {/* (★ 修正: このヘッダーを削除) */}
-        {/* <div className="toolbox-header">ロジックノード</div> */}
+        <div className="toolbox-header">ロジックノード</div>
         <NodeToolboxItem
           nodeType="actionNode"
           nodeName="⚡ アクション: 表示/非表示"
         >
           ⚡ 表示/非表示
+        </NodeToolboxItem>
+        {/* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) アニメーションノードを追加 ↓↓↓↓↓↓↓↓↓↓ */}
+        <NodeToolboxItem
+          nodeType="animateNode"
+          nodeName="⚡ アクション: アニメーション"
+        >
+          ⚡ アニメーション
+        </NodeToolboxItem>
+        {/* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */}
+        <NodeToolboxItem
+          nodeType="pageNode"
+          nodeName="⚡ アクション: ページ遷移"
+        >
+          ⚡ ページ遷移
+        </NodeToolboxItem>
+        <NodeToolboxItem
+          nodeType="setVariableNode"
+          nodeName="⚡ アクション: 変数をセット"
+        >
+          ⚡ 変数をセット
         </NodeToolboxItem>
         <NodeToolboxItem nodeType="ifNode" nodeName="🧠 ロジック: もし〜なら">
           🧠 もし〜なら

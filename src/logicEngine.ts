@@ -1,7 +1,7 @@
 // src/logicEngine.ts
 
 import type { Node, Edge } from "reactflow";
-import type { PreviewState, NodeGraph } from "./types";
+import type { PreviewState, NodeGraph, VariableState, PreviewItemState } from "./types";
 
 /**
  * 渡されたノードID配列（次に実行すべきノード）を処理する
@@ -10,13 +10,19 @@ import type { PreviewState, NodeGraph } from "./types";
  * @param allEdges - グラフ内の全エッジ
  * @param getPreviewState - 現在のプレビュー状態を取得する関数
  * @param setPreviewState - プレビュー状態を更新する関数
+ * @param requestPageChange - ページ遷移をリクエストする関数
+ * @param getVariables - 現在の変数を取得する関数
+ * @param setVariables - 変数を更新する関数
  */
 const processQueue = (
   executionQueue: string[],
   allNodes: Node[],
   allEdges: Edge[],
   getPreviewState: () => PreviewState,
-  setPreviewState: (newState: PreviewState) => void
+  setPreviewState: (newState: PreviewState) => void,
+  requestPageChange: (pageId: string) => void,
+  getVariables: () => VariableState,
+  setVariables: (newVars: VariableState) => void
 ) => {
   const nextQueue: string[] = [];
 
@@ -41,38 +47,76 @@ const processQueue = (
           else if (mode === "hide") newVisibility = false;
           else if (mode === "toggle") newVisibility = !targetItemState.isVisible;
 
-          // 状態を更新
+          // (★ 変更) 状態を更新
           setPreviewState({
             ...currentState,
             [targetItemId]: { ...targetItemState, isVisible: newVisibility },
           });
         }
       }
-      // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) "source" ではなく null を渡す ↓↓↓↓↓↓↓↓↓↓
-      // 次のノード（"source" ハンドルから）を探してキューに追加
       const nextNode = findNextNode(node.id, null, allEdges);
-      // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
       if (nextNode) nextQueue.push(nextNode);
     }
 
     // (2) If ノード (条件分岐)
     else if (node.type === "ifNode") {
-      const { conditionTargetId, conditionType } = node.data;
-      const currentState = getPreviewState();
-      const targetItemState = currentState[conditionTargetId];
+      const { 
+        conditionSource = 'item', 
+        conditionTargetId, 
+        conditionType,
+        variableName,
+        comparison,
+        comparisonValue
+      } = node.data;
 
       let conditionResult = false; // デフォルトは False
-      if (targetItemState) {
-        if (conditionType === "isVisible") {
-          conditionResult = targetItemState.isVisible === true;
-        } else if (conditionType === "isHidden") {
-          conditionResult = targetItemState.isVisible === false;
+
+      if (conditionSource === 'item') {
+        const currentState = getPreviewState();
+        const targetItemState = currentState[conditionTargetId];
+        if (targetItemState) {
+          if (conditionType === "isVisible") {
+            conditionResult = targetItemState.isVisible === true;
+          } else if (conditionType === "isHidden") {
+            conditionResult = targetItemState.isVisible === false;
+          }
+        }
+      } else if (conditionSource === 'variable') {
+        const currentVars = getVariables();
+        const varValue = currentVars[variableName];
+        
+        switch (comparison) {
+          case '==':
+            // eslint-disable-next-line eqeqeq
+            conditionResult = varValue == comparisonValue;
+            break;
+          case '!=':
+            // eslint-disable-next-line eqeqeq
+            conditionResult = varValue != comparisonValue;
+            break;
+          case '>':
+            conditionResult = Number(varValue) > Number(comparisonValue);
+            break;
+          case '>=':
+            conditionResult = Number(varValue) >= Number(comparisonValue);
+            break;
+          case '<':
+            conditionResult = Number(varValue) < Number(comparisonValue);
+            break;
+          case '<=':
+            conditionResult = Number(varValue) <= Number(comparisonValue);
+            break;
+          case 'contains':
+            conditionResult = String(varValue).includes(String(comparisonValue));
+            break;
+          case 'not_contains':
+            conditionResult = !String(varValue).includes(String(comparisonValue));
+            break;
         }
       }
 
-      console.log(`[LogicEngine] 🧠 条件 (${conditionType}): ${conditionResult}`);
+      console.log(`[LogicEngine] 🧠 条件 (${conditionSource}): ${conditionResult}`);
 
-      // 結果に応じて "true" または "false" ハンドルから次のノードを探す
       const nextNode = findNextNode(
         node.id,
         conditionResult ? "true" : "false",
@@ -80,19 +124,118 @@ const processQueue = (
       );
       if (nextNode) nextQueue.push(nextNode);
     }
+    
+    // (3) ページ遷移ノード
+    else if (node.type === "pageNode") {
+      const { targetPageId } = node.data;
+      if (targetPageId) {
+        console.log(`[LogicEngine] 🚀 ページ遷移: ${targetPageId} へ`);
+        requestPageChange(targetPageId);
+      }
+    }
+    
+    // (4) 変数セットノード
+    else if (node.type === "setVariableNode") {
+      const { variableName, operation = 'set', value } = node.data;
+      
+      if (variableName) {
+        const currentVars = getVariables();
+        let newValue = value;
+        
+        if (operation === 'add') {
+          const currentValueNum = Number(currentVars[variableName] || 0);
+          const valueToAddNum = Number(value || 0);
+          newValue = currentValueNum + valueToAddNum;
+        }
+        
+        console.log(`[LogicEngine] 💾 変数セット: ${variableName} = ${newValue}`);
+        setVariables({
+          ...currentVars,
+          [variableName]: newValue
+        });
+      }
 
-    // (3) イベントノード (通常はここから始まらないが、念のため)
-    else if (node.type === "eventNode") {
-      // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) "source" ではなく null を渡す ↓↓↓↓↓↓↓↓↓↓
       const nextNode = findNextNode(node.id, null, allEdges);
-      // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
+      if (nextNode) nextQueue.push(nextNode);
+    }
+    
+    // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) AnimateNodeの処理 ↓↓↓↓↓↓↓↓↓↓
+    // (5) アニメーションノード
+    else if (node.type === "animateNode") {
+      const { 
+        targetItemId, 
+        animType, 
+        value, 
+        durationS = 0.5, 
+        delayS = 0, 
+        easing = 'ease' 
+      } = node.data;
+
+      if (targetItemId) {
+        const currentState = getPreviewState();
+        const targetItemState = currentState[targetItemId];
+
+        if (targetItemState) {
+          const newItemState: PreviewItemState = { ...targetItemState };
+          let cssProperty = ''; // transition に適用するCSSプロパティ名
+
+          // どのプロパティを変更するか
+          if (animType === 'opacity') {
+            cssProperty = 'opacity';
+            newItemState.opacity = Number(value);
+          } else if (animType === 'moveX') {
+            cssProperty = 'transform';
+            newItemState.x = Number(value);
+          } else if (animType === 'moveY') {
+            cssProperty = 'transform';
+            newItemState.y = Number(value);
+          } else if (animType === 'scale') {
+            cssProperty = 'transform';
+            newItemState.scale = Number(value);
+          } else if (animType === 'rotate') {
+            cssProperty = 'transform';
+            newItemState.rotation = Number(value);
+          }
+          
+          // transform系は transition: 'transform ...'
+          // opacity系は transition: 'opacity ...'
+          if (cssProperty) {
+            newItemState.transition = `${cssProperty} ${durationS}s ${easing} ${delayS}s`;
+            
+            console.log(`[LogicEngine] 🎨 アニメーション実行: ${targetItemId} -> ${cssProperty} = ${value}`);
+            
+            setPreviewState({
+              ...currentState,
+              [targetItemId]: newItemState,
+            });
+          }
+        }
+      }
+      
+      const nextNode = findNextNode(node.id, null, allEdges);
+      if (nextNode) nextQueue.push(nextNode);
+    }
+    // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
+
+    // (6) イベントノード
+    else if (node.type === "eventNode") {
+      const nextNode = findNextNode(node.id, null, allEdges);
       if (nextNode) nextQueue.push(nextNode);
     }
   }
 
   // 次のキューが溜まったら、再帰的に処理（非同期の代わり）
   if (nextQueue.length > 0) {
-    processQueue(nextQueue, allNodes, allEdges, getPreviewState, setPreviewState);
+    processQueue(
+      nextQueue, 
+      allNodes, 
+      allEdges, 
+      getPreviewState, 
+      setPreviewState, 
+      requestPageChange,
+      getVariables,
+      setVariables
+    );
   }
 };
 
@@ -112,23 +255,19 @@ const findNextNode = (
 
 /**
  * 外部から呼び出す実行トリガー
- * @param eventName - "click", "onLoad" など
- * @param targetItemId - イベントが発生したアイテムID
- * @param currentPageGraph - 現在のページの全ロジックグラフ
- * @param getPreviewState - 現在のプレビュー状態を取得する関数
- * @param setPreviewState - プレビュー状態を更新する関数
  */
 export const triggerEvent = (
   eventName: string, // "click"
   targetItemId: string, // "item-123"
   currentPageGraph: NodeGraph,
   getPreviewState: () => PreviewState,
-  setPreviewState: (newState: PreviewState) => void
+  setPreviewState: (newState: PreviewState) => void,
+  requestPageChange: (pageId: string) => void,
+  getVariables: () => VariableState,
+  setVariables: (newVars: VariableState) => void
 ) => {
   const { nodes, edges } = currentPageGraph;
 
-  // このイベント（例: "item-123" の "click"）に該当するイベントノードを探す
-  // (注: App.tsx側で、allItemLogics[targetItemId] のグラフを渡す想定)
   const startingNode = nodes.find(
     (n) => n.type === "eventNode" && n.data.eventType === eventName
   );
@@ -140,11 +279,17 @@ export const triggerEvent = (
 
   console.log(`[LogicEngine] 🎬 イベント発生: ${startingNode.data.label}`);
   
-  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) "source" ではなく null を渡す ↓↓↓↓↓↓↓↓↓↓
-  // イベントノードの次から実行キューを開始
   const nextNodeId = findNextNode(startingNode.id, null, edges);
-  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
   if (nextNodeId) {
-    processQueue([nextNodeId], nodes, edges, getPreviewState, setPreviewState);
+    processQueue(
+      [nextNodeId], 
+      nodes, 
+      edges, 
+      getPreviewState, 
+      setPreviewState, 
+      requestPageChange,
+      getVariables,
+      setVariables
+    );
   }
 };
