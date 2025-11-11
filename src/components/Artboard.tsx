@@ -102,27 +102,28 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
 
   // (★ 変更なし) アイテム種別切り替え
   if (item.name.startsWith("ボタン")) {
-    content = <button className="item-button-content">{item.name}</button>;
-  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) <img> タグに draggable={false} を追加 ↓↓↓↓↓↓↓↓↓↓
+    // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) item.name -> item.data.text を表示 ↓↓↓↓↓↓↓↓↓↓
+    content = <button className="item-button-content">{item.data.text}</button>;
+    // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
   } else if (item.name.startsWith("画像")) {
     if (item.data?.src) {
       content = (
         <div className="item-image-content">
           <img
             src={item.data.src}
-            alt={item.name}
-            draggable={false} // (★) これが修正点です
+            alt={item.data.text} // (★) alt も data.text に
+            draggable={false} // (★) ドラッグ競合を修正
           />
         </div>
       );
     } else {
       content = (
         <div className="item-image-content is-placeholder">
-          {item.name} (No Image)
+          {/* (★) プレースホルダーも data.text に */}
+          {item.data.text} (No Image) 
         </div>
       );
     }
-  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
   } else if (item.name.startsWith("テキスト入力欄")) {
     const placeholder = item.data?.placeholder || "テキストを入力...";
     content = (
@@ -152,7 +153,10 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
       </div>
     );
   } else {
-    content = <div className="item-text-content">{item.name}</div>;
+    // (デフォルトはテキスト)
+    // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) item.name -> item.data.text を表示 ↓↓↓↓↓↓↓↓↓↓
+    content = <div className="item-text-content">{item.data.text}</div>;
+    // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
   }
 
   return (
@@ -218,35 +222,53 @@ const Artboard: React.FC<ArtboardProps> = ({
         const x = clientOffset.x - artboardRect.left;
         const y = clientOffset.y - artboardRect.top;
         const newItemId = `item-${Date.now()}`;
+        
+        // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) data プロパティの初期化を修正 ↓↓↓↓↓↓↓↓↓↓
         const newItem: PlacedItemType = {
           id: newItemId,
-          name: item.name,
+          name: item.name, // (種類名: "テキスト")
           x: x,
           y: y,
           width: 100,
           height: 40,
-          data: { src: null },
+          data: {
+            text: item.name, // (表示名: "テキスト")
+            src: null,
+          },
         };
+        // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
+
+        // (アイテムの種類に応じてサイズを変更)
         if (item.name === "画像") {
           newItem.width = 150;
           newItem.height = 100;
+          newItem.data.text = "画像"; // (表示名)
         } else if (item.name === "テキスト") {
           newItem.width = 120;
+          newItem.data.text = "テキスト"; // (表示名)
         } else if (item.name === "テキスト入力欄") {
           newItem.width = 200;
           newItem.height = 45;
           newItem.data = {
+            text: "", // (入力欄は表示テキストを持たない)
+            src: null,
             variableName: `input_${Date.now()}`,
             placeholder: "テキストを入力...",
           };
         }
+
         setPlacedItems((prev) => [...prev, newItem]);
+        
+        // (★) 新しいアイテムに対応するロジックグラフを作成
         const templateKey = Object.keys(nodeGraphTemplates).find(key => item.name.startsWith(key)) || "Default";
         const newGraph = nodeGraphTemplates[templateKey];
+        
         setAllItemLogics((prev) => ({
           ...prev,
           [newItemId]: newGraph
         }));
+        
+        // (★) 作成したアイテムを即座に選択
         onItemSelect(newItemId);
       },
     }),
@@ -281,7 +303,6 @@ const Artboard: React.FC<ArtboardProps> = ({
   const handleItemMouseDown = useCallback((e: React.MouseEvent, itemId: string) => {
     if (isPreviewing) return;
     
-    // (★) placedItems をここで再検索 (依存配列から削除するため)
     const item = placedItems.find((p) => p.id === itemId);
     if (!item) return;
 
@@ -303,9 +324,10 @@ const Artboard: React.FC<ArtboardProps> = ({
     window.addEventListener("mouseup", handleMouseUp);
     
     e.stopPropagation();
-  }, [isPreviewing, placedItems, onItemSelect, handleMouseMove, handleMouseUp]); // (★) 安定化のため placedItems を依存配列に追加
+  }, [isPreviewing, placedItems, onItemSelect, handleMouseMove, handleMouseUp]);
 
   // --- (3) ArtboardItem をメモ化 ---
+  // (★ 変更なし)
   const MemoizedArtboardItem = useMemo(() => {
     return React.memo((props: ArtboardItemProps) => (
       <ArtboardItem
@@ -314,7 +336,6 @@ const Artboard: React.FC<ArtboardProps> = ({
         onItemDragStart={handleItemMouseDown}
       />
     ));
-  // (★ 変更なし)
   }, [onItemSelect, handleItemMouseDown]);
 
   return (

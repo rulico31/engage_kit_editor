@@ -5,14 +5,20 @@ import type { Node, Edge } from "reactflow";
 // アートボードに配置されたアイテムが持つデータの型
 export interface PlacedItemType {
   id: string;
-  name: string;
+  name: string; // (内部的な種類名: "テキスト", "画像" など)
   x: number;
   y: number;
   width: number;
   height: number;
-  // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) 画像のbase64データや将来的な設定を保持するため ↓↓↓↓↓↓↓↓↓↓
-  data?: Record<string, any>;
-  // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
+  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) dataプロパティを必須にし、textを追加 ↓↓↓↓↓↓↓↓↓↓
+  data: {
+    text: string; // (ユーザーが表示・編集するテキスト)
+    src: string | null; // (画像ソース)
+    variableName?: string; // (入力欄の変数名)
+    placeholder?: string; // (入力欄のプレースホルダー)
+    [key: string]: any; // 将来的な他のデータ
+  };
+  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
 }
 
 // ↓↓↓↓↓↓↓↓↓↓ (★ 変更) PreviewItemState を大幅に拡張 ↓↓↓↓↓↓↓↓↓↓

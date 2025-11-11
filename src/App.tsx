@@ -266,7 +266,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
               {/* (B-3) 右エリア (プロパティ) */}
               <Panel defaultSize={25} minSize={15} className="panel-content">
-                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) `setPlacedItems` を渡さない ↓↓↓↓↓↓↓↓↓↓ */}
+                {/* (★ 変更なし) `setPlacedItems` を渡さない */}
                 <PropertiesPanel
                   selection={selection}
                   activeTabId={activeTabId}
@@ -279,7 +279,6 @@ const EditorView: React.FC<EditorViewProps> = ({
                   onNodeDataChange={onNodeDataChange}
                   pageInfoList={pageInfoList}
                 />
-                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </Panel>
             </PanelGroup>
           </Panel>
@@ -428,13 +427,26 @@ function App() {
       const newPlacedItems = currentPage.placedItems.map((item) =>
         item.id === itemId ? { ...item, ...updatedProps } : item
       );
-
-      // (★ 変更なし) "data" の変更ではタブ名は変更しない
+      
+      // (1) アイテム名が更新された場合
       if (updatedProps.name) {
         setSelection(prevSel => prevSel.map(s => 
           s.id === itemId ? { ...s, label: `🔘 ${updatedProps.name}` } : s
         ));
       }
+      
+      // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) エラーを修正 ↓↓↓↓↓↓↓↓↓↓
+      // (2) アイテムのデータ（テキスト）が更新された場合
+      if (updatedProps.data && updatedProps.data.text) {
+        // (★) updatedProps.data.text が undefined でないことを
+        // (★) この if ブロックで保証済み
+        const newLabel = updatedProps.data.text; // (1) 安全な変数に格納
+        
+        setSelection(prevSel => prevSel.map(s => 
+          s.id === itemId ? { ...s, label: `🔘 ${newLabel}` } : s // (2) 安全な変数を使用
+        ));
+      }
+      // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
       
       return {
         ...prevPages,
@@ -619,7 +631,9 @@ function App() {
     const item = placedItems.find(p => p.id === itemId);
     if (!item) return;
     
-    const newEntry: SelectionEntry = { id: itemId, type: 'item', label: `🔘 ${item.name}` };
+    // (★ 変更なし) タブのラベルを data.text から取得
+    const label = item.data?.text || item.name;
+    const newEntry: SelectionEntry = { id: itemId, type: 'item', label: `🔘 ${label}` };
 
     setSelection(prev => {
       const exists = prev.find(s => s.id === itemId);

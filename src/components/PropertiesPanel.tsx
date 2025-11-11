@@ -144,7 +144,7 @@ const NodePropertiesEditor: React.FC<{
             <option value="">-- アイテムを選択 --</option>
             {placedItems.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name}
+                {item.data.text || item.name}
               </option>
             ))}
           </select>
@@ -201,7 +201,7 @@ const NodePropertiesEditor: React.FC<{
                 <option value="">-- アイテムを選択 --</option>
                 {placedItems.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name}
+                    {item.data.text || item.name}
                   </option>
                 ))}
               </select>
@@ -362,7 +362,7 @@ const NodePropertiesEditor: React.FC<{
               <option value="">-- アイテムを選択 --</option>
               {placedItems.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name}
+                  {item.data.text || item.name}
                 </option>
               ))}
             </select>
@@ -505,13 +505,53 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     
     if (item) {
       // (アイテム編集UI)
-      const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => { onItemUpdate(item.id, { name: e.target.value }); };
-      const handleXChange = (e: React.ChangeEvent<HTMLInputElement>) => { onItemUpdate(item.id, { x: e.target.valueAsNumber || 0 }); };
-      const handleYChange = (e: React.ChangeEvent<HTMLInputElement>) => { onItemUpdate(item.id, { y: e.target.valueAsNumber || 0 }); };
-      const handleWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => { onItemUpdate(item.id, { width: e.target.valueAsNumber || 1 }); };
-      const handleHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => { onItemUpdate(item.id, { height: e.target.valueAsNumber || 1 }); };
+      
+      // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) ここからローカルステート管理 ↓↓↓↓↓↓↓↓↓↓
+      // (1) 位置とサイズのローカルステートを定義
+      const [localX, setLocalX] = useState(item.x);
+      const [localY, setLocalY] = useState(item.y);
+      const [localWidth, setLocalWidth] = useState(item.width);
+      const [localHeight, setLocalHeight] = useState(item.height);
+
+      // (2) 選択アイテムが変更されたら、ローカルステートを同期
+      useEffect(() => {
+        setLocalX(item.x);
+        setLocalY(item.y);
+        setLocalWidth(item.width);
+        setLocalHeight(item.height);
+      }, [item.id, item.x, item.y, item.width, item.height]);
+
+      // (3) onChange ハンドラ (ローカルステートのみ更新)
+      const handleLocalXChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalX(e.target.valueAsNumber); };
+      const handleLocalYChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalY(e.target.valueAsNumber); };
+      const handleLocalWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalWidth(e.target.valueAsNumber); };
+      const handleLocalHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalHeight(e.target.valueAsNumber); };
+      
+      // (4) onBlur ハンドラ (グローバルステートを更新 = 保存)
+      const handleLocalXBlur = () => {
+        const val = isNaN(localX) ? 0 : localX;
+        setLocalX(val); // (ローカルも正規化)
+        onItemUpdate(item.id, { x: val });
+      };
+      const handleLocalYBlur = () => {
+        const val = isNaN(localY) ? 0 : localY;
+        setLocalY(val);
+        onItemUpdate(item.id, { y: val });
+      };
+      const handleLocalWidthBlur = () => {
+        const val = (isNaN(localWidth) || localWidth < 1) ? 1 : localWidth;
+        setLocalWidth(val);
+        onItemUpdate(item.id, { width: val });
+      };
+      const handleLocalHeightBlur = () => {
+        const val = (isNaN(localHeight) || localHeight < 1) ? 1 : localHeight;
+        setLocalHeight(val);
+        onItemUpdate(item.id, { height: val });
+      };
+      // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ここまでローカルステート管理 ↑↑↑↑↑↑↑↑↑↑
+      
       const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
-      const handleBlur = () => { /* (ロジックは不要になった) */ };
+      const handleBlur = () => { /* (テキスト入力欄は onBlur で何もしない) */ };
       const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.target.select(); };
 
       // (★ 変更済) 画像アップロードハンドラ
@@ -557,20 +597,39 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         <div className="properties-panel-content">
           <AccordionSection title="基本情報" defaultOpen={true}>
             <div className="prop-group">
-              <div className="prop-label">Name</div>
-              {/* (★ 変更済) disabled 属性を追加 */}
+              <div className="prop-label">Name (アイテム種別)</div>
+              {/* (★ 変更なし) 編集不可のスタイルクラスを追加 */}
               <input
                 type="text"
-                className="prop-input"
+                className="prop-input prop-input-disabled"
                 value={item.name}
-                onChange={handleNameChange} // (呼ばれなくなる)
-                onKeyDown={handleKeyDown}
-                onBlur={handleBlur}
-                onFocus={handleFocus}
-                disabled // (★) Name はアイテムの種類を示すため編集不可にする
+                disabled 
               />
             </div>
           </AccordionSection>
+          
+          {/* (★ 変更なし) 「テキスト」「ボタン」用の編集UI */}
+          {(item.name.startsWith("テキスト") || item.name.startsWith("ボタン")) && (
+            <AccordionSection title="コンテンツ" defaultOpen={true}>
+              <div className="prop-group">
+                <div className="prop-label">
+                  {item.name.startsWith("ボタン") ? "ボタンテキスト" : "テキスト内容"}
+                </div>
+                <input
+                  type="text"
+                  className="prop-input"
+                  name="text"
+                  value={item.data?.text || ""}
+                  onChange={handleItemDataChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleBlur}
+                  onFocus={handleFocus}
+                  placeholder="表示するテキスト"
+                />
+              </div>
+            </AccordionSection>
+          )}
+
 
           {/* (★ 変更済) 「画像」アイテムの時だけ表示するUI */}
           {item.name.startsWith("画像") && (
@@ -610,7 +669,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </AccordionSection>
           )}
           
-          {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) ラベル名を変更 ↓↓↓↓↓↓↓↓↓↓ */}
+          {/* (★ 変更済) 「テキスト入力欄」の時だけ表示するUI */}
           {item.name.startsWith("テキスト入力欄") && (
             <AccordionSection title="入力欄設定" defaultOpen={true}>
               <div className="prop-group">
@@ -643,18 +702,37 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </div>
             </AccordionSection>
           )}
-          {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
 
 
           <AccordionSection title="位置" defaultOpen={true}>
             <div className="prop-row">
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">X</div>
-                <input type="number" className="prop-input" value={Math.round(item.x)} onChange={handleXChange} onKeyDown={handleKeyDown} onBlur={handleBlur} onFocus={handleFocus} />
+                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                <input
+                  type="number"
+                  className="prop-input"
+                  value={isNaN(localX) ? "" : Math.round(localX)}
+                  onChange={handleLocalXChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleLocalXBlur}
+                  onFocus={handleFocus}
+                />
+                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">Y</div>
-                <input type="number" className="prop-input" value={Math.round(item.y)} onChange={handleYChange} onKeyDown={handleKeyDown} onBlur={handleBlur} onFocus={handleFocus} />
+                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                <input
+                  type="number"
+                  className="prop-input"
+                  value={isNaN(localY) ? "" : Math.round(localY)}
+                  onChange={handleLocalYChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleLocalYBlur}
+                  onFocus={handleFocus}
+                />
+                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
             </div>
           </AccordionSection>
@@ -663,11 +741,31 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <div className="prop-row">
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">W</div>
-                <input type="number" className="prop-input" value={item.width} onChange={handleWidthChange} onKeyDown={handleKeyDown} onBlur={handleBlur} onFocus={handleFocus} />
+                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                <input
+                  type="number"
+                  className="prop-input"
+                  value={isNaN(localWidth) ? "" : localWidth}
+                  onChange={handleLocalWidthChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleLocalWidthBlur}
+                  onFocus={handleFocus}
+                />
+                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">H</div>
-                <input type="number" className="prop-input" value={item.height} onChange={handleHeightChange} onKeyDown={handleKeyDown} onBlur={handleBlur} onFocus={handleFocus} />
+                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                <input
+                  type="number"
+                  className="prop-input"
+                  value={isNaN(localHeight) ? "" : localHeight}
+                  onChange={handleLocalHeightChange}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleLocalHeightBlur}
+                  onFocus={handleFocus}
+                />
+                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
             </div>
           </AccordionSection>
