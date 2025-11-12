@@ -4,33 +4,56 @@
 import React, { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
+// (★ 変更なし) Context をインポート
 import type { PlacedItemType, NodeGraph, PreviewState, VariableState } from "../types";
+import { useEditorContext } from "../contexts/EditorContext";
 import "./Artboard.css";
 
+// (★ 変更なし) リサイズハンドルの定義
+type ResizeDirection = 
+  | "top-left" | "top-center" | "top-right"
+  | "middle-left" | "middle-right"
+  | "bottom-left" | "bottom-center" | "bottom-right";
+
+const RESIZE_HANDLES: ResizeDirection[] = [
+  "top-left", "top-center", "top-right",
+  "middle-left", "middle-right",
+  "bottom-left", "bottom-center", "bottom-right",
+];
+
+
 // --- (A) アイテムの型定義 ---
-// (★ 変更なし)
 interface ArtboardItemProps {
   item: PlacedItemType;
   onItemSelect: (id: string) => void;
   onItemDragStart: (e: React.MouseEvent, id: string) => void;
+  onItemResizeStart: (e: React.MouseEvent, id: string, direction: ResizeDirection) => void;
   selectedItemId: string | null;
+  // (プレビュー用)
   isPreviewing: boolean;
   previewState: PreviewState | null;
   onItemEvent: (eventName: string, itemId: string) => void;
+  
+  // (★ 変更なし) 変数関連のProps
   variables: VariableState;
   onVariableChange: (variableName: string, value: any) => void;
+  
+  // (★ 変更なし) ドラッグ中フラグ
+  isDragging: boolean;
 }
 
 const ArtboardItem: React.FC<ArtboardItemProps> = ({
   item,
   onItemSelect,
   onItemDragStart, 
+  onItemResizeStart,
   selectedItemId,
   isPreviewing,
   previewState,
   onItemEvent,
   variables,
   onVariableChange,
+  isDragging,
 }) => {
   // (★ 変更なし)
   const isSelected = item.id === selectedItemId;
@@ -40,6 +63,8 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     width: item.width,
     height: item.height,
   };
+  
+  // (★ 変更なし) ドラッグ中の transition を制御
   if (isPreviewing && previewState && previewState[item.id]) {
     const itemState = previewState[item.id];
     style.visibility = itemState.isVisible ? 'visible' : 'hidden';
@@ -47,8 +72,13 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     style.transform = `translate(${itemState.x}px, ${itemState.y}px) scale(${itemState.scale}) rotate(${itemState.rotation}deg)`;
     style.transition = itemState.transition || 'none';
   } else {
+    // 編集モード
     style.transform = `translate(${item.x}px, ${item.y}px)`;
     style.opacity = 1;
+    
+    if (isDragging) {
+      style.transition = 'none';
+    }
   }
 
   // (★ 変更なし) テキスト入力欄のローカルステート管理
@@ -63,7 +93,6 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
         setInputValue(externalValue);
       }
     } else {
-      // 編集モードに戻ったら、入力欄をクリアする
       setInputValue(""); 
     }
   }, [externalValue, isPreviewing]);
@@ -102,24 +131,21 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
 
   // (★ 変更なし) アイテム種別切り替え
   if (item.name.startsWith("ボタン")) {
-    // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) item.name -> item.data.text を表示 ↓↓↓↓↓↓↓↓↓↓
     content = <button className="item-button-content">{item.data.text}</button>;
-    // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
   } else if (item.name.startsWith("画像")) {
     if (item.data?.src) {
       content = (
         <div className="item-image-content">
           <img
             src={item.data.src}
-            alt={item.data.text} // (★) alt も data.text に
-            draggable={false} // (★) ドラッグ競合を修正
+            alt={item.data.text}
+            draggable={false}
           />
         </div>
       );
     } else {
       content = (
         <div className="item-image-content is-placeholder">
-          {/* (★) プレースホルダーも data.text に */}
           {item.data.text} (No Image) 
         </div>
       );
@@ -132,10 +158,9 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
           type="text"
           className="artboard-item-input"
           placeholder={placeholder}
-          value={inputValue} // (★) ローカルステートを参照
-          readOnly={!isPreviewing} // (★) 編集モードでは読み取り専用
+          value={inputValue}
+          readOnly={!isPreviewing}
           onChange={(e) => {
-            // (★) プレビューモード中のみ、入力イベントを許可
             if (isPreviewing) {
               setInputValue(e.target.value);
               onVariableChange(variableName, e.target.value);
@@ -153,10 +178,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
       </div>
     );
   } else {
-    // (デフォルトはテキスト)
-    // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) item.name -> item.data.text を表示 ↓↓↓↓↓↓↓↓↓↓
     content = <div className="item-text-content">{item.data.text}</div>;
-    // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
   }
 
   return (
@@ -167,45 +189,61 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
       onMouseDown={handleMouseDown}
     >
       {content}
+      
+      {/* (★ 変更なし) リサイズハンドルの描画 */}
+      {isSelected && !isPreviewing && (
+        <>
+          {RESIZE_HANDLES.map((dir) => (
+            <div
+              key={dir}
+              className={`resize-handle ${dir}`}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                onItemResizeStart(e, item.id, dir);
+              }}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 };
 
 // --- (B) アートボード本体の型定義 ---
-// (★ 変更なし)
-interface ArtboardProps {
-  placedItems: PlacedItemType[];
-  setPlacedItems: React.Dispatch<React.SetStateAction<PlacedItemType[]>>;
-  onItemSelect: (id: string) => void;
-  onBackgroundClick: () => void;
-  selectedItemId: string | null;
-  setAllItemLogics: React.Dispatch<React.SetStateAction<Record<string, NodeGraph>>>;
-  nodeGraphTemplates: Record<string, NodeGraph>;
-  isPreviewing: boolean;
-  previewState: PreviewState;
-  onItemEvent: (eventName: string, itemId: string) => void;
-  variables: VariableState;
-  onVariableChange: (variableName: string, value: any) => void;
-}
+// (★ 変更なし) Props の定義を削除
 
-const Artboard: React.FC<ArtboardProps> = ({
-  placedItems,
-  setPlacedItems,
-  onItemSelect,
-  onBackgroundClick,
-  selectedItemId,
-  setAllItemLogics,
-  nodeGraphTemplates,
-  isPreviewing,
-  previewState,
-  onItemEvent,
-  variables,
-  onVariableChange,
-}) => {
+// (★ 変更なし) Props を受け取らない
+const Artboard: React.FC = () => {
+
+  // (★ 変更なし) Context から必要なデータ/関数を取得
+  const {
+    placedItems,
+    setPlacedItems,
+    onItemSelect,
+    onBackgroundClick,
+    selection,
+    activeTabId,
+    setAllItemLogics,
+    nodeGraphTemplates,
+    isPreviewing,
+    previewState,
+    onItemEvent,
+    variables,
+    onVariableChange,
+  } = useEditorContext();
+  
+  const selectedItemId = selection.find(s => s.id === activeTabId && s.type === 'item')?.id || null;
+
   // (★ 変更なし)
   const artboardRef = useRef<HTMLDivElement>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const draggedItemIdRef = useRef<string | null>(null);
+  const resizeInfoRef = useRef<{
+    startPos: { x: number; y: number };
+    startItem: PlacedItemType;
+    direction: ResizeDirection;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // (★ 変更なし) アイテムのドラッグ＆ドロップ (D&D)
   const [{ isOver }, drop] = useDrop(
@@ -222,53 +260,42 @@ const Artboard: React.FC<ArtboardProps> = ({
         const x = clientOffset.x - artboardRect.left;
         const y = clientOffset.y - artboardRect.top;
         const newItemId = `item-${Date.now()}`;
-        
-        // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) data プロパティの初期化を修正 ↓↓↓↓↓↓↓↓↓↓
         const newItem: PlacedItemType = {
           id: newItemId,
-          name: item.name, // (種類名: "テキスト")
+          name: item.name,
           x: x,
           y: y,
           width: 100,
           height: 40,
           data: {
-            text: item.name, // (表示名: "テキスト")
+            text: item.name,
             src: null,
           },
         };
-        // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
-
-        // (アイテムの種類に応じてサイズを変更)
         if (item.name === "画像") {
           newItem.width = 150;
           newItem.height = 100;
-          newItem.data.text = "画像"; // (表示名)
+          newItem.data.text = "画像";
         } else if (item.name === "テキスト") {
           newItem.width = 120;
-          newItem.data.text = "テキスト"; // (表示名)
+          newItem.data.text = "テキスト";
         } else if (item.name === "テキスト入力欄") {
           newItem.width = 200;
           newItem.height = 45;
           newItem.data = {
-            text: "", // (入力欄は表示テキストを持たない)
+            text: "", 
             src: null,
             variableName: `input_${Date.now()}`,
             placeholder: "テキストを入力...",
           };
         }
-
         setPlacedItems((prev) => [...prev, newItem]);
-        
-        // (★) 新しいアイテムに対応するロジックグラフを作成
         const templateKey = Object.keys(nodeGraphTemplates).find(key => item.name.startsWith(key)) || "Default";
         const newGraph = nodeGraphTemplates[templateKey];
-        
         setAllItemLogics((prev) => ({
           ...prev,
           [newItemId]: newGraph
         }));
-        
-        // (★) 作成したアイテムを即座に選択
         onItemSelect(newItemId);
       },
     }),
@@ -297,6 +324,8 @@ const Artboard: React.FC<ArtboardProps> = ({
     draggedItemIdRef.current = null;
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
+    
+    setIsDragging(false);
   }, [handleMouseMove]);
 
   // (★ 変更なし) useCallback でラップ（依存配列を修正）
@@ -308,6 +337,8 @@ const Artboard: React.FC<ArtboardProps> = ({
 
     onItemSelect(itemId);
     draggedItemIdRef.current = itemId;
+    
+    setIsDragging(true);
     
     const artboardRect = artboardRef.current?.getBoundingClientRect();
     if (!artboardRect) return;
@@ -325,18 +356,88 @@ const Artboard: React.FC<ArtboardProps> = ({
     
     e.stopPropagation();
   }, [isPreviewing, placedItems, onItemSelect, handleMouseMove, handleMouseUp]);
+  
+  // (★ 変更なし) リサイズ処理
+  const handleResizing = useCallback((e: MouseEvent) => {
+    if (!resizeInfoRef.current) return;
+    
+    const { startPos, startItem, direction } = resizeInfoRef.current;
+    
+    const dx = e.clientX - startPos.x;
+    const dy = e.clientY - startPos.y;
+    
+    let newX = startItem.x;
+    let newY = startItem.y;
+    let newWidth = startItem.width;
+    let newHeight = startItem.height;
+
+    if (direction.includes("bottom")) {
+      newHeight = Math.max(10, startItem.height + dy);
+    }
+    if (direction.includes("top")) {
+      newHeight = Math.max(10, startItem.height - dy);
+      newY = startItem.y + dy;
+    }
+    if (direction.includes("right")) {
+      newWidth = Math.max(10, startItem.width + dx);
+    }
+    if (direction.includes("left")) {
+      newWidth = Math.max(10, startItem.width - dx);
+      newX = startItem.x + dx;
+    }
+    
+    if (newWidth <= 10) {
+      if (direction.includes("left")) newX = startItem.x + startItem.width - 10;
+    }
+    if (newHeight <= 10) {
+      if (direction.includes("top")) newY = startItem.y + startItem.height - 10;
+    }
+
+    setPlacedItems((prev) =>
+      prev.map((item) =>
+        item.id === startItem.id
+          ? { ...item, x: newX, y: newY, width: newWidth, height: newHeight }
+          : item
+      )
+    );
+  }, [setPlacedItems]);
+
+  const handleResizeEnd = useCallback(() => {
+    resizeInfoRef.current = null;
+    window.removeEventListener("mousemove", handleResizing);
+    window.removeEventListener("mouseup", handleResizeEnd);
+    
+    setIsDragging(false);
+  }, [handleResizing]);
+
+  const handleItemResizeStart = useCallback((
+    e: React.MouseEvent,
+    itemId: string,
+    direction: ResizeDirection
+  ) => {
+    const item = placedItems.find((p) => p.id === itemId);
+    if (!item) return;
+
+    setIsDragging(true);
+
+    resizeInfoRef.current = {
+      startPos: { x: e.clientX, y: e.clientY },
+      startItem: item,
+      direction: direction,
+    };
+
+    window.addEventListener("mousemove", handleResizing);
+    window.addEventListener("mouseup", handleResizeEnd);
+    
+    e.stopPropagation();
+  }, [placedItems, handleResizing, handleResizeEnd]);
+  
 
   // --- (3) ArtboardItem をメモ化 ---
   // (★ 変更なし)
   const MemoizedArtboardItem = useMemo(() => {
-    return React.memo((props: ArtboardItemProps) => (
-      <ArtboardItem
-        {...props}
-        onItemSelect={onItemSelect}
-        onItemDragStart={handleItemMouseDown}
-      />
-    ));
-  }, [onItemSelect, handleItemMouseDown]);
+    return React.memo(ArtboardItem);
+  }, []); 
 
   return (
     <div
@@ -351,6 +452,7 @@ const Artboard: React.FC<ArtboardProps> = ({
           // (★) 2つのPropを正しく渡す
           onItemSelect={onItemSelect}
           onItemDragStart={handleItemMouseDown}
+          onItemResizeStart={handleItemResizeStart}
           selectedItemId={selectedItemId}
           // (プレビュー用)
           isPreviewing={isPreviewing}
@@ -359,10 +461,13 @@ const Artboard: React.FC<ArtboardProps> = ({
           // (変数関連)
           variables={variables}
           onVariableChange={onVariableChange}
+          // (★ 変更なし) ドラッグ中フラグを渡す
+          isDragging={isDragging}
         />
       ))}
     </div>
   );
 };
 
-export default Artboard;
+// (★ 変更なし) Artboard コンポーネント自体をメモ化
+export default React.memo(Artboard);

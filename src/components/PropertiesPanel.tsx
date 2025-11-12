@@ -1,12 +1,11 @@
 // src/components/PropertiesPanel.tsx
 
+// (★ 変更なし)
 import React, { useState, useRef, useEffect } from "react";
-import type { PlacedItemType, PageInfo, SelectionEntry } from "../types";
-import type { NodeGraph } from "../App.tsx";
 import type { Node } from "reactflow";
 import "./PropertiesPanel.css";
-// (ノードエディタ用のCSSをインポート)
 import "./NodePropertiesEditor.css";
+import { useEditorContext } from "../contexts/EditorContext";
 
 // (★ 変更なし) アコーディオンコンポーネント
 interface AccordionProps {
@@ -34,17 +33,16 @@ const AccordionSection: React.FC<AccordionProps> = ({
 
 // (★ 変更なし) タブUIコンポーネント
 interface InspectorTabsProps {
-  selection: SelectionEntry[];
-  activeTabId: string | null;
-  onTabSelect: (id: string) => void;
-  onTabClose: (id: string) => void;
 }
-const InspectorTabs: React.FC<InspectorTabsProps> = ({
-  selection,
-  activeTabId,
-  onTabSelect,
-  onTabClose,
-}) => {
+const InspectorTabs: React.FC<InspectorTabsProps> = () => {
+  
+  const {
+    selection,
+    activeTabId,
+    onTabSelect,
+    onTabClose,
+  } = useEditorContext();
+  
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,7 +52,6 @@ const InspectorTabs: React.FC<InspectorTabsProps> = ({
       if (e.deltaX !== 0) return;
       if (e.deltaY !== 0) {
         e.preventDefault();
-        // (★ 変更済) スクロール方向を反転
         container.scrollLeft -= e.deltaY;
       }
     };
@@ -65,7 +62,7 @@ const InspectorTabs: React.FC<InspectorTabsProps> = ({
   }, []);
   
   if (selection.length === 0) {
-    return null; // タブがなければ何も表示しない
+    return null; 
   }
 
   return (
@@ -80,7 +77,7 @@ const InspectorTabs: React.FC<InspectorTabsProps> = ({
           <span
             className="tab-close"
             onClick={(e) => {
-              e.stopPropagation(); // 親の onTabSelect を発火させない
+              e.stopPropagation();
               onTabClose(entry.id);
             }}
           >
@@ -93,27 +90,20 @@ const InspectorTabs: React.FC<InspectorTabsProps> = ({
 };
 
 // --- (A) App.tsx から渡される Props ---
-interface PropertiesPanelProps {
-  selection: SelectionEntry[];
-  activeTabId: string | null;
-  activeLogicGraphId: string | null;
-  onTabSelect: (id: string) => void;
-  onTabClose: (id: string) => void;
-  placedItems: PlacedItemType[];
-  allItemLogics: Record<string, NodeGraph>;
-  onItemUpdate: (itemId: string, updatedProps: Partial<PlacedItemType>) => void;
-  onNodeDataChange: (nodeId: string, dataUpdate: any) => void;
-  pageInfoList: PageInfo[];
-}
+// (★ 変更なし) Props の定義を削除
 
 // --- (B) ノード専用の編集UI ---
 const NodePropertiesEditor: React.FC<{
   node: Node;
-  placedItems: PlacedItemType[];
-  onNodeDataChange: (nodeId: string, dataUpdate: any) => void;
-  pageInfoList: PageInfo[];
-}> = ({ node, placedItems, onNodeDataChange, pageInfoList }) => {
+}> = ({ node }) => { 
   
+  // (★ 変更なし) Context から取得
+  const {
+    placedItems,
+    onNodeDataChange,
+    pageInfoList,
+  } = useEditorContext();
+
   // (汎用) データ変更ハンドラ
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
     onNodeDataChange(node.id, { [e.target.name]: e.target.value });
@@ -125,10 +115,9 @@ const NodePropertiesEditor: React.FC<{
     e.target.select();
   };
 
-  // どのノードが選択されているかに基づいて、UIを切り替える
+  // (★ 変更なし) どのノードが選択されているかに基づいて、UIを切り替える
   let editorUI: React.ReactNode | null = null;
   
-  // (1) アクションノード (表示/非表示)
   if (node.type === "actionNode") {
     editorUI = (
       <AccordionSection title="ノード設定" defaultOpen={true}>
@@ -136,7 +125,7 @@ const NodePropertiesEditor: React.FC<{
           <label className="prop-label">ターゲット:</label>
           <select
             className="prop-select"
-            name="targetItemId" // data.targetItemId に対応
+            name="targetItemId"
             value={node.data.targetItemId || ""}
             onChange={handleChange}
             onMouseDown={(e) => e.stopPropagation()}
@@ -153,7 +142,7 @@ const NodePropertiesEditor: React.FC<{
           <label className="prop-label">モード:</label>
           <select
             className="prop-select"
-            name="mode" // data.mode に対応
+            name="mode"
             value={node.data.mode || "show"}
             onChange={handleChange}
             onMouseDown={(e) => e.stopPropagation()}
@@ -166,9 +155,8 @@ const NodePropertiesEditor: React.FC<{
       </AccordionSection>
     );
   }
-  // (2) Ifノード (もし〜なら)
   else if (node.type === "ifNode") {
-    const conditionSource = node.data.conditionSource || 'item'; // デフォルトは 'item'
+    const conditionSource = node.data.conditionSource || 'item'; 
     
     editorUI = (
       <AccordionSection title="ノード設定" defaultOpen={true}>
@@ -186,14 +174,13 @@ const NodePropertiesEditor: React.FC<{
           </select>
         </div>
         
-        {/* (A) アイテムのプロパティを比較する場合 */}
         {conditionSource === 'item' && (
           <>
             <div className="prop-group">
               <label className="prop-label">IF (もし):</label>
               <select
                 className="prop-select"
-                name="conditionTargetId" // data.conditionTargetId に対応
+                name="conditionTargetId"
                 value={node.data.conditionTargetId || ""}
                 onChange={handleChange}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -210,7 +197,7 @@ const NodePropertiesEditor: React.FC<{
               <label className="prop-label">IS (が):</label>
               <select
                 className="prop-select"
-                name="conditionType" // data.conditionType に対応
+                name="conditionType"
                 value={node.data.conditionType || "isVisible"}
                 onChange={handleChange}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -222,7 +209,6 @@ const NodePropertiesEditor: React.FC<{
           </>
         )}
         
-        {/* (B) 変数の値を比較する場合 */}
         {conditionSource === 'variable' && (
           <>
             <div className="prop-group">
@@ -275,7 +261,6 @@ const NodePropertiesEditor: React.FC<{
       </AccordionSection>
     );
   }
-  // (3) ページ遷移ノード
   else if (node.type === "pageNode") {
     editorUI = (
       <AccordionSection title="ノード設定" defaultOpen={true}>
@@ -283,7 +268,7 @@ const NodePropertiesEditor: React.FC<{
           <label className="prop-label">遷移先ページ:</label>
           <select
             className="prop-select"
-            name="targetPageId" // data.targetPageId に対応
+            name="targetPageId"
             value={node.data.targetPageId || ""}
             onChange={handleChange}
             onMouseDown={(e) => e.stopPropagation()}
@@ -299,7 +284,6 @@ const NodePropertiesEditor: React.FC<{
       </AccordionSection>
     );
   }
-  // (4) 変数セットノード
   else if (node.type === "setVariableNode") {
     editorUI = (
       <AccordionSection title="ノード設定" defaultOpen={true}>
@@ -345,7 +329,6 @@ const NodePropertiesEditor: React.FC<{
       </AccordionSection>
     );
   }
-  // (5) アニメーションノード
   else if (node.type === "animateNode") {
     editorUI = (
       <>
@@ -450,7 +433,26 @@ const NodePropertiesEditor: React.FC<{
       </>
     );
   }
-  // (6) イベントノード (設定項目なし)
+  else if (node.type === "delayNode") {
+    editorUI = (
+      <AccordionSection title="ノード設定" defaultOpen={true}>
+        <div className="prop-group">
+          <label className="prop-label">遅延 (秒):</label>
+          <input
+            type="number"
+            className="prop-input"
+            name="durationS"
+            value={node.data.durationS || 1.0}
+            onChange={handleChange}
+            onKeyDown={handleInputKeyDown}
+            onFocus={handleInputFocus}
+            step="0.1"
+            min="0"
+          />
+        </div>
+      </AccordionSection>
+    );
+  }
   else if (node.type === "eventNode") {
     editorUI = (
       <AccordionSection title="ノード設定" defaultOpen={true}>
@@ -472,8 +474,6 @@ const NodePropertiesEditor: React.FC<{
           <div className="prop-value">{node.data.label}</div>
         </div>
       </AccordionSection>
-      
-      {/* (★ 変更なし) editorUI が複数のアコーディオンを含むため、そのままレンダリング */}
       {editorUI}
     </div>
   );
@@ -481,19 +481,19 @@ const NodePropertiesEditor: React.FC<{
 
 
 // --- (C) メインの PropertiesPanel (UIスイッチャー) ---
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
-  selection,
-  activeTabId,
-  activeLogicGraphId,
-  onTabSelect,
-  onTabClose,
-  placedItems,
-  allItemLogics,
-  onItemUpdate,
-  onNodeDataChange,
-  pageInfoList,
-}) => {
+// (★ 変更なし) Props を受け取らない
+const PropertiesPanel: React.FC = () => {
   
+  // (★ 変更なし) Context から必要なデータ/関数を取得
+  const {
+    selection,
+    activeTabId,
+    activeLogicGraphId,
+    placedItems,
+    allItemLogics,
+    onItemUpdate,
+  } = useEditorContext();
+
   // (★ 変更なし) アクティブなタブのエントリを取得
   const activeEntry = selection.find((s) => s.id === activeTabId);
 
@@ -506,14 +506,12 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     if (item) {
       // (アイテム編集UI)
       
-      // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) ここからローカルステート管理 ↓↓↓↓↓↓↓↓↓↓
-      // (1) 位置とサイズのローカルステートを定義
+      // (★ 変更なし) ローカルステート管理
       const [localX, setLocalX] = useState(item.x);
       const [localY, setLocalY] = useState(item.y);
       const [localWidth, setLocalWidth] = useState(item.width);
       const [localHeight, setLocalHeight] = useState(item.height);
 
-      // (2) 選択アイテムが変更されたら、ローカルステートを同期
       useEffect(() => {
         setLocalX(item.x);
         setLocalY(item.y);
@@ -521,16 +519,14 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         setLocalHeight(item.height);
       }, [item.id, item.x, item.y, item.width, item.height]);
 
-      // (3) onChange ハンドラ (ローカルステートのみ更新)
       const handleLocalXChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalX(e.target.valueAsNumber); };
       const handleLocalYChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalY(e.target.valueAsNumber); };
       const handleLocalWidthChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalWidth(e.target.valueAsNumber); };
       const handleLocalHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => { setLocalHeight(e.target.valueAsNumber); };
       
-      // (4) onBlur ハンドラ (グローバルステートを更新 = 保存)
       const handleLocalXBlur = () => {
         const val = isNaN(localX) ? 0 : localX;
-        setLocalX(val); // (ローカルも正規化)
+        setLocalX(val);
         onItemUpdate(item.id, { x: val });
       };
       const handleLocalYBlur = () => {
@@ -548,7 +544,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         setLocalHeight(val);
         onItemUpdate(item.id, { height: val });
       };
-      // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ここまでローカルステート管理 ↑↑↑↑↑↑↑↑↑↑
       
       const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") e.currentTarget.blur(); };
       const handleBlur = () => { /* (テキスト入力欄は onBlur で何もしない) */ };
@@ -708,7 +703,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <div className="prop-row">
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">X</div>
-                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -718,11 +713,10 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   onBlur={handleLocalXBlur}
                   onFocus={handleFocus}
                 />
-                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">Y</div>
-                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -732,7 +726,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   onBlur={handleLocalYBlur}
                   onFocus={handleFocus}
                 />
-                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
             </div>
           </AccordionSection>
@@ -741,7 +734,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             <div className="prop-row">
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">W</div>
-                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -751,11 +744,10 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   onBlur={handleLocalWidthBlur}
                   onFocus={handleFocus}
                 />
-                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">H</div>
-                {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) value, onChange, onBlur をローカル版に変更 ↓↓↓↓↓↓↓↓↓↓ */}
+                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -765,7 +757,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   onBlur={handleLocalHeightBlur}
                   onFocus={handleFocus}
                 />
-                {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
               </div>
             </div>
           </AccordionSection>
@@ -784,9 +775,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         content = (
           <NodePropertiesEditor
             node={node}
-            placedItems={placedItems}
-            onNodeDataChange={onNodeDataChange}
-            pageInfoList={pageInfoList}
+            // (★) Props 渡しを削除 (NodePropertiesEditor 内部で Context を使う)
           />
         );
       }
@@ -805,12 +794,8 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   // (★ 変更なし) タブとコンテンツを両方レンダリング
   return (
     <div className="panel-content-wrapper">
-      <InspectorTabs
-        selection={selection}
-        activeTabId={activeTabId}
-        onTabSelect={onTabSelect}
-        onTabClose={onTabClose}
-      />
+      {/* (★) InspectorTabs も Context を使うように変更 */}
+      <InspectorTabs />
       <div className="panel-content-scrollable">
         {content}
       </div>
@@ -818,4 +803,5 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   );
 };
 
-export default PropertiesPanel;
+// (★ 変更なし) PropertiesPanel コンポーネント自体をメモ化
+export default React.memo(PropertiesPanel);

@@ -1,5 +1,6 @@
 // src/components/NodeEditor.tsx
 
+// (★ 変更なし)
 import React, { useRef, useCallback, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
@@ -17,7 +18,8 @@ import ReactFlow, {
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import NodeToolboxItem from "./NodeToolboxItem";
-import type { PlacedItemType, PageInfo } from "../types";
+// (★ 変更なし) Context をインポート
+import { useEditorContext } from "../contexts/EditorContext";
 
 import "reactflow/dist/style.css";
 import "./NodeEditor.css";
@@ -27,23 +29,12 @@ import ActionNode from "./nodes/ActionNode";
 import IfNode from "./nodes/IfNode";
 import PageNode from "./nodes/PageNode.tsx";
 import SetVariableNode from "./nodes/SetVariableNode.tsx";
-// ↓↓↓↓↓↓↓↓↓↓ (★ 追加) AnimateNode をインポート ↓↓↓↓↓↓↓↓↓↓
 import AnimateNode from "./nodes/AnimateNode.tsx";
-// ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
+import DelayNode from "./nodes/DelayNode.tsx";
 
 // --- Props の型定義 ---
-interface NodeEditorProps {
-  nodes: Node[] | undefined;
-  edges: Edge[] | undefined;
-  onNodesChange: OnNodesChange;
-  onEdgesChange: OnEdgesChange;
-  onNodeAdd: (newNode: Node) => void;
-  onConnect: OnConnect;
-  placedItems: PlacedItemType[];
-  onNodeDataChange: (nodeId: string, dataUpdate: any) => void;
-  onNodeClick: (nodeId: string) => void;
-  pageInfoList: PageInfo[];
-}
+// (★ 変更なし) Props の定義を削除
+interface NodeEditorProps {}
 
 // --- ドラッグアイテムの型 ---
 interface NodeToolDragItem {
@@ -51,21 +42,26 @@ interface NodeToolDragItem {
   nodeName: string;
 }
 
-// --- (2) Nodeクリックハンドラ型定義（React Flow v11以降対応）---
+// (★ 変更なし) Nodeクリックハンドラ型定義
 type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
 
-const NodeEditor: React.FC<NodeEditorProps> = ({
-  nodes,
-  edges,
-  onNodesChange,
-  onEdgesChange,
-  onNodeAdd,
-  onConnect,
-  placedItems,
-  onNodeDataChange,
-  onNodeClick,
-  pageInfoList,
-}) => {
+// (★ 変更なし) Props を受け取らない
+const NodeEditor: React.FC<NodeEditorProps> = () => {
+
+  // (★ 変更なし) Context から必要なデータ/関数を取得
+  const {
+    currentGraph,
+    onNodesChange,
+    onEdgesChange,
+    onAddNode,
+    onConnect,
+    onNodeClick,
+  } = useEditorContext();
+  
+  const nodes = currentGraph?.nodes;
+  const edges = currentGraph?.edges;
+
+
   const { fitView, project } = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -91,17 +87,22 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
             (dropRef.current.getBoundingClientRect().top ?? 0),
         });
 
+        const newNodeData: any = { label: nodeName };
+        if (nodeType === 'delayNode') {
+          newNodeData.durationS = 1.0; 
+        }
+
         const newNode: Node = {
           id: `node-${Date.now()}`,
           type: nodeType,
           position,
-          data: { label: nodeName },
+          data: newNodeData,
         };
 
-        onNodeAdd(newNode);
+        onAddNode(newNode);
       },
     }),
-    [project, onNodeAdd]
+    [project, onAddNode]
   );
   drop(dropRef); // drop コネクタを ref に接続
 
@@ -112,18 +113,19 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
     }
   }, [nodes ? nodes[0]?.id : undefined, fitView]);
 
-  // (ユーザー要望) nodeTypes の useMemo (props を中継)
+  // (★ 変更なし) nodeTypes の useMemo
   const nodeTypes = useMemo(() => {
     const wrappedEventNode = (props: NodeProps) => <EventNode {...props} />;
     const wrappedActionNode = (props: NodeProps) => ( <ActionNode {...props} /> );
     const wrappedIfNode = (props: NodeProps) => ( <IfNode {...props} /> );
     const wrappedPageNode = (props: NodeProps) => ( <PageNode {...props} /> );
     const wrappedSetVariableNode = (props: NodeProps) => ( <SetVariableNode {...props} /> );
-    // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) AnimateNode を定義 ↓↓↓↓↓↓↓↓↓↓
     const wrappedAnimateNode = (props: NodeProps) => (
       <AnimateNode {...props} />
     );
-    // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
+    const wrappedDelayNode = (props: NodeProps) => (
+      <DelayNode {...props} />
+    );
 
     return {
       eventNode: wrappedEventNode,
@@ -131,13 +133,12 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
       ifNode: wrappedIfNode,
       pageNode: wrappedPageNode,
       setVariableNode: wrappedSetVariableNode,
-      // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) animateNode を登録 ↓↓↓↓↓↓↓↓↓↓
       animateNode: wrappedAnimateNode,
-      // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
+      delayNode: wrappedDelayNode,
     };
-  }, []); // (★ 修正) 依存配列を空にする
+  }, []); 
 
-  // --- (3) handleNodeClick の型注釈を修正 ---
+  // (★ 変更なし) handleNodeClick
   const handleNodeClick: NodeClickHandler = (event, node) => {
     onNodeClick(node.id);
   };
@@ -163,14 +164,12 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
         >
           ⚡ 表示/非表示
         </NodeToolboxItem>
-        {/* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) アニメーションノードを追加 ↓↓↓↓↓↓↓↓↓↓ */}
         <NodeToolboxItem
           nodeType="animateNode"
           nodeName="⚡ アクション: アニメーション"
         >
           ⚡ アニメーション
         </NodeToolboxItem>
-        {/* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */}
         <NodeToolboxItem
           nodeType="pageNode"
           nodeName="⚡ アクション: ページ遷移"
@@ -182,6 +181,9 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
           nodeName="⚡ アクション: 変数をセット"
         >
           ⚡ 変数をセット
+        </NodeToolboxItem>
+        <NodeToolboxItem nodeType="delayNode" nodeName="⏱️ ロジック: 遅延">
+          ⏱️ 遅延 (Wait)
         </NodeToolboxItem>
         <NodeToolboxItem nodeType="ifNode" nodeName="🧠 ロジック: もし〜なら">
           🧠 もし〜なら
@@ -212,12 +214,15 @@ const NodeEditor: React.FC<NodeEditorProps> = ({
 };
 
 // --- Wrapper コンポーネント ---
-const NodeEditorWrapper: React.FC<NodeEditorProps> = (props) => {
+// (★ 変更なし) Props を受け取らない
+const NodeEditorWrapper: React.FC = (props) => {
   return (
     <ReactFlowProvider>
-      <NodeEditor {...props} />
+      {/* (★) props を渡さない */}
+      <NodeEditor />
     </ReactFlowProvider>
   );
 };
 
-export default NodeEditorWrapper;
+// (★ 変更なし) NodeEditorWrapper コンポーネント自体をメモ化
+export default React.memo(NodeEditorWrapper);

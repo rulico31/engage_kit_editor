@@ -20,7 +20,9 @@
 .panel-content {
   padding: 12px;
   box-sizing: border-box; /* パディングを含めてサイズ計算する */
-  overflow: auto; /* 内容が多ければスクロール */
+  /* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) overflow-y と overflow-x を統合 ↓↓↓↓↓↓↓↓↓↓ */
+  overflow: auto; /* (★) 垂直・水平ともに必要な場合のみスクロール */
+  /* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */
   background-color: #2a2a2a;
   border-radius: 4px;
   margin: 2px;
@@ -42,7 +44,46 @@
 .resize-handle {
   background-color: #444;
   transition: background-color 0.2s ease;
+  /* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) z-index と position を設定 ↓↓↓↓↓↓↓↓↓↓ */
+  position: relative;
+  z-index: 5; /* パネルより手前に */
+  /* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */
 }
+
+/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) 当たり判定を広げ、デフォルトUIを非表示 ↓↓↓↓↓↓↓↓↓↓ */
+
+/* ライブラリが生成するデフォルトのグラバー(丸い矩形)を非表示にする */
+.resize-handle[data-panel-resize-handle-id] > div {
+  display: none;
+}
+
+/* ハンドルの当たり判定を広げるための疑似要素 */
+.resize-handle::before {
+  content: "";
+  position: absolute;
+  z-index: 10; /* ハンドル本体よりもさらに手前 */
+  background: transparent; /* 透明 */
+}
+
+/* 縦方向ハンドル (左右の当たり判定を 8px に広げる) */
+.resize-handle[data-orientation="vertical"]::before {
+  top: 0;
+  bottom: 0;
+  left: -2px; /* (4px幅の中心から -2px) */
+  width: 8px; /* (4px + 左右2pxずつ) */
+  cursor: col-resize;
+}
+
+/* 横方向ハンドル (上下の当たり判定を 8px に広げる) */
+.resize-handle[data-orientation="horizontal"]::before {
+  left: 0;
+  right: 0;
+  top: -2px; /* (4px幅の中心から -2px) */
+  height: 8px; /* (4px + 上下2pxずつ) */
+  cursor: row-resize;
+}
+/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */
+
 
 /* ハンドルをホバーまたはドラッグした時のスタイル */
 .resize-handle[data-state="hover"],

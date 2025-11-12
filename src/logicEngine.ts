@@ -159,7 +159,6 @@ const processQueue = (
       if (nextNode) nextQueue.push(nextNode);
     }
     
-    // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) AnimateNodeの処理 ↓↓↓↓↓↓↓↓↓↓
     // (5) アニメーションノード
     else if (node.type === "animateNode") {
       const { 
@@ -215,9 +214,40 @@ const processQueue = (
       const nextNode = findNextNode(node.id, null, allEdges);
       if (nextNode) nextQueue.push(nextNode);
     }
+    
+    // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) DelayNodeの処理 ↓↓↓↓↓↓↓↓↓↓
+    // (6) 遅延ノード
+    else if (node.type === "delayNode") {
+      const { durationS = 1.0 } = node.data;
+      const durationMs = Number(durationS) * 1000;
+      
+      console.log(`[LogicEngine] ⏱️ 遅延開始: ${durationMs}ms`);
+
+      // (★) setTimeout を使って非同期に次のノードを実行
+      setTimeout(() => {
+        console.log(`[LogicEngine] ⏱️ 遅延終了: ${durationMs}ms`);
+        const nextNode = findNextNode(node.id, null, allEdges);
+        if (nextNode) {
+          // (★) 新しいキューで processQueue を開始
+          processQueue(
+            [nextNode], // (★) 次のノードだけを含むキュー
+            allNodes, 
+            allEdges, 
+            getPreviewState, 
+            setPreviewState, 
+            requestPageChange,
+            getVariables,
+            setVariables
+          );
+        }
+      }, durationMs);
+      
+      // (★) DelayNode はここで現在のキュー処理を終了する
+      // (★) (nextQueue には何も追加しない)
+    }
     // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
 
-    // (6) イベントノード
+    // (7) イベントノード
     else if (node.type === "eventNode") {
       const nextNode = findNextNode(node.id, null, allEdges);
       if (nextNode) nextQueue.push(nextNode);
@@ -257,7 +287,9 @@ const findNextNode = (
  * 外部から呼び出す実行トリガー
  */
 export const triggerEvent = (
-  eventName: string, // "click"
+  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) eventName に "onInputChanged" を追加 ↓↓↓↓↓↓↓↓↓↓
+  eventName: string, // "click", "onLoad", "onInputChanged"
+  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
   targetItemId: string, // "item-123"
   currentPageGraph: NodeGraph,
   getPreviewState: () => PreviewState,

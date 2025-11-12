@@ -1,0 +1,31 @@
+/* src/components/nodes/DelayNode.css */
+
+.delay-node {
+  background: #c26a1d; /* (オレンジ系 - SetVariableNode と同じ色) */
+  border: 1px solid #a0500c;
+  border-radius: 5px;
+  padding: 10px 15px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 170px;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+/* (ハンドルスタイル) */
+.delay-node .react-flow__handle {
+  background: #efefef;
+  border: 2px solid #c26a1d;
+}
+.delay-node .react-flow__handle-left {
+  left: -8px;
+}
+.delay-node .react-flow__handle-right {
+  right: -8px;
+}
+
+.delay-node-label {
+  font-weight: bold;
+}

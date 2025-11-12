@@ -24,7 +24,6 @@
 /* ( .placed-item { ... } のスタイルは
    PlacedItem.css に移動したので、ここからは削除します。
    )
-  ↓↓↓↓↓↓↓↓↓↓ (★ 変更) ここから ArtboardItem のスタイルを追加 ↓↓↓↓↓↓↓↓↓↓
 */
 
 /* アートボード上の全アイテムの基本スタイル */
@@ -110,70 +109,100 @@
   outline: none;
 }
 
-/* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) テキスト入力欄のスタイル ↓↓↓↓↓↓↓↓↓↓ */
+/* (★ 変更済) テキスト入力欄のスタイル */
 .item-input-content {
   width: 100%;
   height: 100%;
-  padding: 0; /* (★) 親のパディングをリセット */
+  padding: 0; 
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .artboard-item-input {
   width: 100%;
   height: 100%;
-  
-  /* (★) 見た目をリセット */
   border: none;
   background: none;
   outline: none;
-  
-  /* (★) 親 (.artboard-item) のスタイルを継承 */
   font: inherit;
   color: inherit;
-  
-  /* (★) 編集モードではドラッグカーソル、プレビューではテキストカーソル */
   cursor: inherit;
-  
-  /* (★) パディングを .artboard-item と合わせる (枠線分を引く) */
   padding: 8px 14px;
-  box-sizing: border-box; /* (★) これが重要 */
+  box-sizing: border-box; 
 }
-
-/* (★) 編集モードでは入力不可にし、ドラッグカーソルを強制 */
 .artboard-item:not(.preview) .artboard-item-input {
-  pointer-events: none; /* (★) マウスイベントを透過し、親の onMouseDown を発火 */
+  /* (★) 編集モード中は .artboard-item のクリックイベントを透過 */
+  pointer-events: none; 
 }
-
-/* (★) プレビューモードではテキストカーソルにする */
 .artboard-item.preview .artboard-item-input {
   cursor: text;
-  background-color: #fff; /* (★) 入力可能であることを示すため白背景に */
+  background-color: #fff; 
   border-radius: 3px;
 }
-
 .artboard-item.preview.selected {
-  /* (★) プレビュー中は .selected スタイルを無効化 */
   border-color: #ccc;
   box-shadow: none;
 }
-/* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */
 
 
-/* --- Eート中のスタイル --- */
+/* --- プレビュー中のスタイル --- */
 
-/* プレビュー中のアイテムのカーソル */
 .artboard-item.preview {
-  cursor: default; /* デフォルトは矢印 */
+  cursor: default; 
 }
-
-/* プレビュー中のボタンのみ、カーソルをポインターに変更 */
 .artboard-item.preview .item-button-content {
   cursor: pointer;
 }
 
-/* ↑↑↑↑↑↑↑↑↑↑ (★ 変更) ArtboardItem のスタイルここまで ↑↑↑↑↑↑↑↑↑↑ */
+
+/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) リサイズハンドルのスタイル ↓↓↓↓↓↓↓↓↓↓ */
+
+/* (1) ハンドルの共通スタイル */
+.resize-handle {
+  position: absolute;
+  background: #ffffff00;
+  border: 1px solid #959595;
+  transform: translate(-50%, -50%); /* 中心を基準に配置 */
+  z-index: 2;
+  box-sizing: border-box;
+}
+
+/* (2) 四隅のハンドル (四角形) */
+.resize-handle.top-left,
+.resize-handle.top-right,
+.resize-handle.bottom-left,
+.resize-handle.bottom-right {
+  width: 9px;
+  height: 9px;
+  border-radius: 0; /* 角ばったまま */
+}
+
+/* (3) 辺のハンドル (上下) (横長の長方形) */
+.resize-handle.top-center,
+.resize-handle.bottom-center {
+  width: 20px; /* (★) 細長く */
+  height: 6px;  /* (★) 細く */
+  border-radius: 3px; /* (★) 角を丸める */
+}
+
+/* (4) 辺のハンドル (左右) (縦長の長方形) */
+.resize-handle.middle-left,
+.resize-handle.middle-right {
+  width: 6px;   /* (★) 細く */
+  height: 20px; /* (★) 細長く */
+  border-radius: 3px; /* (★) 角を丸める */
+}
+
+/* (5) ハンドルの位置とカーソル */
+.resize-handle.top-left { top: 0; left: 0; cursor: nwse-resize; }
+.resize-handle.top-right { top: 0; right: 0; cursor: nesw-resize; }
+.resize-handle.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+.resize-handle.bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
+.resize-handle.top-center { top: 0; left: 50%; cursor: ns-resize; }
+.resize-handle.bottom-center { bottom: 0; left: 50%; cursor: ns-resize; }
+.resize-handle.middle-left { top: 50%; left: 0; cursor: ew-resize; }
+.resize-handle.middle-right { top: 50%; right: 0; cursor: ew-resize; }
+/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */
 
 
 /* プレビュー中のスタイル */
