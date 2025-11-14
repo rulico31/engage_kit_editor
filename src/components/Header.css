@@ -2,8 +2,8 @@
 
 .app-header {
   display: flex;
-  justify-content: space-between; /* (★) 左(left)と右(right)のグループを引き離す */
-  align-items: center; /* (★) 全体の高さを中央揃えにする */
+  justify-content: space-between; /* 左・中央・右を配置 */
+  align-items: center;
   background-color: #2a2a2a;
   padding: 0 10px 0 20px;
   height: 45px;
@@ -16,15 +16,62 @@
 .header-left,
 .header-right {
   display: flex;
-  align-items: center; /* (★) 各グループ内の高さを中央揃えにする */
+  align-items: center;
   gap: 8px;
+  /* 幅を確保して中央揃えが崩れないようにする（簡易的な対応） */
+  flex: 1;
 }
 
+.header-right {
+  justify-content: flex-end; /* 右寄せ */
+}
+
+/* (★ 追加) 中央エリア */
+.header-center {
+  display: flex;
+  justify-content: center;
+  flex: 1;
+}
+
+/* (★ 追加) ビュー切り替えボタングループ */
+.view-mode-group {
+  display: flex;
+  background-color: #1e1e1e; /* ヘッダーより少し暗くして凹んだ感じに */
+  padding: 3px;
+  border-radius: 6px;
+  gap: 2px;
+}
+
+.view-mode-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.view-mode-btn:hover {
+  color: #ccc;
+  background-color: #333;
+}
+
+.view-mode-btn.active {
+  background-color: #3a3a3a; /* アクティブ時の背景 */
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* 既存スタイル */
 .header-title {
   font-weight: 600;
   font-size: 1.1em;
   color: #eee;
-  white-space: nowrap; /* (★) タイトルが改行しないように */
+  white-space: nowrap;
 }
 .header-title span {
   font-weight: 400;
@@ -32,21 +79,20 @@
   margin-left: 4px;
 }
 
-/* (★) ボタンとアイコンのスタイル */
 .header-button {
   display: flex;
   align-items: center;
-  gap: 6px; /* アイコンとテキストの間隔 */
+  gap: 6px;
   font-size: 14px;
   font-weight: 500;
-  background-color: transparent; /* (★ ゴーストボタン) */
+  background-color: transparent;
   color: #ccc;
   border: none;
   padding: 6px 10px;
   border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s;
-  white-space: nowrap; /* (★ 改行防止) */
+  white-space: nowrap;
 }
 .header-button:hover {
   background-color: #3f3f3f;
@@ -61,14 +107,12 @@
   background-color: transparent;
 }
 
-/* (★) アイコンのサイズ指定 */
 .header-icon {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
 }
 
-/* (★) プレビューボタンの特別色 */
 .header-button.preview-button {
   background-color: #2a8a4a;
   border-color: #2a8a4a;
@@ -87,7 +131,6 @@
   background-color: #008be6;
 }
 
-/* (★) セパレータ */
 .header-separator {
   width: 1px;
   height: 24px;

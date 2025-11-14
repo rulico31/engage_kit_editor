@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./Header.css";
 
-// (★ ご指摘どおり名前付きインポートを使用)
 import { HomeIcon } from "./icons/HomeIcon";
 import { SaveIcon } from "./icons/SaveIcon";
 import { UploadIcon } from "./icons/UploadIcon";
@@ -12,6 +11,9 @@ import { StopIcon } from "./icons/StopIcon";
 import { MaximizeIcon } from "./icons/MaximizeIcon";
 import { MinimizeIcon } from "./icons/MinimizeIcon";
 
+// ★ この型定義のエクスポートが必要です！
+export type ViewMode = "design" | "logic" | "split";
+
 interface HeaderProps {
   projectName: string;
   isPreviewing: boolean;
@@ -19,6 +21,10 @@ interface HeaderProps {
   onExportProject: () => void;
   onImportProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onTogglePreview: () => void;
+  
+  // ViewMode型を使用
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -28,11 +34,11 @@ const Header: React.FC<HeaderProps> = ({
   onExportProject,
   onImportProject,
   onTogglePreview,
+  viewMode,
+  onViewModeChange,
 }) => {
-  // (★ フルスクリーン状態の管理)
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  // (★ フルスクリーンAPIのトグル)
   const handleToggleFullScreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -41,7 +47,6 @@ const Header: React.FC<HeaderProps> = ({
     }
   }, []);
 
-  // (★ フルスクリーン状態の変更を監視)
   useEffect(() => {
     const handleFullScreenChange = () => {
       setIsFullScreen(!!document.fullscreenElement);
@@ -54,12 +59,11 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="app-header">
-      {/* (左側: タイトルとホームボタン) */}
+      {/* 左側 */}
       <div className="header-left">
         <h1 className="header-title">
           Engage-Kit <span>/ {projectName}</span>
         </h1>
-        {/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) ホームボタンを .header-left に配置 ↓↓↓↓↓↓↓↓↓↓ */}
         <div className="header-separator"></div>
         <button
           className="header-button"
@@ -70,22 +74,43 @@ const Header: React.FC<HeaderProps> = ({
           <HomeIcon className="header-icon" />
           ホーム
         </button>
-        {/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */}
       </div>
 
-      {/* (右側: その他のアクションボタン) */}
-      <div className="header-right">
-        {/* (★ 修正) ホームボタンと区切り線を .header-left に移動したため、ここからは削除 */}
+      {/* 中央: ビュー切り替え */}
+      {!isPreviewing && (
+        <div className="header-center">
+          <div className="view-mode-group">
+            <button
+              className={`view-mode-btn ${viewMode === "design" ? "active" : ""}`}
+              onClick={() => onViewModeChange("design")}
+              title="デザインモード"
+            >
+              🎨 デザイン
+            </button>
+            <button
+              className={`view-mode-btn ${viewMode === "logic" ? "active" : ""}`}
+              onClick={() => onViewModeChange("logic")}
+              title="ロジックモード"
+            >
+              🧠 ロジック
+            </button>
+            <button
+              className={`view-mode-btn ${viewMode === "split" ? "active" : ""}`}
+              onClick={() => onViewModeChange("split")}
+              title="分割表示"
+            >
+              🖥️ 分割
+            </button>
+          </div>
+        </div>
+      )}
 
+      {/* 右側 */}
+      <div className="header-right">
         {!isPreviewing && (
           <>
-            <button
-              className="header-button"
-              onClick={onExportProject}
-              title="プロジェクトを保存"
-            >
-              <SaveIcon className="header-icon" />
-              保存
+            <button className="header-button" onClick={onExportProject}>
+              <SaveIcon className="header-icon" /> 保存
             </button>
             <input
               type="file"
@@ -94,44 +119,23 @@ const Header: React.FC<HeaderProps> = ({
               style={{ display: "none" }}
               onChange={onImportProject}
             />
-            <label
-              htmlFor="import-project-input-header"
-              className="header-button"
-              title="プロジェクトを読み込む"
-            >
-              <UploadIcon className="header-icon" />
-              読込
+            <label htmlFor="import-project-input-header" className="header-button">
+              <UploadIcon className="header-icon" /> 読込
             </label>
             <div className="header-separator"></div>
           </>
         )}
 
-        {/* (プレビューボタン) */}
         <button
           onClick={onTogglePreview}
-          className={`header-button ${
-            isPreviewing ? "edit-button" : "preview-button"
-          }`}
+          className={`header-button ${isPreviewing ? "edit-button" : "preview-button"}`}
         >
-          {isPreviewing ? (
-            <StopIcon className="header-icon" />
-          ) : (
-            <PlayIcon className="header-icon" />
-          )}
+          {isPreviewing ? <StopIcon className="header-icon" /> : <PlayIcon className="header-icon" />}
           {isPreviewing ? "編集に戻る" : "プレビュー"}
         </button>
 
-        {/* (フルスクリーンボタン) */}
-        <button
-          className="header-button"
-          onClick={handleToggleFullScreen}
-          title={isFullScreen ? "全画面解除" : "全画面表示"}
-        >
-          {isFullScreen ? (
-            <MinimizeIcon className="header-icon" />
-          ) : (
-            <MaximizeIcon className="header-icon" />
-          )}
+        <button className="header-button" onClick={handleToggleFullScreen}>
+          {isFullScreen ? <MinimizeIcon className="header-icon" /> : <MaximizeIcon className="header-icon" />}
         </button>
       </div>
     </header>

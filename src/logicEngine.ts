@@ -3,16 +3,12 @@
 import type { Node, Edge } from "reactflow";
 import type { PreviewState, NodeGraph, VariableState, PreviewItemState } from "./types";
 
+// ★ リスナー管理用の型定義
+export type ResumeListener = () => void;
+export type ActiveListeners = Map<string, ResumeListener[]>;
+
 /**
- * 渡されたノードID配列（次に実行すべきノード）を処理する
- * @param executionQueue - 実行待機中のノードIDの配列
- * @param allNodes - グラフ内の全ノード
- * @param allEdges - グラフ内の全エッジ
- * @param getPreviewState - 現在のプレビュー状態を取得する関数
- * @param setPreviewState - プレビュー状態を更新する関数
- * @param requestPageChange - ページ遷移をリクエストする関数
- * @param getVariables - 現在の変数を取得する関数
- * @param setVariables - 変数を更新する関数
+ * ロジック実行エンジン
  */
 const processQueue = (
   executionQueue: string[],
@@ -22,7 +18,8 @@ const processQueue = (
   setPreviewState: (newState: PreviewState) => void,
   requestPageChange: (pageId: string) => void,
   getVariables: () => VariableState,
-  setVariables: (newVars: VariableState) => void
+  setVariables: (newVars: VariableState) => void,
+  activeListeners: ActiveListeners // ★ 追加: リスナー管理マップ
 ) => {
   const nextQueue: string[] = [];
 
@@ -30,298 +27,215 @@ const processQueue = (
     const node = allNodes.find((n) => n.id === nodeId);
     if (!node) continue;
 
-    console.log(`[LogicEngine] ⚡ 実行中: ${node.data.label || node.id}`);
+    console.log(`[LogicEngine] ⚡ 実行中: ${node.type} / ${node.id}`);
 
-    // --- ノードの種類に応じて処理を実行 ---
-
-    // (1) アクションノード (表示/非表示)
+    // (1) アクションノード
     if (node.type === "actionNode") {
       const { targetItemId, mode } = node.data;
       if (targetItemId) {
         const currentState = getPreviewState();
         const targetItemState = currentState[targetItemId];
-
         if (targetItemState) {
           let newVisibility = targetItemState.isVisible;
           if (mode === "show") newVisibility = true;
           else if (mode === "hide") newVisibility = false;
           else if (mode === "toggle") newVisibility = !targetItemState.isVisible;
 
-          // (★ 変更) 状態を更新
           setPreviewState({
             ...currentState,
             [targetItemId]: { ...targetItemState, isVisible: newVisibility },
           });
         }
       }
-      const nextNode = findNextNode(node.id, null, allEdges);
-      if (nextNode) nextQueue.push(nextNode);
+      pushNext(node.id, null, allEdges, nextQueue);
     }
 
-    // (2) If ノード (条件分岐)
+    // (2) If ノード
     else if (node.type === "ifNode") {
       const { 
-        conditionSource = 'item', 
-        conditionTargetId, 
-        conditionType,
-        variableName,
-        comparison,
-        comparisonValue
+        conditionSource = 'item', conditionTargetId, conditionType,
+        variableName, comparison, comparisonValue
       } = node.data;
 
-      let conditionResult = false; // デフォルトは False
-
+      let conditionResult = false;
       if (conditionSource === 'item') {
         const currentState = getPreviewState();
         const targetItemState = currentState[conditionTargetId];
         if (targetItemState) {
-          if (conditionType === "isVisible") {
-            conditionResult = targetItemState.isVisible === true;
-          } else if (conditionType === "isHidden") {
-            conditionResult = targetItemState.isVisible === false;
-          }
+          if (conditionType === "isVisible") conditionResult = targetItemState.isVisible === true;
+          else if (conditionType === "isHidden") conditionResult = targetItemState.isVisible === false;
         }
       } else if (conditionSource === 'variable') {
         const currentVars = getVariables();
         const varValue = currentVars[variableName];
-        
-        switch (comparison) {
-          case '==':
-            // eslint-disable-next-line eqeqeq
-            conditionResult = varValue == comparisonValue;
-            break;
-          case '!=':
-            // eslint-disable-next-line eqeqeq
-            conditionResult = varValue != comparisonValue;
-            break;
-          case '>':
-            conditionResult = Number(varValue) > Number(comparisonValue);
-            break;
-          case '>=':
-            conditionResult = Number(varValue) >= Number(comparisonValue);
-            break;
-          case '<':
-            conditionResult = Number(varValue) < Number(comparisonValue);
-            break;
-          case '<=':
-            conditionResult = Number(varValue) <= Number(comparisonValue);
-            break;
-          case 'contains':
-            conditionResult = String(varValue).includes(String(comparisonValue));
-            break;
-          case 'not_contains':
-            conditionResult = !String(varValue).includes(String(comparisonValue));
-            break;
-        }
+        // (簡易比較ロジック)
+        // eslint-disable-next-line eqeqeq
+        if (comparison === '==') conditionResult = varValue == comparisonValue;
+        // ... (他の比較は省略せず実装しても良いが、長くなるため既存機能維持)
+        else if (comparison === '!=') conditionResult = varValue != comparisonValue;
+        else if (comparison === '>') conditionResult = Number(varValue) > Number(comparisonValue);
+        else if (comparison === '>=') conditionResult = Number(varValue) >= Number(comparisonValue);
+        else if (comparison === '<') conditionResult = Number(varValue) < Number(comparisonValue);
+        else if (comparison === '<=') conditionResult = Number(varValue) <= Number(comparisonValue);
+        else if (comparison === 'contains') conditionResult = String(varValue).includes(String(comparisonValue));
+        else if (comparison === 'not_contains') conditionResult = !String(varValue).includes(String(comparisonValue));
       }
-
-      console.log(`[LogicEngine] 🧠 条件 (${conditionSource}): ${conditionResult}`);
-
-      const nextNode = findNextNode(
-        node.id,
-        conditionResult ? "true" : "false",
-        allEdges
-      );
-      if (nextNode) nextQueue.push(nextNode);
+      pushNext(node.id, conditionResult ? "true" : "false", allEdges, nextQueue);
     }
     
     // (3) ページ遷移ノード
     else if (node.type === "pageNode") {
       const { targetPageId } = node.data;
-      if (targetPageId) {
-        console.log(`[LogicEngine] 🚀 ページ遷移: ${targetPageId} へ`);
-        requestPageChange(targetPageId);
-      }
+      if (targetPageId) requestPageChange(targetPageId);
     }
     
     // (4) 変数セットノード
     else if (node.type === "setVariableNode") {
       const { variableName, operation = 'set', value } = node.data;
-      
       if (variableName) {
         const currentVars = getVariables();
         let newValue = value;
-        
-        if (operation === 'add') {
-          const currentValueNum = Number(currentVars[variableName] || 0);
-          const valueToAddNum = Number(value || 0);
-          newValue = currentValueNum + valueToAddNum;
-        }
-        
-        console.log(`[LogicEngine] 💾 変数セット: ${variableName} = ${newValue}`);
-        setVariables({
-          ...currentVars,
-          [variableName]: newValue
-        });
+        if (operation === 'add') newValue = Number(currentVars[variableName] || 0) + Number(value || 0);
+        setVariables({ ...currentVars, [variableName]: newValue });
       }
-
-      const nextNode = findNextNode(node.id, null, allEdges);
-      if (nextNode) nextQueue.push(nextNode);
+      pushNext(node.id, null, allEdges, nextQueue);
     }
     
     // (5) アニメーションノード
     else if (node.type === "animateNode") {
-      const { 
-        targetItemId, 
-        animType, 
-        value, 
-        durationS = 0.5, 
-        delayS = 0, 
-        easing = 'ease' 
-      } = node.data;
-
+      const { targetItemId, animType, value, durationS = 0.5, delayS = 0, easing = 'ease' } = node.data;
       if (targetItemId) {
         const currentState = getPreviewState();
         const targetItemState = currentState[targetItemId];
-
         if (targetItemState) {
           const newItemState: PreviewItemState = { ...targetItemState };
-          let cssProperty = ''; // transition に適用するCSSプロパティ名
-
-          // どのプロパティを変更するか
-          if (animType === 'opacity') {
-            cssProperty = 'opacity';
-            newItemState.opacity = Number(value);
-          } else if (animType === 'moveX') {
-            cssProperty = 'transform';
-            newItemState.x = Number(value);
-          } else if (animType === 'moveY') {
-            cssProperty = 'transform';
-            newItemState.y = Number(value);
-          } else if (animType === 'scale') {
-            cssProperty = 'transform';
-            newItemState.scale = Number(value);
-          } else if (animType === 'rotate') {
-            cssProperty = 'transform';
-            newItemState.rotation = Number(value);
-          }
+          let cssProperty = '';
+          if (animType === 'opacity') { cssProperty = 'opacity'; newItemState.opacity = Number(value); }
+          else if (animType === 'moveX') { cssProperty = 'transform'; newItemState.x = Number(value); }
+          else if (animType === 'moveY') { cssProperty = 'transform'; newItemState.y = Number(value); }
+          else if (animType === 'scale') { cssProperty = 'transform'; newItemState.scale = Number(value); }
+          else if (animType === 'rotate') { cssProperty = 'transform'; newItemState.rotation = Number(value); }
           
-          // transform系は transition: 'transform ...'
-          // opacity系は transition: 'opacity ...'
           if (cssProperty) {
             newItemState.transition = `${cssProperty} ${durationS}s ${easing} ${delayS}s`;
-            
-            console.log(`[LogicEngine] 🎨 アニメーション実行: ${targetItemId} -> ${cssProperty} = ${value}`);
-            
-            setPreviewState({
-              ...currentState,
-              [targetItemId]: newItemState,
-            });
+            setPreviewState({ ...currentState, [targetItemId]: newItemState });
           }
         }
       }
-      
-      const nextNode = findNextNode(node.id, null, allEdges);
-      if (nextNode) nextQueue.push(nextNode);
+      pushNext(node.id, null, allEdges, nextQueue);
     }
     
-    // ↓↓↓↓↓↓↓↓↓↓ (★ 追加) DelayNodeの処理 ↓↓↓↓↓↓↓↓↓↓
     // (6) 遅延ノード
     else if (node.type === "delayNode") {
       const { durationS = 1.0 } = node.data;
-      const durationMs = Number(durationS) * 1000;
-      
-      console.log(`[LogicEngine] ⏱️ 遅延開始: ${durationMs}ms`);
-
-      // (★) setTimeout を使って非同期に次のノードを実行
       setTimeout(() => {
-        console.log(`[LogicEngine] ⏱️ 遅延終了: ${durationMs}ms`);
         const nextNode = findNextNode(node.id, null, allEdges);
         if (nextNode) {
-          // (★) 新しいキューで processQueue を開始
-          processQueue(
-            [nextNode], // (★) 次のノードだけを含むキュー
-            allNodes, 
-            allEdges, 
-            getPreviewState, 
-            setPreviewState, 
-            requestPageChange,
-            getVariables,
-            setVariables
-          );
+          processQueue([nextNode], allNodes, allEdges, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
         }
-      }, durationMs);
-      
-      // (★) DelayNode はここで現在のキュー処理を終了する
-      // (★) (nextQueue には何も追加しない)
+      }, Number(durationS) * 1000);
+      // ここでキュー処理を終了（非同期で再開）
     }
-    // ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑
 
-    // (7) イベントノード
+    // (7) イベントノード (通過点として機能する場合)
     else if (node.type === "eventNode") {
-      const nextNode = findNextNode(node.id, null, allEdges);
-      if (nextNode) nextQueue.push(nextNode);
+      pushNext(node.id, null, allEdges, nextQueue);
+    }
+
+    // ★ (8) 新機能: クリック待ちノード (WaitForClickNode)
+    else if (node.type === "waitForClickNode") {
+      const { targetItemId } = node.data;
+      
+      if (targetItemId) {
+        console.log(`[LogicEngine] 🛑 クリック待機中... ターゲット: ${targetItemId}`);
+        
+        // 次のノードを探しておく
+        const nextNodeId = findNextNode(node.id, null, allEdges);
+        
+        if (nextNodeId) {
+          // 再開用関数 (Closure)
+          const resumeFlow = () => {
+            console.log(`[LogicEngine] ▶️ 待機解除: フロー再開`);
+            processQueue(
+              [nextNodeId], 
+              allNodes, allEdges, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners
+            );
+          };
+
+          // リスナーマップに登録
+          const listeners = activeListeners.get(targetItemId) || [];
+          listeners.push(resumeFlow);
+          activeListeners.set(targetItemId, listeners);
+        }
+      } else {
+        // ターゲット未設定ならスルーして次へ
+        pushNext(node.id, null, allEdges, nextQueue);
+      }
+      // ここでキュー処理を中断（クリックされるまで進まない）
     }
   }
 
-  // 次のキューが溜まったら、再帰的に処理（非同期の代わり）
+  // 次の同期キューがあれば処理
   if (nextQueue.length > 0) {
-    processQueue(
-      nextQueue, 
-      allNodes, 
-      allEdges, 
-      getPreviewState, 
-      setPreviewState, 
-      requestPageChange,
-      getVariables,
-      setVariables
-    );
+    processQueue(nextQueue, allNodes, allEdges, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
   }
 };
 
-/**
- * 指定されたソースノードとハンドルに接続されているターゲットノードIDを見つける
- */
-const findNextNode = (
-  sourceNodeId: string,
-  sourceHandle: string | null, // "source", "true", "false", または null
-  allEdges: Edge[]
-): string | undefined => {
-  const edge = allEdges.find(
-    (e) => e.source === sourceNodeId && e.sourceHandle === sourceHandle
-  );
+// ヘルパー: 次のノードを探してキューに追加
+const pushNext = (srcId: string, handle: string | null, edges: Edge[], queue: string[]) => {
+  const next = findNextNode(srcId, handle, edges);
+  if (next) queue.push(next);
+};
+
+const findNextNode = (srcId: string, handle: string | null, edges: Edge[]): string | undefined => {
+  const edge = edges.find((e) => e.source === srcId && e.sourceHandle === handle);
   return edge?.target;
 };
 
 /**
- * 外部から呼び出す実行トリガー
+ * イベントトリガー (App.tsx から呼ばれる)
  */
 export const triggerEvent = (
-  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) eventName に "onInputChanged" を追加 ↓↓↓↓↓↓↓↓↓↓
-  eventName: string, // "click", "onLoad", "onInputChanged"
-  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
-  targetItemId: string, // "item-123"
+  eventName: string,
+  targetItemId: string,
   currentPageGraph: NodeGraph,
   getPreviewState: () => PreviewState,
   setPreviewState: (newState: PreviewState) => void,
   requestPageChange: (pageId: string) => void,
   getVariables: () => VariableState,
-  setVariables: (newVars: VariableState) => void
+  setVariables: (newVars: VariableState) => void,
+  activeListeners: ActiveListeners // ★ 追加
 ) => {
   const { nodes, edges } = currentPageGraph;
 
-  const startingNode = nodes.find(
-    (n) => n.type === "eventNode" && n.data.eventType === eventName
-  );
-
-  if (!startingNode) {
-    console.warn(`[LogicEngine] イベント (${eventName}) に紐づくノードが見つかりません`);
-    return;
+  // 1. まず「待機中」のフローがあるかチェックして再開させる
+  if (eventName === "click" && activeListeners.has(targetItemId)) {
+    const listeners = activeListeners.get(targetItemId);
+    if (listeners) {
+      // 登録されている全ての再開関数を実行
+      listeners.forEach(resume => resume());
+      // 実行したらリストから削除（One-shot動作）
+      activeListeners.delete(targetItemId);
+      // ★ 待機解除だけで終了せず、通常のクリックイベントも発火させたい場合は下へ続く
+      // ここでは「待機解除」を優先し、通常の開始イベントとは独立させる想定
+      return; 
+    }
   }
 
-  console.log(`[LogicEngine] 🎬 イベント発生: ${startingNode.data.label}`);
-  
-  const nextNodeId = findNextNode(startingNode.id, null, edges);
-  if (nextNodeId) {
-    processQueue(
-      [nextNodeId], 
-      nodes, 
-      edges, 
-      getPreviewState, 
-      setPreviewState, 
-      requestPageChange,
-      getVariables,
-      setVariables
-    );
+  // 2. 通常のイベント開始ノードを探す (On Click Nodeなど)
+  const startingNodes = nodes.filter(
+    (n) => n.type === "eventNode" && n.data.eventType === eventName
+    // (将来的に「特定のアイテムのクリック」をStartにする場合、ここで data.targetId もチェック可能)
+  );
+
+  if (startingNodes.length > 0) {
+    const nextQueue = startingNodes.map(n => {
+        // イベントノード自体に処理はないので、その次から開始
+        return findNextNode(n.id, null, edges);
+    }).filter((id): id is string => !!id);
+
+    if (nextQueue.length > 0) {
+        processQueue(nextQueue, nodes, edges, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+    }
   }
 };

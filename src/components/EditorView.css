@@ -1,0 +1,183 @@
+/* src/components/EditorView.css */
+
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #1e1e1e;
+}
+
+/* ワークスペース全体 (縦積み) */
+.editor-workspace-vertical {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: 4px;
+}
+
+/* 上段の行 (横並び) */
+.workspace-upper-row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  overflow: hidden;
+  min-height: 0; /* Flexbox内スクロールに必須 */
+}
+
+/* 下段の行 (縦積みの一部として) */
+.workspace-lower-row {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* --- パネル共通設定 --- */
+
+.panel-left, .panel-right {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  border: 1px solid #333;
+}
+
+.panel-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+  /* 左右にリサイズバーがあるのでマージンやパディングは不要 */
+}
+
+/* コンテンツラッパー */
+.workspace-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.workspace-section {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid #333;
+  background-color: #222;
+}
+
+.design-section { background-color: #1a1a1a; }
+.logic-section { background-color: #1a1a1a; }
+
+.canvas-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  position: relative;
+}
+
+.preview-viewport {
+  flex: 1;
+  background-color: #111;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* =========================================
+   ★ 水平リサイズバー (全幅)
+   ========================================= */
+
+.resize-separator-horizontal {
+  flex-shrink: 0;
+  height: 12px;
+  width: 100%;
+  margin: -2px 0; /* 上下のパネルに重ねる */
+  background-color: transparent;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20; /* 最前面 */
+  transition: background-color 0.2s;
+}
+
+.resize-separator-horizontal:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.resize-handle-pill-horizontal {
+  width: 60px; /* 全幅なので少し広く */
+  height: 6px;
+  background-color: #444;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.resize-handle-dots-horizontal {
+  width: 30px;
+  height: 2px;
+  background-image: radial-gradient(circle, #888 1px, transparent 1px);
+  background-size: 4px 4px;
+  background-position: center;
+  background-repeat: repeat-x;
+}
+
+.resize-separator-horizontal:hover .resize-handle-pill-horizontal {
+  background-color: #007acc;
+  transform: scale(1.1);
+}
+.resize-separator-horizontal:active .resize-handle-pill-horizontal {
+  background-color: #008be6;
+}
+
+
+/* =========================================
+   ★ 垂直リサイズバー (左右パネル用)
+   ========================================= */
+
+.resize-separator-vertical {
+  flex-shrink: 0;
+  width: 12px;
+  margin: 0 -2px;
+  background-color: transparent;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background-color 0.2s;
+}
+
+.resize-separator-vertical:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.resize-handle-pill-vertical {
+  width: 6px;
+  height: 40px;
+  background-color: #444;
+  border-radius: 3px;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.resize-separator-vertical:hover .resize-handle-pill-vertical {
+  background-color: #007acc;
+  transform: scale(1.1);
+}
+.resize-separator-vertical:active .resize-handle-pill-vertical {
+  background-color: #008be6;
+}

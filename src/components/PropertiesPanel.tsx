@@ -1,13 +1,12 @@
 // src/components/PropertiesPanel.tsx
 
-// (★ 変更なし)
 import React, { useState, useRef, useEffect } from "react";
 import type { Node } from "reactflow";
 import "./PropertiesPanel.css";
 import "./NodePropertiesEditor.css";
 import { useEditorContext } from "../contexts/EditorContext";
 
-// (★ 変更なし) アコーディオンコンポーネント
+// アコーディオンコンポーネント
 interface AccordionProps {
   title: string;
   children: React.ReactNode;
@@ -31,7 +30,7 @@ const AccordionSection: React.FC<AccordionProps> = ({
   );
 };
 
-// (★ 変更なし) タブUIコンポーネント
+// タブUIコンポーネント
 interface InspectorTabsProps {
 }
 const InspectorTabs: React.FC<InspectorTabsProps> = () => {
@@ -89,20 +88,22 @@ const InspectorTabs: React.FC<InspectorTabsProps> = () => {
   );
 };
 
-// --- (A) App.tsx から渡される Props ---
-// (★ 変更なし) Props の定義を削除
-
 // --- (B) ノード専用の編集UI ---
 const NodePropertiesEditor: React.FC<{
   node: Node;
 }> = ({ node }) => { 
   
-  // (★ 変更なし) Context から取得
+  // Context から取得
   const {
     placedItems,
     onNodeDataChange,
     pageInfoList,
+    activeLogicGraphId,
   } = useEditorContext();
+
+  // 親アイテムを特定
+  const parentItem = placedItems.find(p => p.id === activeLogicGraphId);
+  const isInputItem = parentItem?.name.startsWith("テキスト入力欄") || false;
 
   // (汎用) データ変更ハンドラ
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
@@ -115,7 +116,7 @@ const NodePropertiesEditor: React.FC<{
     e.target.select();
   };
 
-  // (★ 変更なし) どのノードが選択されているかに基づいて、UIを切り替える
+  // どのノードが選択されているかに基づいて、UIを切り替える
   let editorUI: React.ReactNode | null = null;
   
   if (node.type === "actionNode") {
@@ -375,7 +376,7 @@ const NodePropertiesEditor: React.FC<{
               type="number"
               className="prop-input"
               name="value"
-              value={node.data.value || 0}
+              value={node.data.value ?? 0}
               onChange={handleChange}
               onKeyDown={handleInputKeyDown}
               onFocus={handleInputFocus}
@@ -388,7 +389,7 @@ const NodePropertiesEditor: React.FC<{
               type="number"
               className="prop-input"
               name="durationS"
-              value={node.data.durationS || 0.5}
+              value={node.data.durationS ?? 0.5}
               onChange={handleChange}
               onKeyDown={handleInputKeyDown}
               onFocus={handleInputFocus}
@@ -405,7 +406,7 @@ const NodePropertiesEditor: React.FC<{
               type="number"
               className="prop-input"
               name="delayS"
-              value={node.data.delayS || 0}
+              value={node.data.delayS ?? 0}
               onChange={handleChange}
               onKeyDown={handleInputKeyDown}
               onFocus={handleInputFocus}
@@ -442,7 +443,7 @@ const NodePropertiesEditor: React.FC<{
             type="number"
             className="prop-input"
             name="durationS"
-            value={node.data.durationS || 1.0}
+            value={node.data.durationS ?? 1.0}
             onChange={handleChange}
             onKeyDown={handleInputKeyDown}
             onFocus={handleInputFocus}
@@ -453,15 +454,69 @@ const NodePropertiesEditor: React.FC<{
       </AccordionSection>
     );
   }
+  else if (node.type === "waitForClickNode") {
+    editorUI = (
+      <AccordionSection title="待機設定" defaultOpen={true}>
+        <div className="prop-group">
+          <label className="prop-label">クリックを待つ対象:</label>
+          <select
+            className="prop-select"
+            name="targetItemId"
+            value={node.data.targetItemId || ""}
+            onChange={(e) => {
+              const selectedItem = placedItems.find(p => p.id === e.target.value);
+              const newLabel = selectedItem ? `待ち: ${selectedItem.data.text || selectedItem.name}` : "ターゲット未設定";
+              
+              onNodeDataChange(node.id, { 
+                targetItemId: e.target.value,
+                label: newLabel
+              });
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <option value="">-- アイテムを選択 --</option>
+            {placedItems.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.data.text || item.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="prop-description" style={{fontSize: '0.8em', color: '#888', marginTop: '8px'}}>
+          ※ このノードに到達すると、指定したアイテムがクリックされるまで処理を一時停止します。
+        </div>
+      </AccordionSection>
+    );
+  }
   else if (node.type === "eventNode") {
     editorUI = (
-      <AccordionSection title="ノード設定" defaultOpen={true}>
-        <div className="placeholder-text">(このノードに設定項目はありません)</div>
+      <AccordionSection title="イベント設定" defaultOpen={true}>
+        <div className="prop-group">
+          <label className="prop-label">トリガーの種類:</label>
+          <select
+            className="prop-select"
+            name="eventType"
+            value={node.data.eventType || "click"}
+            onChange={handleChange}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <option value="click">👆 クリック時 (On Click)</option>
+            <option value="onLoad">🚀 読み込み時 (On Load)</option>
+            
+            {/* ★ 修正: 入力完了時を選択肢として追加 */}
+            {isInputItem && (
+              <option value="onInputComplete">✅ 入力完了時 (On Submit)</option>
+            )}
+          </select>
+        </div>
+        <div className="prop-description" style={{fontSize: '0.8em', color: '#888', marginTop: '8px'}}>
+          ※ このフローが実行されるきっかけを指定します。
+        </div>
       </AccordionSection>
     );
   }
   
-  // (★ 変更なし) ラッパー
+  // ラッパー
   return (
     <div className="properties-panel-content">
       <AccordionSection title="基本情報" defaultOpen={true}>
@@ -481,10 +536,9 @@ const NodePropertiesEditor: React.FC<{
 
 
 // --- (C) メインの PropertiesPanel (UIスイッチャー) ---
-// (★ 変更なし) Props を受け取らない
 const PropertiesPanel: React.FC = () => {
   
-  // (★ 変更なし) Context から必要なデータ/関数を取得
+  // Context から必要なデータ/関数を取得
   const {
     selection,
     activeTabId,
@@ -494,7 +548,7 @@ const PropertiesPanel: React.FC = () => {
     onItemUpdate,
   } = useEditorContext();
 
-  // (★ 変更なし) アクティブなタブのエントリを取得
+  // アクティブなタブのエントリを取得
   const activeEntry = selection.find((s) => s.id === activeTabId);
 
   let content = null;
@@ -506,7 +560,7 @@ const PropertiesPanel: React.FC = () => {
     if (item) {
       // (アイテム編集UI)
       
-      // (★ 変更なし) ローカルステート管理
+      // ローカルステート管理
       const [localX, setLocalX] = useState(item.x);
       const [localY, setLocalY] = useState(item.y);
       const [localWidth, setLocalWidth] = useState(item.width);
@@ -549,7 +603,7 @@ const PropertiesPanel: React.FC = () => {
       const handleBlur = () => { /* (テキスト入力欄は onBlur で何もしない) */ };
       const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.target.select(); };
 
-      // (★ 変更済) 画像アップロードハンドラ
+      // 画像アップロードハンドラ
       const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -578,7 +632,7 @@ const PropertiesPanel: React.FC = () => {
         });
       };
       
-      // (★ 変更済) テキスト入力欄用のデータハンドラ
+      // テキスト入力欄用のデータハンドラ
       const handleItemDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         onItemUpdate(item.id, {
           data: {
@@ -593,7 +647,6 @@ const PropertiesPanel: React.FC = () => {
           <AccordionSection title="基本情報" defaultOpen={true}>
             <div className="prop-group">
               <div className="prop-label">Name (アイテム種別)</div>
-              {/* (★ 変更なし) 編集不可のスタイルクラスを追加 */}
               <input
                 type="text"
                 className="prop-input prop-input-disabled"
@@ -603,7 +656,6 @@ const PropertiesPanel: React.FC = () => {
             </div>
           </AccordionSection>
           
-          {/* (★ 変更なし) 「テキスト」「ボタン」用の編集UI */}
           {(item.name.startsWith("テキスト") || item.name.startsWith("ボタン")) && (
             <AccordionSection title="コンテンツ" defaultOpen={true}>
               <div className="prop-group">
@@ -626,7 +678,6 @@ const PropertiesPanel: React.FC = () => {
           )}
 
 
-          {/* (★ 変更済) 「画像」アイテムの時だけ表示するUI */}
           {item.name.startsWith("画像") && (
             <AccordionSection title="画像ソース" defaultOpen={true}>
               <div className="prop-group">
@@ -664,7 +715,6 @@ const PropertiesPanel: React.FC = () => {
             </AccordionSection>
           )}
           
-          {/* (★ 変更済) 「テキスト入力欄」の時だけ表示するUI */}
           {item.name.startsWith("テキスト入力欄") && (
             <AccordionSection title="入力欄設定" defaultOpen={true}>
               <div className="prop-group">
@@ -703,7 +753,6 @@ const PropertiesPanel: React.FC = () => {
             <div className="prop-row">
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">X</div>
-                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -716,7 +765,6 @@ const PropertiesPanel: React.FC = () => {
               </div>
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">Y</div>
-                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -734,7 +782,6 @@ const PropertiesPanel: React.FC = () => {
             <div className="prop-row">
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">W</div>
-                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -747,7 +794,6 @@ const PropertiesPanel: React.FC = () => {
               </div>
               <div className="prop-group prop-group-half">
                 <div className="prop-label-inline">H</div>
-                {/* (★ 変更なし) value, onChange, onBlur をローカル版に変更済 */}
                 <input
                   type="number"
                   className="prop-input"
@@ -771,11 +817,9 @@ const PropertiesPanel: React.FC = () => {
     if (logicTree) {
       const node = logicTree.nodes.find((n) => n.id === activeEntry.id);
       if (node) {
-        // (タスク4) ノード専用エディタをレンダリング
         content = (
           <NodePropertiesEditor
             node={node}
-            // (★) Props 渡しを削除 (NodePropertiesEditor 内部で Context を使う)
           />
         );
       }
@@ -791,10 +835,8 @@ const PropertiesPanel: React.FC = () => {
     );
   }
 
-  // (★ 変更なし) タブとコンテンツを両方レンダリング
   return (
     <div className="panel-content-wrapper">
-      {/* (★) InspectorTabs も Context を使うように変更 */}
       <InspectorTabs />
       <div className="panel-content-scrollable">
         {content}
@@ -803,5 +845,4 @@ const PropertiesPanel: React.FC = () => {
   );
 };
 
-// (★ 変更なし) PropertiesPanel コンポーネント自体をメモ化
 export default React.memo(PropertiesPanel);

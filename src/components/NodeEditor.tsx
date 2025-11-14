@@ -1,54 +1,37 @@
 // src/components/NodeEditor.tsx
 
-// (★ 変更なし)
-import React, { useRef, useCallback, useEffect, useMemo } from "react";
+import React, { useRef, useEffect, useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
   useReactFlow,
   type Node,
-  type Edge,
-  type OnNodesChange,
-  type OnEdgesChange,
-  type OnConnect,
   type NodeProps,
-  ReactFlowProvider,
+  ReactFlowProvider, // ★ Providerをインポート
 } from "reactflow";
-
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import NodeToolboxItem from "./NodeToolboxItem";
-// (★ 変更なし) Context をインポート
 import { useEditorContext } from "../contexts/EditorContext";
-
 import "reactflow/dist/style.css";
 import "./NodeEditor.css";
 
+// ノードコンポーネント
 import EventNode from "./nodes/EventNode";
 import ActionNode from "./nodes/ActionNode";
 import IfNode from "./nodes/IfNode";
-import PageNode from "./nodes/PageNode.tsx";
-import SetVariableNode from "./nodes/SetVariableNode.tsx";
-import AnimateNode from "./nodes/AnimateNode.tsx";
-import DelayNode from "./nodes/DelayNode.tsx";
+import PageNode from "./nodes/PageNode";
+import SetVariableNode from "./nodes/SetVariableNode";
+import AnimateNode from "./nodes/AnimateNode";
+import DelayNode from "./nodes/DelayNode";
+import WaitForClickNode from "./nodes/WaitForClickNode";
 
-// --- Props の型定義 ---
-// (★ 変更なし) Props の定義を削除
-interface NodeEditorProps {}
-
-// --- ドラッグアイテムの型 ---
-interface NodeToolDragItem {
-  nodeType: string;
-  nodeName: string;
-}
-
-// (★ 変更なし) Nodeクリックハンドラ型定義
+interface NodeToolDragItem { nodeType: string; nodeName: string; }
 type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
 
-// (★ 変更なし) Props を受け取らない
-const NodeEditor: React.FC<NodeEditorProps> = () => {
-
-  // (★ 変更なし) Context から必要なデータ/関数を取得
+// ★ 内部コンポーネント: ReactFlowProvider の子として動作する
+// useReactFlow() はこの中でしか使えないため分離する
+const NodeEditorContent: React.FC = () => {
   const {
     currentGraph,
     onNodesChange,
@@ -60,37 +43,29 @@ const NodeEditor: React.FC<NodeEditorProps> = () => {
   
   const nodes = currentGraph?.nodes;
   const edges = currentGraph?.edges;
-
-
+  
+  // ★ useReactFlow は ReactFlowProvider の内部でのみ動作可能
   const { fitView, project } = useReactFlow();
-  const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  // useDrop フック
   const [{ isOver }, drop] = useDrop(
     () => ({
       accept: ItemTypes.NODE_TOOL,
-      collect: (monitor: DropTargetMonitor) => ({
-        isOver: !!monitor.isOver(),
-      }),
+      collect: (monitor: DropTargetMonitor) => ({ isOver: !!monitor.isOver() }),
       drop: (item: NodeToolDragItem, monitor: DropTargetMonitor) => {
         const { nodeType, nodeName } = item;
         const clientOffset = monitor.getClientOffset();
         if (!clientOffset || !dropRef.current) return;
-
+        
+        // 座標変換
         const position = project({
-          x:
-            clientOffset.x -
-            (dropRef.current.getBoundingClientRect().left ?? 0),
-          y:
-            clientOffset.y -
-            (dropRef.current.getBoundingClientRect().top ?? 0),
+          x: clientOffset.x - (dropRef.current.getBoundingClientRect().left ?? 0),
+          y: clientOffset.y - (dropRef.current.getBoundingClientRect().top ?? 0),
         });
 
         const newNodeData: any = { label: nodeName };
-        if (nodeType === 'delayNode') {
-          newNodeData.durationS = 1.0; 
-        }
+        if (nodeType === 'delayNode') newNodeData.durationS = 1.0;
+        if (nodeType === 'waitForClickNode') newNodeData.label = "ターゲット未設定";
 
         const newNode: Node = {
           id: `node-${Date.now()}`,
@@ -98,99 +73,49 @@ const NodeEditor: React.FC<NodeEditorProps> = () => {
           position,
           data: newNodeData,
         };
-
         onAddNode(newNode);
       },
     }),
     [project, onAddNode]
   );
-  drop(dropRef); // drop コネクタを ref に接続
+  drop(dropRef);
 
-  // ノード変更時にビューをフィット
   useEffect(() => {
     if (nodes && nodes.length > 0) {
-      fitView({ duration: 200 });
+      // 少し遅らせてfitViewすることで描画後のサイズに合わせる
+      setTimeout(() => fitView({ duration: 200 }), 100);
     }
   }, [nodes ? nodes[0]?.id : undefined, fitView]);
 
-  // (★ 変更なし) nodeTypes の useMemo
-  const nodeTypes = useMemo(() => {
-    const wrappedEventNode = (props: NodeProps) => <EventNode {...props} />;
-    const wrappedActionNode = (props: NodeProps) => ( <ActionNode {...props} /> );
-    const wrappedIfNode = (props: NodeProps) => ( <IfNode {...props} /> );
-    const wrappedPageNode = (props: NodeProps) => ( <PageNode {...props} /> );
-    const wrappedSetVariableNode = (props: NodeProps) => ( <SetVariableNode {...props} /> );
-    const wrappedAnimateNode = (props: NodeProps) => (
-      <AnimateNode {...props} />
-    );
-    const wrappedDelayNode = (props: NodeProps) => (
-      <DelayNode {...props} />
-    );
+  const nodeTypes = useMemo(() => ({
+    eventNode: (props: NodeProps) => <EventNode {...props} />,
+    actionNode: (props: NodeProps) => <ActionNode {...props} />,
+    ifNode: (props: NodeProps) => <IfNode {...props} />,
+    pageNode: (props: NodeProps) => <PageNode {...props} />,
+    setVariableNode: (props: NodeProps) => <SetVariableNode {...props} />,
+    animateNode: (props: NodeProps) => <AnimateNode {...props} />,
+    delayNode: (props: NodeProps) => <DelayNode {...props} />,
+    waitForClickNode: (props: NodeProps) => <WaitForClickNode {...props} />,
+  }), []); 
 
-    return {
-      eventNode: wrappedEventNode,
-      actionNode: wrappedActionNode,
-      ifNode: wrappedIfNode,
-      pageNode: wrappedPageNode,
-      setVariableNode: wrappedSetVariableNode,
-      animateNode: wrappedAnimateNode,
-      delayNode: wrappedDelayNode,
-    };
-  }, []); 
+  const handleNodeClick: NodeClickHandler = (event, node) => onNodeClick(node.id);
 
-  // (★ 変更なし) handleNodeClick
-  const handleNodeClick: NodeClickHandler = (event, node) => {
-    onNodeClick(node.id);
-  };
+  if (!nodes || !edges) return <div className="node-editor-placeholder">アイテムを選択してください</div>;
 
-  // --- ノード未定義時のプレースホルダー ---
-  if (!nodes || !edges) {
-    return (
-      <div className="node-editor-placeholder">
-        アートボード上のアイテムを選択して、ロジックの編集を開始します。
-      </div>
-    );
-  }
-
-  // --- メインの return ---
   return (
-    <div className="node-editor-wrapper" ref={reactFlowWrapper}>
-      {/* ツールボックス */}
+    <div className="node-editor-wrapper">
       <aside className="node-toolbox">
         <div className="toolbox-header">ロジックノード</div>
-        <NodeToolboxItem
-          nodeType="actionNode"
-          nodeName="⚡ アクション: 表示/非表示"
-        >
-          ⚡ 表示/非表示
-        </NodeToolboxItem>
-        <NodeToolboxItem
-          nodeType="animateNode"
-          nodeName="⚡ アクション: アニメーション"
-        >
-          ⚡ アニメーション
-        </NodeToolboxItem>
-        <NodeToolboxItem
-          nodeType="pageNode"
-          nodeName="⚡ アクション: ページ遷移"
-        >
-          ⚡ ページ遷移
-        </NodeToolboxItem>
-        <NodeToolboxItem
-          nodeType="setVariableNode"
-          nodeName="⚡ アクション: 変数をセット"
-        >
-          ⚡ 変数をセット
-        </NodeToolboxItem>
-        <NodeToolboxItem nodeType="delayNode" nodeName="⏱️ ロジック: 遅延">
-          ⏱️ 遅延 (Wait)
-        </NodeToolboxItem>
-        <NodeToolboxItem nodeType="ifNode" nodeName="🧠 ロジック: もし〜なら">
-          🧠 もし〜なら
-        </NodeToolboxItem>
+        <NodeToolboxItem nodeType="actionNode" nodeName="⚡ アクション: 表示/非表示">⚡ 表示/非表示</NodeToolboxItem>
+        <NodeToolboxItem nodeType="animateNode" nodeName="⚡ アクション: アニメーション">⚡ アニメーション</NodeToolboxItem>
+        <NodeToolboxItem nodeType="pageNode" nodeName="⚡ アクション: ページ遷移">⚡ ページ遷移</NodeToolboxItem>
+        <NodeToolboxItem nodeType="setVariableNode" nodeName="⚡ アクション: 変数をセット">⚡ 変数をセット</NodeToolboxItem>
+        <div style={{ height: 10 }} />
+        <NodeToolboxItem nodeType="delayNode" nodeName="⏱️ ロジック: 遅延">⏱️ 遅延 (Wait)</NodeToolboxItem>
+        <NodeToolboxItem nodeType="ifNode" nodeName="🧠 ロジック: もし〜なら">🧠 もし〜なら</NodeToolboxItem>
+        <NodeToolboxItem nodeType="waitForClickNode" nodeName="👆 ロジック: クリック待ち">👆 クリック待ち</NodeToolboxItem>
       </aside>
 
-      {/* React Flow キャンバス */}
       <div ref={dropRef} className="react-flow-drop-target">
         <ReactFlow
           nodes={nodes}
@@ -213,16 +138,13 @@ const NodeEditor: React.FC<NodeEditorProps> = () => {
   );
 };
 
-// --- Wrapper コンポーネント ---
-// (★ 変更なし) Props を受け取らない
-const NodeEditorWrapper: React.FC = (props) => {
+// ★ メインコンポーネント: Wrapperとして機能し、Providerを提供する
+const NodeEditor: React.FC = () => {
   return (
     <ReactFlowProvider>
-      {/* (★) props を渡さない */}
-      <NodeEditor />
+      <NodeEditorContent />
     </ReactFlowProvider>
   );
 };
 
-// (★ 変更なし) NodeEditorWrapper コンポーネント自体をメモ化
-export default React.memo(NodeEditorWrapper);
+export default React.memo(NodeEditor);

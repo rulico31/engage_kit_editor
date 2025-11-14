@@ -1,0 +1,47 @@
+/* src/components/nodes/WaitForClickNode.css */
+
+.wait-for-click-node {
+  background: #e6b400; /* 黄色系 (待機・注意) */
+  border: 1px solid #b38b00;
+  border-radius: 20px; /* 丸みを帯びさせて「一時停止」感を出す */
+  padding: 8px 16px;
+  color: #222;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 140px;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.wait-for-click-node-header {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wait-for-click-node-label {
+  font-size: 14px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+/* ハンドルスタイル */
+.wait-for-click-node .react-flow__handle {
+  background: #fff;
+  border: 2px solid #e6b400;
+  width: 10px;
+  height: 10px;
+}
+
+.wait-for-click-node .react-flow__handle-left {
+  left: -5px;
+}
+.wait-for-click-node .react-flow__handle-right {
+  right: -5px;
+}

@@ -1,23 +1,14 @@
 // src/components/LeftPanel.tsx
 
-import React from "react";
-import {
-  Panel,
-  PanelGroup,
-  PanelResizeHandle,
-} from "react-resizable-panels";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import ToolboxItem from "./ToolboxItem";
 import ContentBrowser from "./ContentBrowser";
-// ↓↓↓↓↓↓↓↓↓↓ (★ 変更なし) PageInfo と Context をインポート ↓↓↓↓↓↓↓↓↓↓
-// import type { PageInfo } from "../types";
 import { useEditorContext } from "../contexts/EditorContext";
-// ↑↑↑↑↑↑↑↑↑↑ (★ 変更なし) ↑↑↑↑↑↑↑↑↑↑
 
-// (★ 変更なし)
-// interface LeftPanelProps { ... }
+// ★ 新しいCSSファイルをインポート
+import "./LeftPanel.css";
 
 export const LeftPanel: React.FC = React.memo(() => {
-  // (★ 変更なし)
   const {
     pageInfoList,
     selectedPageId,
@@ -25,36 +16,94 @@ export const LeftPanel: React.FC = React.memo(() => {
     onAddPage,
   } = useEditorContext();
 
-  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) return 文直下の <Panel ...> を削除 ↓↓↓↓↓↓↓↓↓↓
+  // 上部（ツールボックス）の高さ比率
+  const [splitRatio, setSplitRatio] = useState(0.4);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = "row-resize";
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }, []);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingRef.current || !containerRef.current) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    let newRatio = relativeY / rect.height;
+
+    if (newRatio < 0.2) newRatio = 0.2;
+    if (newRatio > 0.8) newRatio = 0.8;
+    
+    setSplitRatio(newRatio);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isDraggingRef.current = false;
+    document.body.style.cursor = "";
+    window.removeEventListener("mousemove", handleMouseMove);
+    window.removeEventListener("mouseup", handleMouseUp);
+  }, [handleMouseMove]);
+
+  useEffect(() => {
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
+
   return (
-    // <Panel defaultSize={20} minSize={15} className="panel-column"> // (★ この行を削除)
-      <PanelGroup direction="vertical">
-        {/* (A) 上部: ツールボックス */}
-        <Panel defaultSize={40} minSize={20} className="panel-content">
-          <div className="tool-list">
-            <ToolboxItem name="テキスト" />
-            <ToolboxItem name="ボタン" />
-            <ToolboxItem name="画像" />
-            <ToolboxItem name="テキスト入力欄" />
-          </div>
-        </Panel>
-        
-        <PanelResizeHandle className="resize-handle" />
-        
-        {/* (B) 下部: コンテンツブラウザ (ページ管理) */}
-        <Panel defaultSize={60} minSize={20} className="panel-content">
-          <ContentBrowser
-            pages={pageInfoList}
-            selectedPageId={selectedPageId}
-            onSelectPage={onSelectPage}
-            onAddPage={onAddPage}
-          />
-        </Panel>
-      </PanelGroup>
-    // </Panel> // (★ この行を削除)
+    <div 
+      ref={containerRef} 
+      className="left-panel-container" // CSSクラスを使用
+    >
+      {/* (A) 上部: ツールボックス */}
+      <div 
+        style={{ height: `${splitRatio * 100}%` }}
+        className="tool-list-container panel-content"
+      >
+        <div className="tool-list" style={{ overflowY: "auto", flex: 1, paddingRight: "4px" }}>
+          <ToolboxItem name="テキスト" />
+          <ToolboxItem name="ボタン" />
+          <ToolboxItem name="画像" />
+          <ToolboxItem name="テキスト入力欄" />
+        </div>
+      </div>
+      
+      {/* ★ 修正: CSSクラス (.left-panel-separator) を適用 */}
+      <div 
+        className="left-panel-separator"
+        onMouseDown={handleMouseDown}
+        title="ドラッグして高さを変更"
+      >
+        <div className="left-panel-handle" />
+      </div>
+      
+      {/* (B) 下部: コンテンツブラウザ */}
+      <div 
+        style={{ 
+          flex: 1, 
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column"
+        }}
+        className="panel-content"
+      >
+        <ContentBrowser
+          pages={pageInfoList}
+          selectedPageId={selectedPageId}
+          onSelectPage={onSelectPage}
+          onAddPage={onAddPage}
+        />
+      </div>
+    </div>
   );
-  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
 });
 
-// React.memo でラップすることで、不要な再レンダリングを防ぎます
 export default LeftPanel;

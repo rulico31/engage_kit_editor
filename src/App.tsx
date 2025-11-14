@@ -16,8 +16,18 @@ import {
 } from "reactflow";
 
 import HomeScreen from "./components/HomeScreen";
-import type { PlacedItemType, ProjectData, PageData, NodeGraph, PageInfo, PreviewState, SelectionEntry, VariableState, PreviewItemState } from "./types";
-import { triggerEvent } from "./logicEngine";
+import type { 
+  PlacedItemType, 
+  ProjectData, 
+  PageData, 
+  NodeGraph, 
+  PageInfo, 
+  PreviewState, 
+  SelectionEntry, 
+  VariableState 
+} from "./types";
+
+import { triggerEvent, type ActiveListeners } from "./logicEngine";
 import EditorView from "./components/EditorView";
 
 import { EditorContext, type EditorContextType } from "./contexts/EditorContext";
@@ -56,7 +66,8 @@ const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
     nodes: [{
       id: "input-change",
       type: "eventNode",
-      data: { label: "🎬 イベント: 入力値が変更された時", eventType: "onInputChanged" },
+      // ★ 修正: デフォルトを "onInputComplete" に変更
+      data: { label: "🎬 イベント: 入力完了時", eventType: "onInputComplete" },
       position: { x: 50, y: 50 },
     }],
     edges: [],
@@ -94,13 +105,16 @@ function App() {
   // 変数
   const [variables, setVariables] = useState<VariableState>({});
 
+  // 待機中のリスナーを保持するRef
+  const activeListeners = useRef<ActiveListeners>(new Map());
+
   const previewStateRef = useRef(previewState);
   useEffect(() => { previewStateRef.current = previewState; }, [previewState]);
 
   const variablesRef = useRef(variables);
   useEffect(() => { variablesRef.current = variables; }, [variables]);
 
-  // --- Derived values (計算はここで行い、useMemoの依存を分かりやすくする) ---
+  // --- Derived values ---
   const derived = useMemo(() => {
     if (!selectedPageId) return { placedItems: [] as PlacedItemType[], allItemLogics: {} as Record<string, NodeGraph>, currentGraph: undefined as NodeGraph | undefined };
     const currentPage = pages[selectedPageId];
@@ -117,7 +131,7 @@ function App() {
 
   const pageInfoList: PageInfo[] = useMemo(() => pageOrder.map(id => ({ id, name: pages[id]?.name || "無題" })), [pageOrder, pages]);
 
-  // --- (4) コールバック (selectedPageIdを直接参照する場面は functional update を使い閉じない) ---
+  // --- (4) コールバック ---
 
   const setPlacedItemsForCurrentPage = useCallback((action: React.SetStateAction<PlacedItemType[]>) => {
     setPages(prevPages => {
@@ -147,7 +161,6 @@ function App() {
 
       const newPlacedItems = currentPage.placedItems.map(item => item.id === itemId ? { ...item, ...updatedProps } : item);
 
-      // 選択ラベル更新は functional setSelection を使う
       if (updatedProps.name) {
         setSelection(prev => prev.map(s => s.id === itemId ? { ...s, label: `🔘 ${updatedProps.name}` } : s));
       }
@@ -170,7 +183,6 @@ function App() {
 
       const newNodes = applyNodeChanges(changes, currentGraph.nodes);
 
-      // selection を functional update で整合
       setSelection(prevSel => {
         const newSel = [...prevSel];
         newNodes.forEach(node => {
@@ -319,6 +331,7 @@ function App() {
     setIsPreviewing(false);
     setPreviewState({});
     setVariables({});
+    activeListeners.current.clear();
   }, []);
 
   const handleNewProject = useCallback(() => {
@@ -476,6 +489,7 @@ function App() {
         });
       } else {
         setPreviewState({});
+        activeListeners.current.clear();
       }
       return next;
     });
@@ -492,25 +506,25 @@ function App() {
 
   const handleItemEvent = useCallback((eventName: string, itemId: string) => {
     if (!selectedPageId) return;
+    
     const targetGraph = pages[selectedPageId]?.allItemLogics[itemId];
-    if (!targetGraph) {
-      console.warn(`[App] ${itemId} に紐づくロジックグラフがありません`);
-      return;
-    }
+    
+    const dummyGraph: NodeGraph = { nodes: [], edges: [] };
+    const graphToUse = targetGraph || dummyGraph;
 
     triggerEvent(
       eventName,
       itemId,
-      targetGraph,
+      graphToUse,
       () => previewStateRef.current,
       (newState: PreviewState) => { previewStateRef.current = newState; setPreviewState(newState); },
       handlePageChangeRequest,
       () => variablesRef.current,
-      (newVars: VariableState) => { variablesRef.current = newVars; setVariables(newVars); }
+      (newVars: VariableState) => { variablesRef.current = newVars; setVariables(newVars); },
+      activeListeners.current
     );
   }, [selectedPageId, pages, handlePageChangeRequest]);
 
-  // --- useMemo: context value を安定化 ---
   const contextValue: EditorContextType = useMemo(() => ({
     pages,
     pageOrder,

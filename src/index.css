@@ -20,3 +20,49 @@ body,
   color: #ccc;
   font-family: sans-serif;
 }
+
+/* ========================================
+  ★ グローバル・スクロールバー設定 (Dark Theme)
+  ========================================
+  アプリ内のすべてのスクロールバーを、
+  デフォルトの「白」から「ダークグレー」に変更し、
+  プロフェッショナルな統一感を出します。
+*/
+
+/* 全要素に対して適用 */
+* {
+  /* Firefox用 */
+  scrollbar-width: thin;
+  scrollbar-color: #555 #1e1e1e;
+}
+
+/* WebKit系ブラウザ (Chrome, Edge, Safari) 用の擬似要素 */
+
+/* スクロールバー全体の幅・高さ */
+::-webkit-scrollbar {
+  width: 8px;   /* 縦スクロールバーの幅 */
+  height: 8px;  /* 横スクロールバーの高さ */
+}
+
+/* スクロールバーの背景（トラック） */
+::-webkit-scrollbar-track {
+  background: #1e1e1e; /* アプリ背景色に合わせる */
+  border-radius: 4px;
+}
+
+/* スクロールバーの持ち手（サム） */
+::-webkit-scrollbar-thumb {
+  background-color: #444; /* 少し明るいグレー */
+  border-radius: 4px;     /* 丸みをつける */
+  border: 2px solid #1e1e1e; /* 余白を作るためのボーダー（背景色と同じにする） */
+}
+
+/* 持ち手にホバーした時 */
+::-webkit-scrollbar-thumb:hover {
+  background-color: #666; /* より明るくして反応を示す */
+}
+
+/* スクロールバーの交差部分（右下など） */
+::-webkit-scrollbar-corner {
+  background-color: #1e1e1e;
+}

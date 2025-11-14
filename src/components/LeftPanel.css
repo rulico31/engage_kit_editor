@@ -1,0 +1,61 @@
+/* src/components/LeftPanel.css */
+
+.left-panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.tool-list-container {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* background-color: #2a2a2a; (継承されるので不要) */
+}
+
+/* リサイズハンドル（兼 コンテンツブラウザのヘッダー境界） */
+.left-panel-separator {
+  flex-shrink: 0;
+  height: 9px; /* つかみやすい高さ */
+  margin: 0;
+  z-index: 20;
+  cursor: row-resize;
+  
+  /* ★ レイアウト: 中央揃え (これが消えていた原因) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* ★ 見た目: プロフェッショナルな境界線スタイル */
+  background-color: #1a1a1a; /* パネル(#2a2a2a)と差別化 */
+  border-top: 1px solid #000;    /* くっきりした黒い線 */
+  border-bottom: 1px solid #000; /* くっきりした黒い線 */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); /* わずかなハイライトで立体感 */
+
+  transition: background-color 0.2s ease;
+}
+
+.left-panel-separator:hover {
+  background-color: #333; /* ホバー時に少し明るく */
+}
+
+/* つまみ (Pill) */
+.left-panel-handle {
+  width: 30px;
+  height: 5px;
+  background-color: #555;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+/* ホバー時につまみを青くする */
+.left-panel-separator:hover .left-panel-handle {
+  background-color: #007acc;
+  transform: scaleX(1.2); /* 横に少し広がるアニメーション */
+}
+
+.left-panel-separator:active .left-panel-handle {
+  background-color: #009aff;
+}
