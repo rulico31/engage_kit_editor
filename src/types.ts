@@ -10,18 +10,26 @@ export interface PlacedItemType {
   y: number;
   width: number;
   height: number;
-  // ↓↓↓↓↓↓↓↓↓↓ (★ 修正) dataプロパティを必須にし、textを追加 ↓↓↓↓↓↓↓↓↓↓
   data: {
     text: string; // (ユーザーが表示・編集するテキスト)
     src: string | null; // (画像ソース)
     variableName?: string; // (入力欄の変数名)
     placeholder?: string; // (入力欄のプレースホルダー)
+    
+    // 画像の縦横比関連
+    keepAspectRatio?: boolean;
+    originalAspectRatio?: number;
+    
+    // 外観
+    showBorder?: boolean;
+    isTransparent?: boolean;
+    isArtboardBackground?: boolean;
+    artboardBackgroundPosition?: string;
+
     [key: string]: any; // 将来的な他のデータ
   };
-  // ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑
 }
 
-// ↓↓↓↓↓↓↓↓↓↓ (★ 変更) PreviewItemState を大幅に拡張 ↓↓↓↓↓↓↓↓↓↓
 // プレビューモード中の各アイテムが持つ状態の型
 export interface PreviewItemState {
   isVisible: boolean;
@@ -34,7 +42,6 @@ export interface PreviewItemState {
   // アニメーションの制御
   transition: string | null; // (例: "opacity 0.5s ease 0.1s")
 }
-// ↑↑↑↑↑↑↑↑↑↑ (★ 変更) ↑↑↑↑↑↑↑↑↑↑
 
 // プレビュー状態全体（アイテムIDと状態のマップ）
 export type PreviewState = Record<string, PreviewItemState>;
@@ -82,4 +89,10 @@ export interface SelectionEntry {
   id: string; // Item ID または Node ID
   type: 'item' | 'node'; // どちらの種類か
   label: string; // タブに表示する名前
+}
+
+// ★ 追加: プレビュー用の背景情報
+export interface PreviewBackground {
+  src: string | null;
+  position: string | undefined;
 }

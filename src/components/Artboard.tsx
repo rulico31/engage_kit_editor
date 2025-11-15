@@ -48,9 +48,12 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
 }) => {
   const isSelected = item.id === selectedItemId;
 
+  const isAutoHeight = item.name.startsWith("テキスト") || item.name.startsWith("ボタン") || item.name.startsWith("テキスト入力欄");
+
   const style: React.CSSProperties = {
     width: item.width,
-    height: item.height,
+    height: isAutoHeight ? 'auto' : item.height,
+    minHeight: item.height, 
   };
   
   if (isPreviewing && previewState && previewState[item.id]) {
@@ -67,9 +70,15 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     }
   }
 
+  // ★ 修正: プレビュー中でも編集中でも、背景アイテムは非表示
+  if (item.data?.isArtboardBackground) {
+    style.display = 'none';
+  }
+
   const variableName = item.data?.variableName || "";
   const externalValue = variables[variableName] || "";
   const [inputValue, setInputValue] = useState(externalValue);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (isPreviewing) {
@@ -81,9 +90,17 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     }
   }, [externalValue, isPreviewing]);
 
+  useEffect(() => {
+    if (item.name.startsWith("テキスト入力欄") && textareaRef.current) {
+      const el = textareaRef.current;
+      el.style.height = "0px";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [inputValue, item.width, item.name]);
+
   const handleClick = (e: React.MouseEvent) => {
     if (isPreviewing) {
-      if (e.target instanceof HTMLInputElement) return;
+      if (e.target instanceof HTMLTextAreaElement) return;
       onItemEvent("click", item.id);
     } else {
       onItemSelect(item.id);
@@ -91,7 +108,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     }
   };
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.target instanceof HTMLInputElement) {
+    if (e.target instanceof HTMLTextAreaElement) {
       e.stopPropagation();
       return;
     }
@@ -109,10 +126,20 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
   if (isPreviewing) {
     itemClassName += " preview";
   }
+  
+  if (item.data?.showBorder === false) {
+    itemClassName += " no-border";
+  }
+  if (item.data?.isTransparent === true) {
+    itemClassName += " is-transparent";
+  }
 
   if (item.name.startsWith("ボタン")) {
     content = <button className="item-button-content">{item.data.text}</button>;
   } else if (item.name.startsWith("画像")) {
+    style.height = item.height;
+    style.minHeight = undefined;
+    
     if (item.data?.src) {
       content = (
         <div className="item-image-content">
@@ -130,27 +157,24 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     const placeholder = item.data?.placeholder || "テキストを入力...";
     content = (
       <div className="item-input-content">
-        <input
-          type="text"
-          className="artboard-item-input"
+        <textarea
+          ref={textareaRef}
+          className="artboard-item-textarea"
           placeholder={placeholder}
           value={inputValue}
           readOnly={!isPreviewing}
-          // ★ 変更: 入力中は変数更新のみ行い、イベントは発火しない
           onChange={(e) => {
             if (isPreviewing) {
               setInputValue(e.target.value);
               onVariableChange(variableName, e.target.value);
             }
           }}
-          // ★ 追加: エンターキーが押されたら完了とみなす
           onKeyDown={(e) => {
             if (isPreviewing && e.key === "Enter") {
-              e.currentTarget.blur(); // フォーカスを外す
+              e.currentTarget.blur();
               onItemEvent("onInputComplete", item.id);
             }
           }}
-          // ★ 追加: フォーカスが外れたら完了とみなす
           onBlur={() => {
             if (isPreviewing) {
               onItemEvent("onInputComplete", item.id);
@@ -167,6 +191,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
       </div>
     );
   } else {
+    // テキスト
     content = <div className="item-text-content">{item.data.text}</div>;
   }
 
@@ -178,7 +203,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
       onMouseDown={handleMouseDown}
     >
       {content}
-      {isSelected && !isPreviewing && (
+      {isSelected && !isPreviewing && !item.data?.isArtboardBackground && (
         <>
           {RESIZE_HANDLES.map((dir) => (
             <div
@@ -209,6 +234,7 @@ const Artboard: React.FC = () => {
     nodeGraphTemplates,
     isPreviewing,
     previewState,
+    previewBackground, // ★ 追加
     onItemEvent,
     variables,
     onVariableChange,
@@ -216,7 +242,7 @@ const Artboard: React.FC = () => {
   
   const selectedItemId = selection.find(s => s.id === activeTabId && s.type === 'item')?.id || null;
 
-  // Zoom State
+  // (★ 変更なし) Zoom State
   const [zoomLevel, setZoomLevel] = useState(1.0);
 
   const artboardRef = useRef<HTMLDivElement>(null);
@@ -229,7 +255,7 @@ const Artboard: React.FC = () => {
   } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // ショートカットキーによるズーム制御
+  // (★ 変更なし) ショートカットキーによるズーム制御
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -250,7 +276,7 @@ const Artboard: React.FC = () => {
   }, []);
 
 
-  // --- D&D ---
+  // (★ 変更なし) D&D
   const [{ isOver }, drop] = useDrop(
     () => ({
       accept: ItemTypes.TOOL,
@@ -263,7 +289,6 @@ const Artboard: React.FC = () => {
         const clientOffset = monitor.getClientOffset();
         if (!clientOffset) return;
         
-        // Zoom補正
         const x = (clientOffset.x - artboardRect.left) / zoomLevel;
         const y = (clientOffset.y - artboardRect.top) / zoomLevel;
 
@@ -275,17 +300,18 @@ const Artboard: React.FC = () => {
           y: y,
           width: 100,
           height: 40,
-          data: { text: item.name, src: null },
+          data: { text: item.name, src: null, showBorder: true, isTransparent: false, isArtboardBackground: false },
         };
         
         if (item.name === "画像") {
           newItem.width = 150; newItem.height = 100; newItem.data.text = "画像";
+          newItem.data.keepAspectRatio = true;
         } else if (item.name === "テキスト") {
           newItem.width = 120; newItem.data.text = "テキスト";
         } else if (item.name === "テキスト入力欄") {
           newItem.width = 200; newItem.height = 45;
           newItem.data = {
-            text: "", src: null, variableName: `input_${Date.now()}`, placeholder: "テキストを入力...",
+            text: "", src: null, variableName: `input_${Date.now()}`, placeholder: "テキストを入力...", showBorder: true, isTransparent: false
           };
         }
 
@@ -300,13 +326,12 @@ const Artboard: React.FC = () => {
   );
   drop(artboardRef); 
 
-  // --- アイテム移動 ---
+  // (★ 変更なし) アイテム移動
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!draggedItemIdRef.current || !dragStartPos.current || !artboardRef.current) return;
       const artboardRect = artboardRef.current.getBoundingClientRect();
       
-      // Zoom補正
       const mouseXInArtboard = (e.clientX - artboardRect.left) / zoomLevel;
       const mouseYInArtboard = (e.clientY - artboardRect.top) / zoomLevel;
 
@@ -335,6 +360,8 @@ const Artboard: React.FC = () => {
     
     const item = placedItems.find((p) => p.id === itemId);
     if (!item) return;
+    
+    if (item.data.isArtboardBackground) return;
 
     onItemSelect(itemId);
     draggedItemIdRef.current = itemId;
@@ -343,7 +370,6 @@ const Artboard: React.FC = () => {
     const artboardRect = artboardRef.current?.getBoundingClientRect();
     if (!artboardRect) return;
 
-    // Zoom補正
     const mouseXInArtboard = (e.clientX - artboardRect.left) / zoomLevel;
     const mouseYInArtboard = (e.clientY - artboardRect.top) / zoomLevel;
     
@@ -357,12 +383,11 @@ const Artboard: React.FC = () => {
     e.stopPropagation();
   }, [isPreviewing, placedItems, onItemSelect, handleMouseMove, handleMouseUp, zoomLevel]);
   
-  // --- リサイズ ---
+  // (★ 変更なし) リサイズ
   const handleResizing = useCallback((e: MouseEvent) => {
     if (!resizeInfoRef.current) return;
     const { startPos, startItem, direction } = resizeInfoRef.current;
     
-    // Zoom補正
     const dx = (e.clientX - startPos.x) / zoomLevel;
     const dy = (e.clientY - startPos.y) / zoomLevel;
     
@@ -418,6 +443,33 @@ const Artboard: React.FC = () => {
 
   const MemoizedArtboardItem = useMemo(() => React.memo(ArtboardItem), []); 
 
+  // ★ 修正: 背景画像ロジック (プレビューモード対応)
+  const backgroundStyle = useMemo(() => {
+    if (isPreviewing) {
+      // プレビューモード: Context の previewBackground を使う
+      if (previewBackground.src) {
+        return {
+          backgroundImage: `url(${previewBackground.src})`,
+          backgroundPosition: previewBackground.position || '50% 50%',
+        };
+      }
+    } else {
+      // 編集モード: placedItems から探す
+      const bgItem = placedItems.find(p => p.data.isArtboardBackground === true && p.data.src);
+      if (bgItem) {
+        return {
+          backgroundImage: `url(${bgItem.data.src})`,
+          backgroundPosition: bgItem.data.artboardBackgroundPosition || '50% 50%',
+        };
+      }
+    }
+    // デフォルト
+    return {
+      backgroundImage: 'none',
+      backgroundPosition: '50% 50%',
+    };
+  }, [placedItems, isPreviewing, previewBackground]); // ★ 依存配列に previewBackground を追加
+
   return (
     <div 
       className="artboard-wrapper" 
@@ -430,11 +482,12 @@ const Artboard: React.FC = () => {
     >
       <div
         ref={artboardRef}
-        className={`artboard ${isOver ? "is-over" : ""}`}
+        className={`artboard ${isOver ? "is-over" : ""} ${backgroundStyle.backgroundImage !== 'none' ? 'has-background-image' : ''}`}
         style={{
           transform: `scale(${zoomLevel})`,
-          transformOrigin: "0 0",
           margin: 0,
+          backgroundImage: backgroundStyle.backgroundImage,
+          backgroundPosition: backgroundStyle.backgroundPosition,
         }}
         onClick={onBackgroundClick}
       >

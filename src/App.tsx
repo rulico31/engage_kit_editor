@@ -24,13 +24,15 @@ import type {
   PageInfo, 
   PreviewState, 
   SelectionEntry, 
-  VariableState 
+  VariableState,
+  PreviewBackground // ★ 追加
 } from "./types";
 
 import { triggerEvent, type ActiveListeners } from "./logicEngine";
 import EditorView from "./components/EditorView";
-
 import { EditorContext, type EditorContextType } from "./contexts/EditorContext";
+
+import BackgroundPositionerModal from "./components/BackgroundPositionerModal";
 
 export type { NodeGraph } from "./types";
 
@@ -66,7 +68,6 @@ const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
     nodes: [{
       id: "input-change",
       type: "eventNode",
-      // ★ 修正: デフォルトを "onInputComplete" に変更
       data: { label: "🎬 イベント: 入力完了時", eventType: "onInputComplete" },
       position: { x: 50, y: 50 },
     }],
@@ -82,6 +83,9 @@ const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
     edges: [],
   },
 };
+
+// ★ プレビュー背景の初期値
+const initialPreviewBackground: PreviewBackground = { src: null, position: undefined };
 
 function App() {
   // --- (1) ビュー管理 State ---
@@ -101,9 +105,18 @@ function App() {
   // プレビュー用
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [previewState, setPreviewState] = useState<PreviewState>({});
+  // ★ 追加: プレビュー用背景ステート
+  const [previewBackground, setPreviewBackground] = useState<PreviewBackground>(initialPreviewBackground);
 
   // 変数
   const [variables, setVariables] = useState<VariableState>({});
+  
+  // 背景画像モーダル用のState
+  const [bgModal, setBgModal] = useState({
+    isOpen: false,
+    itemId: null as string | null,
+    src: null as string | null,
+  });
 
   // 待機中のリスナーを保持するRef
   const activeListeners = useRef<ActiveListeners>(new Map());
@@ -114,7 +127,7 @@ function App() {
   const variablesRef = useRef(variables);
   useEffect(() => { variablesRef.current = variables; }, [variables]);
 
-  // --- Derived values ---
+  // Derived values
   const derived = useMemo(() => {
     if (!selectedPageId) return { placedItems: [] as PlacedItemType[], allItemLogics: {} as Record<string, NodeGraph>, currentGraph: undefined as NodeGraph | undefined };
     const currentPage = pages[selectedPageId];
@@ -129,7 +142,7 @@ function App() {
     };
   }, [pages, selectedPageId, activeLogicGraphId]);
 
-  const pageInfoList: PageInfo[] = useMemo(() => pageOrder.map(id => ({ id, name: pages[id]?.name || "無題" })), [pageOrder, pages]);
+  const pageInfoList: PageInfo[] = useMemo(() => pageOrder.map(id => ({ id: id, name: pages[id]?.name || "無題" })), [pageOrder, pages]);
 
   // --- (4) コールバック ---
 
@@ -330,6 +343,7 @@ function App() {
     setActiveLogicGraphId(null);
     setIsPreviewing(false);
     setPreviewState({});
+    setPreviewBackground(initialPreviewBackground); // ★ リセット
     setVariables({});
     activeListeners.current.clear();
   }, []);
@@ -470,16 +484,37 @@ function App() {
 
     const targetPageData = pages[targetPageId];
     const initialPreviewState: PreviewState = {};
+    // ★ ページ遷移時も背景を設定
+    const bgItem = targetPageData.placedItems.find(p => p.data.isArtboardBackground);
+    if (bgItem) {
+      setPreviewBackground({ src: bgItem.data.src, position: bgItem.data.artboardBackgroundPosition });
+    } else {
+      setPreviewBackground(initialPreviewBackground);
+    }
+    
     targetPageData.placedItems.forEach(item => {
       initialPreviewState[item.id] = { isVisible: true, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
     setPreviewState(initialPreviewState);
   }, [pages]);
 
+  // ★ 修正: handleTogglePreview (背景設定ロジックを追加)
   const handleTogglePreview = useCallback(() => {
     setIsPreviewing(prev => {
       const next = !prev;
       if (next) {
+        // --- プレビュー開始時 ---
+        setVariables({});
+        variablesRef.current = {};
+        
+        // ★ プレビュー用背景を設定
+        const bgItem = derived.placedItems.find(p => p.data.isArtboardBackground);
+        if (bgItem) {
+          setPreviewBackground({ src: bgItem.data.src, position: bgItem.data.artboardBackgroundPosition });
+        } else {
+          setPreviewBackground(initialPreviewBackground);
+        }
+        
         setPreviewState(ps => {
           const initial: PreviewState = {};
           derived.placedItems.forEach(item => {
@@ -487,8 +522,11 @@ function App() {
           });
           return initial;
         });
+        
       } else {
+        // --- プレビュー終了時 ---
         setPreviewState({});
+        setPreviewBackground(initialPreviewBackground); // ★ 背景リセット
         activeListeners.current.clear();
       }
       return next;
@@ -507,8 +545,9 @@ function App() {
   const handleItemEvent = useCallback((eventName: string, itemId: string) => {
     if (!selectedPageId) return;
     
-    const targetGraph = pages[selectedPageId]?.allItemLogics[itemId];
+    const { placedItems, allItemLogics } = derived;
     
+    const targetGraph = allItemLogics[itemId];
     const dummyGraph: NodeGraph = { nodes: [], edges: [] };
     const graphToUse = targetGraph || dummyGraph;
 
@@ -516,6 +555,7 @@ function App() {
       eventName,
       itemId,
       graphToUse,
+      placedItems,
       () => previewStateRef.current,
       (newState: PreviewState) => { previewStateRef.current = newState; setPreviewState(newState); },
       handlePageChangeRequest,
@@ -523,14 +563,76 @@ function App() {
       (newVars: VariableState) => { variablesRef.current = newVars; setVariables(newVars); },
       activeListeners.current
     );
-  }, [selectedPageId, pages, handlePageChangeRequest]);
+  }, [selectedPageId, pages, handlePageChangeRequest, derived]);
+  
+  // ★ 修正: 背景モーダル用ハンドラ (エラー修正)
+  const handleOpenBackgroundModal = useCallback((itemId: string, src: string) => {
+    if (!src) {
+      alert("先に画像をアップロードしてください。");
+      return;
+    }
+    setBgModal({ isOpen: true, itemId: itemId, src: src });
+  }, []);
+  
+  const handleCloseBackgroundModal = useCallback(() => {
+    setBgModal({ isOpen: false, itemId: null, src: null });
+  }, []);
 
+  const handleConfirmBackgroundModal = useCallback((newPosition: string) => {
+    if (bgModal.itemId && selectedPageId) {
+      const currentPage = pages[selectedPageId];
+      if (!currentPage) return;
+      
+      const currentItem = currentPage.placedItems.find(p => p.id === bgModal.itemId);
+      if (!currentItem) return;
+
+      // ★ 修正: 他の背景フラグをリセットする
+      const newPlacedItems = currentPage.placedItems.map(item => {
+        if (item.id === bgModal.itemId) {
+          // これを背景にする
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              isArtboardBackground: true,
+              artboardBackgroundPosition: newPosition,
+            }
+          };
+        } else if (item.data.isArtboardBackground) {
+          // 他のアイテムは背景フラグを外す
+          return {
+            ...item,
+            data: {
+              ...item.data,
+              isArtboardBackground: false,
+              artboardBackgroundPosition: undefined,
+            }
+          };
+        }
+        return item; // それ以外は変更なし
+      });
+      
+      // ★ 修正: handleItemUpdate ではなく、ページ全体を更新
+      setPages(prev => ({
+        ...prev,
+        [selectedPageId]: {
+          ...currentPage,
+          placedItems: newPlacedItems,
+        }
+      }));
+    }
+    setBgModal({ isOpen: false, itemId: null, src: null });
+  }, [bgModal.itemId, selectedPageId, pages]);
+
+
+  // --- useMemo: context value を安定化 ---
   const contextValue: EditorContextType = useMemo(() => ({
     pages,
     pageOrder,
     selectedPageId,
     isPreviewing,
     previewState,
+    previewBackground, // ★ 追加
     variables,
     placedItems: derived.placedItems,
     allItemLogics: derived.allItemLogics,
@@ -558,14 +660,17 @@ function App() {
     onNodeClick: handleNodeClick,
     onTabSelect: handleTabSelect,
     onTabClose: handleCloseTab,
+    
+    onOpenBackgroundModal: handleOpenBackgroundModal,
   }), [
-    pages, pageOrder, selectedPageId, isPreviewing, previewState, variables,
+    pages, pageOrder, selectedPageId, isPreviewing, previewState, previewBackground, variables, // ★ previewBackground 追加
     selection, activeTabId, activeLogicGraphId,
     handleSelectPage, handleAddPage, handleItemEvent, handleVariableChangeFromItem,
     setPlacedItemsForCurrentPage, setAllItemLogicsForCurrentPage, handleItemUpdate,
     onNodesChange, onEdgesChange, onConnect, handleAddNode, handleNodeDataChange,
     handleItemSelect, handleBackgroundClick, handleNodeClick, handleTabSelect, handleCloseTab,
-    derived, pageInfoList
+    derived, pageInfoList, 
+    handleOpenBackgroundModal, handleCloseBackgroundModal, handleConfirmBackgroundModal
   ]);
 
   if (view === "home") {
@@ -582,6 +687,14 @@ function App() {
         onImportProject={handleImportProject}
         onTogglePreview={handleTogglePreview}
       />
+      
+      {bgModal.isOpen && bgModal.src && (
+        <BackgroundPositionerModal
+          imageUrl={bgModal.src}
+          onClose={handleCloseBackgroundModal}
+          onConfirm={handleConfirmBackgroundModal}
+        />
+      )}
     </EditorContext.Provider>
   );
 }

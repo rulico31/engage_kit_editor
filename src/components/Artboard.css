@@ -6,73 +6,61 @@
   color: #000000;
   border-radius: 4px;
 
-  /* 影をつけて立体感を出す */
+  /* 影 */
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
 
-  /* サイズ (例として固定サイズ) */
+  /* サイズ */
   width: 1000px;
   height: 700px;
 
-  /* 親要素(ビューポート)の中で中央に配置 */
-  margin: 20px auto;
-
-  /* ↓↓↓↓↓↓↓↓↓↓ これが重要 ↓↓↓↓↓↓↓↓↓↓ */
-  /* 子要素(PlacedItem)を絶対座標で配置するための基準点 */
+  margin: 0;
   position: relative;
+  transform-origin: 0 0;
+
+  /* ★ 修正: 背景画像用のスタイル */
+  background-size: cover;
+  background-position: 50% 50%; /* デフォルトは中央 */
+  background-repeat: no-repeat;
+  transition: background-image 0.2s ease; /* 変更時にフェードイン */
 }
 
-/* ( .placed-item { ... } のスタイルは
-   PlacedItem.css に移動したので、ここからは削除します。
-   )
-*/
-
-/* アートボード上の全アイテムの基本スタイル */
+/* (★ 変更なし) アートボード上の全アイテムの基本スタイル */
 .artboard-item {
-  /* 位置 (Artboard.tsx の <div style={style}> で制御) */
   position: absolute;
-  
-  /* (★ 変更) サイズと外観の指定 */
   background-color: #f0f0f0;
-  border: 2px solid #ccc; /* 枠線を2pxに */
+  border: 2px solid #ccc;
   border-radius: 5px;
-  padding: 10px 16px; /* パディングを増やして大きくする */
-  
-  /* (★ 変更) フォントを大きくする */
+  padding: 10px 12px;
   font-size: 15px;
   font-weight: 500;
-  color: #333; /* テキスト色を濃く */
-
-  /* 編集中の操作スタイル */
+  color: #333;
   cursor: move;
   user-select: none;
-  white-space: nowrap;
   box-sizing: border-box;
-
-  /* アニメーション */
   transition: border-color 0.2s ease, box-shadow 0.2s ease,
-              transform 0.2s ease, opacity 0.2s ease; /* (★) プレビュー用に transition を追加 */
-  
-  /* 子要素（テキストやボタン）を中央揃え */
+              transform 0.2s ease, opacity 0.2s ease,
+              background-color 0.2s ease;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
-/* 選択状態のスタイル */
+/* (★ 変更なし) 選択状態のスタイル */
 .artboard-item.selected {
-  border-color: #007acc; /* 選択色 */
-  box-shadow: 0 0 8px rgba(0, 122, 204, 0.7); /* 影を少し大きく */
-  z-index: 1; /* 他のアイテムより手前に表示 */
+  border-color: #007acc;
+  box-shadow: 0 0 8px rgba(0, 122, 204, 0.7);
+  z-index: 1;
 }
 
 /* --- アイテム種別ごとのスタイル --- */
 
 .item-text-content {
-  /* (特に指定なし、.artboard-item のスタイルを継承) */
   color: #333;
+  width: 100%;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
-/* (★ 変更済) 画像コンテントのスタイル */
 .item-image-content {
   color: #555;
   font-style: italic;
@@ -95,21 +83,23 @@
 
 
 .item-button-content {
-  /* (★) ネイティブの <button> スタイルをリセット */
   background: none;
   border: none;
   padding: 0;
   margin: 0;
-  font: inherit; /* 親 (.artboard-item) のフォント設定を継承 */
+  font: inherit;
   color: inherit;
-  cursor: inherit; /* 親 (.artboard-item) のカーソルを継承 */
+  cursor: inherit;
   outline: none;
+  width: 100%;
+  word-break: break-word;
+  text-align: center;
+  white-space: pre-wrap;
 }
 .item-button-content:focus {
   outline: none;
 }
 
-/* (★ 変更済) テキスト入力欄のスタイル */
 .item-input-content {
   width: 100%;
   height: 100%;
@@ -118,32 +108,36 @@
   align-items: center;
   justify-content: center;
 }
-.artboard-item-input {
+
+.artboard-item-textarea {
   width: 100%;
   height: 100%;
+  min-height: 20px;
   border: none;
   background: none;
   outline: none;
   font: inherit;
   color: inherit;
   cursor: inherit;
-  padding: 8px 14px;
+  padding: 0;
   box-sizing: border-box; 
+  resize: none;
+  overflow: hidden;
 }
-.artboard-item:not(.preview) .artboard-item-input {
-  /* (★) 編集モード中は .artboard-item のクリックイベントを透過 */
+
+.artboard-item:not(.preview) .artboard-item-textarea {
   pointer-events: none; 
 }
-.artboard-item.preview .artboard-item-input {
+.artboard-item.preview .artboard-item-textarea {
   cursor: text;
   background-color: #fff; 
   border-radius: 3px;
+  padding: 8px 10px;
 }
 .artboard-item.preview.selected {
   border-color: #ccc;
   box-shadow: none;
 }
-
 
 /* --- プレビュー中のスタイル --- */
 
@@ -154,46 +148,35 @@
   cursor: pointer;
 }
 
-
-/* ↓↓↓↓↓↓↓↓↓↓ (★ 修正) リサイズハンドルのスタイル ↓↓↓↓↓↓↓↓↓↓ */
-
-/* (1) ハンドルの共通スタイル */
+/* (★ 変更なし) リサイズハンドルのスタイル */
 .resize-handle {
   position: absolute;
-  background: #ffffff00;
+  background: #ffffff;
   border: 1px solid #959595;
-  transform: translate(-50%, -50%); /* 中心を基準に配置 */
+  transform: translate(-50%, -50%);
   z-index: 2;
   box-sizing: border-box;
 }
-
-/* (2) 四隅のハンドル (四角形) */
 .resize-handle.top-left,
 .resize-handle.top-right,
 .resize-handle.bottom-left,
 .resize-handle.bottom-right {
   width: 9px;
   height: 9px;
-  border-radius: 0; /* 角ばったまま */
+  border-radius: 0;
 }
-
-/* (3) 辺のハンドル (上下) (横長の長方形) */
 .resize-handle.top-center,
 .resize-handle.bottom-center {
-  width: 20px; /* (★) 細長く */
-  height: 6px;  /* (★) 細く */
-  border-radius: 3px; /* (★) 角を丸める */
+  width: 20px;
+  height: 6px;
+  border-radius: 3px;
 }
-
-/* (4) 辺のハンドル (左右) (縦長の長方形) */
 .resize-handle.middle-left,
 .resize-handle.middle-right {
-  width: 6px;   /* (★) 細く */
-  height: 20px; /* (★) 細長く */
-  border-radius: 3px; /* (★) 角を丸める */
+  width: 6px;
+  height: 20px;
+  border-radius: 3px;
 }
-
-/* (5) ハンドルの位置とカーソル */
 .resize-handle.top-left { top: 0; left: 0; cursor: nwse-resize; }
 .resize-handle.top-right { top: 0; right: 0; cursor: nesw-resize; }
 .resize-handle.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
@@ -202,15 +185,30 @@
 .resize-handle.bottom-center { bottom: 0; left: 50%; cursor: ns-resize; }
 .resize-handle.middle-left { top: 50%; left: 0; cursor: ew-resize; }
 .resize-handle.middle-right { top: 50%; right: 0; cursor: ew-resize; }
-/* ↑↑↑↑↑↑↑↑↑↑ (★ 修正) ↑↑↑↑↑↑↑↑↑↑ */
 
 
-/* プレビュー中のスタイル */
-/* プレビューモードの .artboard は、
-  .preview-viewport の子要素になります。
-  中央揃えを維持するためにマージンを再度設定します。
-*/
+/* (★ 変更なし) プレビュー中のスタイル */
 .artboard.is-preview {
   margin: 20px auto;
   cursor: default;
+}
+
+/* (★ 変更なし) ボーダー非表示スタイル */
+.artboard-item.no-border {
+  border-color: transparent;
+}
+
+/* (★ 変更なし) 背景透過スタイル */
+.artboard-item.is-transparent {
+  background-color: transparent;
+}
+
+/* (★ 変更なし) 選択時はボーダーを再表示 */
+.artboard-item.no-border.selected {
+  border-color: #007acc;
+}
+
+/* (★ 変更なし) プレビュー中も非表示を維持 */
+.artboard-item.no-border.preview {
+  border-color: transparent;
 }

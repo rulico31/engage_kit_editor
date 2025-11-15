@@ -9,6 +9,7 @@ import type {
   PreviewState,
   SelectionEntry,
   VariableState,
+  PreviewBackground, // ★ 追加
 } from "../types";
 import {
   type Node,
@@ -19,7 +20,6 @@ import {
 } from "reactflow";
 
 // --- Context が提供するデータの型定義 ---
-// (App.tsx が EditorView に渡していたPropsとほぼ同じ)
 export interface EditorContextType {
   pages: Record<string, PageData>;
   pageOrder: string[];
@@ -60,14 +60,17 @@ export interface EditorContextType {
   onTabClose: (id: string) => void;
   
   nodeGraphTemplates: Record<string, NodeGraph>;
+  
+  onOpenBackgroundModal: (itemId: string, src: string) => void;
+  
+  // ★ 追加
+  previewBackground: PreviewBackground;
 }
 
 // --- Context オブジェクトの作成 ---
-// (★) デフォルト値は null だが、すぐに Provider から値が提供される
 export const EditorContext = createContext<EditorContextType | null>(null);
 
 // --- カスタムフックの作成 ---
-// (★) これにより、各コンポーネントは型チェックを受けつつ簡単にContextデータにアクセスできる
 export const useEditorContext = () => {
   const context = useContext(EditorContext);
   if (!context) {
