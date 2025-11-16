@@ -5,6 +5,8 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import "./ActionNode.css";
 // (★ 削除)
 // import type { PlacedItemType } from "../../types";
+// ★ 型をインポート
+import type { NodePropertyConfig } from "../../types";
 
 // (★ 変更) Props の型から不要なものを削除
 interface ActionNodeProps extends NodeProps {
@@ -54,3 +56,26 @@ const ActionNode: React.FC<ActionNodeProps> = ({
 };
 
 export default memo(ActionNode);
+
+// ★ 以下をファイル末尾に追加
+export const actionNodeConfig: NodePropertyConfig = {
+  title: "ノード設定",
+  properties: [
+    {
+      name: "targetItemId",
+      label: "ターゲット:",
+      type: "select", // (PropertiesPanel側で placedItems から options を生成)
+    },
+    {
+      name: "mode",
+      label: "モード:",
+      type: "select",
+      defaultValue: "show",
+      options: [
+        { label: "表示する", value: "show" },
+        { label: "非表示にする", value: "hide" },
+        { label: "切り替える", value: "toggle" },
+      ],
+    },
+  ],
+};

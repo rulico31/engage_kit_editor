@@ -3,6 +3,7 @@
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import "./DelayNode.css"; // (★ 新規作成)
+import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
 
 interface DelayNodeProps extends NodeProps {}
 
@@ -28,3 +29,18 @@ const DelayNode: React.FC<DelayNodeProps> = ({
 };
 
 export default memo(DelayNode);
+
+// ★ 以下をファイル末尾に追加
+export const delayNodeConfig: NodePropertyConfig = {
+  title: "ノード設定",
+  properties: [
+    {
+      name: "durationS",
+      label: "遅延 (秒)",
+      type: "number",
+      defaultValue: 1.0,
+      step: 0.1,
+      min: 0,
+    },
+  ],
+};

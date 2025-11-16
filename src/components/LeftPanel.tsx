@@ -3,18 +3,36 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import ToolboxItem from "./ToolboxItem";
 import ContentBrowser from "./ContentBrowser";
-import { useEditorContext } from "../contexts/EditorContext";
+// import { useEditorContext } from "../contexts/EditorContext"; // 削除
+
+// ★ Zustand ストアをインポート
+import { usePageStore } from "../stores/usePageStore";
 
 // ★ 新しいCSSファイルをインポート
 import "./LeftPanel.css";
 
 export const LeftPanel: React.FC = React.memo(() => {
-  const {
-    pageInfoList,
-    selectedPageId,
-    onSelectPage,
-    onAddPage,
-  } = useEditorContext();
+  // ★ 修正: ストアから購読
+  const { 
+    pageInfoList, 
+    selectedPageId, 
+    onSelectPage, 
+    onAddPage 
+  } = usePageStore(state => ({
+    // 派生状態 (セレクタで計算)
+    pageInfoList: state.pageOrder.map(id => ({ id: id, name: state.pages[id]?.name || "無題" })),
+    selectedPageId: state.selectedPageId,
+    onSelectPage: state.setSelectedPageId,
+    onAddPage: state.addPage, // (★ addPage はプロンプトを必要とする...ストアの実装を修正)
+  }));
+
+  // ★ 修正: addPage のラップ
+  const handleAddPageClick = () => {
+    const newPageName = prompt("新しいページ名を入力してください:", `Page ${pageInfoList.length + 1}`);
+    if (newPageName) {
+      onAddPage(newPageName);
+    }
+  };
 
   // 上部（ツールボックス）の高さ比率
   const [splitRatio, setSplitRatio] = useState(0.4);
@@ -99,7 +117,7 @@ export const LeftPanel: React.FC = React.memo(() => {
           pages={pageInfoList}
           selectedPageId={selectedPageId}
           onSelectPage={onSelectPage}
-          onAddPage={onAddPage}
+          onAddPage={handleAddPageClick} // ★ 修正
         />
       </div>
     </div>

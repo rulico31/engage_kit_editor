@@ -1,299 +1,231 @@
-/* src/components/PropertiesPanel.css */
+/* PropertiesPanel.css */
 
-/* (★ 変更なし) パネルのルートラッパー */
 .panel-content-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden; /* スクロールは .panel-content-scrollable で行う */
+  overflow: hidden; /* スクロールバーが2重に出ないように */
 }
 
-
-/* (★ 変更なし) タブUIのスタイル */
-.inspector-tabs-container {
-  display: flex;
-  flex-shrink: 0; /* タブは縮まない */
-  overflow-x: auto; /* タブが多すぎたら横スクロール */
-  background-color: #2a2a2a; /* パネル背景色 */
-  border-bottom: 1px solid #1e1e1e; /* 暗い区切り線 */
-  padding: 4px 4px 0 4px; /* 下だけパディング 0 */
-  
-  /* (★ 変更なし) Firefox用スクロールバー */
-  scrollbar-width: thin;
-  scrollbar-color: #555 #1e1e1e; /* (thumb track) */
-}
-
-.inspector-tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: #3a3a3a;
-  color: #aaa;
-  font-size: 0.9em;
-  font-weight: 500;
-  padding: 8px 12px;
-  border-radius: 4px 4px 0 0; /* 上だけ角丸 */
-  border: 1px solid #444;
-  border-bottom: none; /* 下の線は消す */
-  cursor: pointer;
-  white-space: nowrap;
-  max-width: 150px;
-}
-
-.inspector-tab:hover {
-  background-color: #4a4a4a;
+.panel-content-scrollable {
+  flex-grow: 1;
+  overflow-y: auto; /* ここでスクロール */
+  background-color: #2e2e2e; /* パネル背景色 */
   color: #ccc;
 }
 
-.inspector-tab.is-active {
-  background-color: #2a2a2a; /* パネルのコンテンツ背景色と同じ */
-  color: #eee;
-  font-weight: bold;
-  /* アクティブなタブの下ボーダーを背景色で上書きして消す */
-  border-bottom: 1px solid #2a2a2a;
-  margin-bottom: -1px; /* 1px分だけ下に伸ばして、下の区切り線を隠す */
-}
-
-.tab-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-close {
-  font-size: 1.1em;
-  font-weight: bold;
-  color: #aaa;
-  border-radius: 50%;
-  padding: 0 2px;
-}
-.tab-close:hover {
-  color: #fff;
-  background-color: #555;
-}
-
-
-/* (★ 変更なし) .panel-content を .panel-content-scrollable に変更 */
-.panel-content-scrollable {
-  flex-grow: 1; /* 残りの高さをすべて使う */
-  overflow-y: auto; /* コンテンツが多ければスクロール */
-  padding: 12px;
-  
-  /* (★ 変更なし) Firefox用スクロールバー */
-  scrollbar-width: auto; /* (thin ではなく auto) */
-  scrollbar-color: #555 #2a2a2a; /* (thumb track) */
-}
-
-
-/* .properties-panel-content はアコーディオンのラッパーとして残す */
 .properties-panel-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  color: #eee;
+  padding: 16px;
+  font-size: 0.9em;
 }
 
 .placeholder-text {
-  color: #888;
-  font-style: italic;
+  padding: 20px;
   text-align: center;
-  margin-top: 20px;
+  color: #777;
+  font-style: italic;
 }
 
-.prop-group {
+/* --- タブ --- */
+.inspector-tabs-container {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-shrink: 0;
+  width: 100%;
+  background-color: #252526;
+  border-bottom: 1px solid #333;
+  overflow-x: auto; /* タブが溢れたらスクロール */
+}
+
+.inspector-tab {
+  padding: 8px 10px 8px 12px;
+  cursor: pointer;
+  border-right: 1px solid #333;
+  color: #888;
+  font-size: 0.85em;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inspector-tab:hover {
+  background-color: #333;
+  color: #eee;
+}
+.inspector-tab.is-active {
+  background-color: #2e2e2e;
+  color: #fff;
+  font-weight: 600;
+}
+.tab-label {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab-close {
+  font-size: 1.2em;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.tab-close:hover {
+  background-color: #555;
+  color: #fff;
+}
+
+
+/* --- アコーディオン --- */
+.accordion-section {
+  margin-bottom: 2px;
+  border-bottom: 1px solid #3f3f3f;
+}
+.accordion-header {
+  background-color: #3c3c3c;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: #eee;
+}
+.accordion-header:hover {
+  background-color: #444;
+}
+.accordion-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  margin-right: 8px;
+  font-size: 0.8em;
+}
+.accordion-icon.is-open {
+  transform: rotate(90deg);
+}
+.accordion-content {
+  padding: 12px 16px;
+  background-color: #333;
+}
+
+/* --- フォーム要素 --- */
+.prop-group {
+  margin-bottom: 12px;
+}
+.prop-group:last-child {
+  margin-bottom: 0;
 }
 
 .prop-label {
-  font-size: 0.9em;
-  color: #aaa;
-  margin-bottom: 2px;
-}
-
-.prop-input {
-  font-size: 1em;
+  display: block;
+  font-size: 0.85em;
   font-weight: 500;
-  background-color: #2a2a2a;
-  padding: 6px 8px;
-  border-radius: 4px;
-  border: 1px solid #444;
-  color: #eee; 
-  font-family: inherit;
-  width: 100%;
-  box-sizing: border-box; 
-}
-
-.prop-input:focus {
-  border-color: #007acc;
-  outline: none;
-  box-shadow: 0 0 0 1px #007acc;
-}
-
-/* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) 編集不可のインプットスタイル ↓↓↓↓↓↓↓↓↓↓ */
-.prop-input-disabled {
-  background-color: #333; /* 少し暗い背景 */
-  border-color: #333; /* 枠線なし */
-  color: #aaa; /* テキストを薄く */
-  cursor: not-allowed;
-}
-.prop-input-disabled:focus {
-  border-color: #333;
-  box-shadow: none;
-}
-/* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */
-
-
-.prop-input[type="number"] {
-  -moz-appearance: textfield;
-}
-.prop-input[type="number"]::-webkit-outer-spin-button,
-.prop-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+  color: #aaa;
+  margin-bottom: 6px;
 }
 
 .prop-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
-
 .prop-group-half {
-  flex: 1;
+  flex-basis: 50%;
 }
-
 .prop-label-inline {
-  font-size: 0.9em;
-  color: #aaa;
-  margin-bottom: 4px;
-  padding-left: 2px;
-}
-
-/* (★ 変更なし) アコーディオンUIのスタイル */
-.accordion-section {
-  border-bottom: 1px solid #444;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-}
-.accordion-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-}
-
-.accordion-header {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  margin-bottom: 4px; /* 開いている時のコンテンツとのマージン */
-}
-
-.accordion-title {
-  font-weight: bold;
-  color: #eee;
-  font-size: 1.05em;
-}
-
-.accordion-icon {
-  font-size: 0.8em;
-  color: #aaa;
-  margin-right: 6px;
-  transition: transform 0.2s ease;
   display: inline-block;
+  color: #aaa;
+  margin-right: 8px;
+  font-size: 0.9em;
+  width: 15px; /* X, Y, W, H ラベルの幅を固定 */
 }
 
-.accordion-icon.is-open {
-  transform: rotate(0deg); /* 開 (▼) */
-}
-
-.accordion-icon:not(.is-open) {
-  transform: rotate(-90deg); /* 閉 (▶) */
-}
-
-.accordion-content {
-  padding-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* ↓↓↓↓↓↓↓↓↓↓ (★ 追加) 画像アップロードボタン等のスタイル ↓↓↓↓↓↓↓↓↓↓ */
+.prop-input,
+.prop-select,
 .prop-button {
-  background-color: #007acc;
-  border: none;
-  color: white;
-  padding: 8px 12px;
+  width: 100%;
+  background-color: #2a2a2a;
+  border: 1px solid #555;
   border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
+  padding: 8px;
+  color: #eee;
   font-size: 0.95em;
+  box-sizing: border-box; /* padding を含めて width: 100% */
+}
+.prop-input:focus,
+.prop-select:focus {
+  border-color: #007acc;
+  outline: none;
+}
+.prop-input-disabled {
+  background-color: #3f3f3f;
+  color: #888;
+}
+
+textarea.prop-input {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.prop-button {
+  background-color: #4a4a4a;
+  cursor: pointer;
   text-align: center;
-  transition: background-color 0.2s ease;
 }
 .prop-button:hover {
-  background-color: #008be6;
+  background-color: #5a5a5a;
 }
-
 .prop-button-danger {
-  background-color: #c33a3a;
-  border: none;
-  color: white;
-  padding: 6px 10px;
-  border-radius: 4px;
+  width: auto;
+  background-color: #7c2d2d;
+  color: #eee;
   cursor: pointer;
-  font-weight: 500;
-  font-size: 0.9em;
-  text-align: center;
-  transition: background-color 0.2s ease;
-  margin-top: 8px; /* プレビュー画像との隙間 */
+  font-size: 0.85em;
+  padding: 6px 12px;
 }
 .prop-button-danger:hover {
-  background-color: #d44a4a;
+  background-color: #a03a3a;
 }
 
 .prop-image-preview {
   width: 100%;
-  max-height: 150px;
-  object-fit: cover;
+  height: auto;
   border-radius: 4px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  max-height: 200px;
+  object-fit: contain;
+  background-color: #222;
+}
+
+.prop-color-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prop-color-picker {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 34px;
+  height: 34px; 
+  padding: 4px;
   border: 1px solid #555;
-  margin-top: 4px;
-}
-/* ↑↑↑↑↑↑↑↑↑↑ (★ 追加) ↑↑↑↑↑↑↑↑↑↑ */
-
-
-/* (★ 変更なし) スクロールバーのスタイル（ダークテーマ） */
-/* Webkit (Chrome, Safari, Edge) */
-.inspector-tabs-container::-webkit-scrollbar {
-  height: 6px; /* スクロールバーの高さ */
-}
-
-.inspector-tabs-container::-webkit-scrollbar-track {
-  background: #1e1e1e; 
-  border-radius: 3px;
-}
-
-.inspector-tabs-container::-webkit-scrollbar-thumb {
-  background-color: #555; /* つまみの色 */
-  border-radius: 3px;
-}
-
-.inspector-tabs-container::-webkit-scrollbar-thumb:hover {
-  background-color: #777; /* ホバー時のつまみの色 */
-}
-
-/* (★ 変更なし) .panel-content-scrollable の縦スクロールバー */
-.panel-content-scrollable::-webkit-scrollbar {
-  width: 8px;
-}
-.panel-content-scrollable::-webkit-scrollbar-track {
-  background: #2a2a2a;
-}
-.panel-content-scrollable::-webkit-scrollbar-thumb {
-  background-color: #555;
   border-radius: 4px;
-  border: 2px solid #2a2a2a; /* パディングのように見せる */
+  background-color: #2a2a2a;
+  cursor: pointer;
+  box-sizing: border-box; 
 }
-.panel-content-scrollable::-webkit-scrollbar-thumb:hover {
-  background-color: #777;
+.prop-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.prop-color-picker::-webkit-color-swatch {
+  border: 1px solid #777;
+  border-radius: 2px;
+}
+.prop-color-picker::-moz-color-swatch {
+  border: 1px solid #777;
+  border-radius: 2px;
+}
+
+/* ★ 追加: 重ね順ボタン用のグリッドレイアウト */
+.prop-grid-buttons-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }

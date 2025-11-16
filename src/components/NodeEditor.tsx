@@ -12,9 +12,13 @@ import ReactFlow, {
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import NodeToolboxItem from "./NodeToolboxItem";
-import { useEditorContext } from "../contexts/EditorContext";
+// import { useEditorContext } from "../contexts/EditorContext"; // 削除
 import "reactflow/dist/style.css";
 import "./NodeEditor.css";
+
+// ★ Zustand ストアをインポート
+import { usePageStore } from "../stores/usePageStore";
+import { useSelectionStore } from "../stores/useSelectionStore";
 
 // ノードコンポーネント
 import EventNode from "./nodes/EventNode";
@@ -32,15 +36,32 @@ type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
 // ★ 内部コンポーネント: ReactFlowProvider の子として動作する
 // useReactFlow() はこの中でしか使えないため分離する
 const NodeEditorContent: React.FC = () => {
-  const {
-    currentGraph,
-    onNodesChange,
-    onEdgesChange,
-    onAddNode,
-    onConnect,
-    onNodeClick,
-  } = useEditorContext();
+  // ★ 修正: ストアからの購読ロジックを修正 (安全な分離購読)
   
+  // (A) activeLogicGraphId は selection ストアから取得
+  const activeLogicGraphId = useSelectionStore((s) => s.activeLogicGraphId);
+
+  // (B) page store からは allItemLogics（ページに紐づく全ロジック群）を取得
+  const { allItemLogics } = usePageStore((s) => {
+    const page = s.selectedPageId ? s.pages[s.selectedPageId] : undefined;
+    return { allItemLogics: page?.allItemLogics ?? {} };
+  });
+
+  // (C) currentGraph を安全に決定（存在しなければ undefined）
+  // これにより、IDとロジック群の更新タイミングがズレてもクラッシュしない
+  const currentGraph = activeLogicGraphId ? allItemLogics[activeLogicGraphId] : undefined;
+
+  // (D) アクション関数類は getState() で取り出す（関数だけなので購読は不要）
+  const { 
+    applyNodesChange: onNodesChange, 
+    applyEdgesChange: onEdgesChange, 
+    addNodeToCurrentGraph: onAddNode, 
+    applyConnect: onConnect 
+  } = usePageStore.getState();
+  
+  const onNodeClick = useSelectionStore(state => state.handleNodeClick);
+  
+  // currentGraph が undefined の場合、nodes も edges も undefined になり、安全にフォールバックする
   const nodes = currentGraph?.nodes;
   const edges = currentGraph?.edges;
   
@@ -98,8 +119,11 @@ const NodeEditorContent: React.FC = () => {
     waitForClickNode: (props: NodeProps) => <WaitForClickNode {...props} />,
   }), []); 
 
-  const handleNodeClick: NodeClickHandler = (event, node) => onNodeClick(node.id);
+  const handleNodeClick: NodeClickHandler = (event, node) => {
+    onNodeClick(node.id, node.data?.label); // ★ 修正: ?. で安全にアクセス
+  };
 
+  // ★ 修正: nodes と edges が (currentGraph起因で) undefined の場合はフォールバック
   if (!nodes || !edges) return <div className="node-editor-placeholder">アイテムを選択してください</div>;
 
   return (

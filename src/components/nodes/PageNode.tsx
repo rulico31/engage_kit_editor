@@ -5,6 +5,7 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import "./PageNode.css";
 // (★ 削除)
 // import type { PageInfo } from "../../types.ts";
+import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
 
 // (★ 変更) Props の型から不要なものを削除
 interface PageNodeProps extends NodeProps {
@@ -46,3 +47,15 @@ const PageNode: React.FC<PageNodeProps> = ({
 };
 
 export default memo(PageNode);
+
+// ★ 以下をファイル末尾に追加
+export const pageNodeConfig: NodePropertyConfig = {
+  title: "ノード設定",
+  properties: [
+    {
+      name: "targetPageId",
+      label: "遷移先ページ:",
+      type: "select", // (PropertiesPanel側で pageInfoList から options を生成)
+    },
+  ],
+};

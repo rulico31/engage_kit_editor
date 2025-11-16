@@ -1,11 +1,15 @@
-// src/components/Artboard.tsx
-
 import React, { useRef, useCallback, useMemo, useState, useEffect } from "react";
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import type { PlacedItemType, PreviewState, VariableState } from "../types";
-import { useEditorContext } from "../contexts/EditorContext";
+// import { useEditorContext } from "../contexts/EditorContext"; // 削除
 import "./Artboard.css";
+
+// ★ Zustand ストアをインポート
+import { usePageStore } from "../stores/usePageStore";
+import { useSelectionStore } from "../stores/useSelectionStore";
+import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
+import { usePreviewStore } from "../stores/usePreviewStore";
 
 type ResizeDirection = 
   | "top-left" | "top-center" | "top-right"
@@ -21,7 +25,7 @@ const RESIZE_HANDLES: ResizeDirection[] = [
 // --- (A) アイテムコンポーネント ---
 interface ArtboardItemProps {
   item: PlacedItemType;
-  onItemSelect: (id: string) => void;
+  onItemSelect: (id: string, label: string) => void; // (★ ラベル引数を追加)
   onItemDragStart: (e: React.MouseEvent, id: string) => void;
   onItemResizeStart: (e: React.MouseEvent, id: string, direction: ResizeDirection) => void;
   selectedItemId: string | null;
@@ -54,6 +58,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     width: item.width,
     height: isAutoHeight ? 'auto' : item.height,
     minHeight: item.height, 
+    color: item.data?.color || '#333333',
   };
   
   if (isPreviewing && previewState && previewState[item.id]) {
@@ -70,8 +75,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     }
   }
 
-  // ★ 修正: プレビュー中でも編集中でも、背景アイテムは非表示
-  if (item.data?.isArtboardBackground) {
+  if (!isPreviewing && item.data?.isArtboardBackground) {
     style.display = 'none';
   }
 
@@ -103,7 +107,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
       if (e.target instanceof HTMLTextAreaElement) return;
       onItemEvent("click", item.id);
     } else {
-      onItemSelect(item.id);
+      onItemSelect(item.id, item.data.text || item.name); // (★ ラベルを渡す)
       e.stopPropagation();
     }
   };
@@ -183,7 +187,7 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
           onClick={(e) => {
             if (!isPreviewing) {
               e.stopPropagation();
-              onItemSelect(item.id);
+              onItemSelect(item.id, item.data.text || item.name); // (★ ラベルを渡す)
             }
           }}
           onMouseDown={(e) => e.stopPropagation()}
@@ -221,28 +225,55 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
   );
 };
 
-// --- (B) アートボード本体 ---
-const Artboard: React.FC = () => {
-  const {
-    placedItems,
-    setPlacedItems,
-    onItemSelect,
-    onBackgroundClick,
-    selection,
-    activeTabId,
-    setAllItemLogics,
-    nodeGraphTemplates,
-    isPreviewing,
-    previewState,
-    previewBackground, // ★ 追加
-    onItemEvent,
-    variables,
-    onVariableChange,
-  } = useEditorContext();
-  
-  const selectedItemId = selection.find(s => s.id === activeTabId && s.type === 'item')?.id || null;
+// --- (B) スナップ用ヘルパー関数 ---
+const snapToGrid = (value: number, size: number | null, min: number = -Infinity): number => {
+  if (size === null) {
+    return Math.max(min, value);
+  }
+  if (size === 1) {
+    return Math.max(min, Math.round(value));
+  }
+  const snapped = Math.round(value / size) * size;
+  return Math.max(min, snapped);
+};
 
-  // (★ 変更なし) Zoom State
+// --- (C) アートボード本体 ---
+const Artboard: React.FC = () => {
+  
+  // ★ 修正: 派生状態 (セレクタ) を安全に修正
+  const { placedItems, updateItem, addItem } = usePageStore(state => {
+    const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
+    return {
+      placedItems: page?.placedItems || [],
+      updateItem: state.updateItem,
+      addItem: state.addItem,
+    };
+  });
+
+  // SelectionStore (UI状態)
+  const { activeTabId, handleItemSelect, handleBackgroundClick } = useSelectionStore(state => ({
+    activeTabId: state.activeTabId,
+    handleItemSelect: state.handleItemSelect,
+    handleBackgroundClick: state.handleBackgroundClick,
+  }));
+  
+  // SettingsStore (エディタ設定)
+  const { isPreviewing, gridSize } = useEditorSettingsStore(state => ({
+    isPreviewing: state.isPreviewing,
+    gridSize: state.gridSize,
+  }));
+  
+  // PreviewStore (プレビュー状態)
+  const { previewState, previewBackground, variables, onItemEvent, onVariableChange } = usePreviewStore(state => ({
+    previewState: state.previewState,
+    previewBackground: state.previewBackground,
+    variables: state.variables,
+    onItemEvent: state.handleItemEvent,
+    onVariableChange: state.handleVariableChangeFromItem,
+  }));
+
+  const selectedItemId = activeTabId; 
+
   const [zoomLevel, setZoomLevel] = useState(1.0);
 
   const artboardRef = useRef<HTMLDivElement>(null);
@@ -255,7 +286,6 @@ const Artboard: React.FC = () => {
   } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  // (★ 変更なし) ショートカットキーによるズーム制御
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
@@ -276,7 +306,6 @@ const Artboard: React.FC = () => {
   }, []);
 
 
-  // (★ 変更なし) D&D
   const [{ isOver }, drop] = useDrop(
     () => ({
       accept: ItemTypes.TOOL,
@@ -296,37 +325,33 @@ const Artboard: React.FC = () => {
         const newItem: PlacedItemType = {
           id: newItemId,
           name: item.name,
-          x: x,
-          y: y,
+          x: snapToGrid(x, gridSize),
+          y: snapToGrid(y, gridSize),
           width: 100,
           height: 40,
-          data: { text: item.name, src: null, showBorder: true, isTransparent: false, isArtboardBackground: false },
+          data: { text: item.name, src: null, showBorder: true, isTransparent: false, isArtboardBackground: false, color: "#333333" },
         };
         
         if (item.name === "画像") {
           newItem.width = 150; newItem.height = 100; newItem.data.text = "画像";
           newItem.data.keepAspectRatio = true;
+          newItem.data.color = undefined;
         } else if (item.name === "テキスト") {
           newItem.width = 120; newItem.data.text = "テキスト";
         } else if (item.name === "テキスト入力欄") {
           newItem.width = 200; newItem.height = 45;
           newItem.data = {
-            text: "", src: null, variableName: `input_${Date.now()}`, placeholder: "テキストを入力...", showBorder: true, isTransparent: false
+            text: "", src: null, variableName: `input_${Date.now()}`, placeholder: "テキストを入力...", showBorder: true, isTransparent: false, color: "#333333"
           };
         }
 
-        setPlacedItems((prev) => [...prev, newItem]);
-        const templateKey = Object.keys(nodeGraphTemplates).find(key => item.name.startsWith(key)) || "Default";
-        const newGraph = nodeGraphTemplates[templateKey];
-        setAllItemLogics((prev) => ({ ...prev, [newItemId]: newGraph }));
-        onItemSelect(newItemId);
+        addItem(newItem);
       },
     }),
-    [setPlacedItems, setAllItemLogics, nodeGraphTemplates, onItemSelect, zoomLevel]
+    [addItem, zoomLevel, gridSize]
   );
   drop(artboardRef); 
 
-  // (★ 変更なし) アイテム移動
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!draggedItemIdRef.current || !dragStartPos.current || !artboardRef.current) return;
@@ -338,13 +363,12 @@ const Artboard: React.FC = () => {
       const newX = mouseXInArtboard - dragStartPos.current.x;
       const newY = mouseYInArtboard - dragStartPos.current.y;
 
-      setPlacedItems((prev) =>
-        prev.map((item) =>
-          item.id === draggedItemIdRef.current ? { ...item, x: newX, y: newY } : item
-        )
-      );
+      updateItem(draggedItemIdRef.current, {
+        x: snapToGrid(newX, gridSize),
+        y: snapToGrid(newY, gridSize)
+      });
     },
-    [setPlacedItems, zoomLevel]
+    [updateItem, zoomLevel, gridSize]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -363,7 +387,7 @@ const Artboard: React.FC = () => {
     
     if (item.data.isArtboardBackground) return;
 
-    onItemSelect(itemId);
+    handleItemSelect(itemId, item.data.text || item.name);
     draggedItemIdRef.current = itemId;
     setIsDragging(true);
     
@@ -374,16 +398,15 @@ const Artboard: React.FC = () => {
     const mouseYInArtboard = (e.clientY - artboardRect.top) / zoomLevel;
     
     dragStartPos.current = {
-      x: mouseXInArtboard - item.x,
-      y: mouseYInArtboard - item.y,
+      x: mouseXInArtboard - snapToGrid(item.x, gridSize),
+      y: mouseYInArtboard - snapToGrid(item.y, gridSize),
     };
 
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
     e.stopPropagation();
-  }, [isPreviewing, placedItems, onItemSelect, handleMouseMove, handleMouseUp, zoomLevel]);
+  }, [isPreviewing, placedItems, handleItemSelect, handleMouseMove, handleMouseUp, zoomLevel, gridSize]);
   
-  // (★ 変更なし) リサイズ
   const handleResizing = useCallback((e: MouseEvent) => {
     if (!resizeInfoRef.current) return;
     const { startPos, startItem, direction } = resizeInfoRef.current;
@@ -395,25 +418,34 @@ const Artboard: React.FC = () => {
     let newY = startItem.y;
     let newWidth = startItem.width;
     let newHeight = startItem.height;
-
-    if (direction.includes("bottom")) newHeight = Math.max(10, startItem.height + dy);
-    if (direction.includes("top")) {
-      newHeight = Math.max(10, startItem.height - dy);
-      newY = startItem.y + dy;
-    }
-    if (direction.includes("right")) newWidth = Math.max(10, startItem.width + dx);
-    if (direction.includes("left")) {
-      newWidth = Math.max(10, startItem.width - dx);
-      newX = startItem.x + dx;
-    }
     
-    if (newWidth <= 10 && direction.includes("left")) newX = startItem.x + startItem.width - 10;
-    if (newHeight <= 10 && direction.includes("top")) newY = startItem.y + startItem.height - 10;
+    const minDim = snapToGrid(10, gridSize, 10);
 
-    setPlacedItems((prev) =>
-      prev.map((item) => item.id === startItem.id ? { ...item, x: newX, y: newY, width: newWidth, height: newHeight } : item)
-    );
-  }, [setPlacedItems, zoomLevel]);
+    if (direction.includes("bottom")) newHeight = startItem.height + dy;
+    if (direction.includes("top")) newHeight = startItem.height - dy;
+    if (direction.includes("right")) newWidth = startItem.width + dx;
+    if (direction.includes("left")) newWidth = startItem.width - dx;
+    
+    const snappedWidth = snapToGrid(newWidth, gridSize, minDim);
+    const snappedHeight = snapToGrid(newHeight, gridSize, minDim);
+    
+    let snappedX = startItem.x;
+    let snappedY = startItem.y;
+
+    if (direction.includes("left")) {
+      snappedX = snapToGrid(startItem.x + (startItem.width - snappedWidth), gridSize);
+    }
+    if (direction.includes("top")) {
+      snappedY = snapToGrid(startItem.y + (startItem.height - snappedHeight), gridSize);
+    }
+
+    updateItem(startItem.id, {
+      x: snappedX,
+      y: snappedY,
+      width: snappedWidth,
+      height: snappedHeight,
+    });
+  }, [updateItem, zoomLevel, gridSize]);
 
   const handleResizeEnd = useCallback(() => {
     resizeInfoRef.current = null;
@@ -432,21 +464,25 @@ const Artboard: React.FC = () => {
     setIsDragging(true);
     resizeInfoRef.current = {
       startPos: { x: e.clientX, y: e.clientY },
-      startItem: item,
+      startItem: {
+        ...item,
+        x: snapToGrid(item.x, gridSize),
+        y: snapToGrid(item.y, gridSize),
+        width: snapToGrid(item.width, gridSize, 10),
+        height: snapToGrid(item.height, gridSize, 10),
+      },
       direction: direction,
     };
     window.addEventListener("mousemove", handleResizing);
     window.addEventListener("mouseup", handleResizeEnd);
     e.stopPropagation();
-  }, [placedItems, handleResizing, handleResizeEnd]);
+  }, [placedItems, handleResizing, handleResizeEnd, gridSize]);
   
 
   const MemoizedArtboardItem = useMemo(() => React.memo(ArtboardItem), []); 
 
-  // ★ 修正: 背景画像ロジック (プレビューモード対応)
   const backgroundStyle = useMemo(() => {
     if (isPreviewing) {
-      // プレビューモード: Context の previewBackground を使う
       if (previewBackground.src) {
         return {
           backgroundImage: `url(${previewBackground.src})`,
@@ -454,7 +490,6 @@ const Artboard: React.FC = () => {
         };
       }
     } else {
-      // 編集モード: placedItems から探す
       const bgItem = placedItems.find(p => p.data.isArtboardBackground === true && p.data.src);
       if (bgItem) {
         return {
@@ -463,12 +498,11 @@ const Artboard: React.FC = () => {
         };
       }
     }
-    // デフォルト
     return {
       backgroundImage: 'none',
       backgroundPosition: '50% 50%',
     };
-  }, [placedItems, isPreviewing, previewBackground]); // ★ 依存配列に previewBackground を追加
+  }, [placedItems, isPreviewing, previewBackground]);
 
   return (
     <div 
@@ -489,13 +523,13 @@ const Artboard: React.FC = () => {
           backgroundImage: backgroundStyle.backgroundImage,
           backgroundPosition: backgroundStyle.backgroundPosition,
         }}
-        onClick={onBackgroundClick}
+        onClick={handleBackgroundClick}
       >
         {placedItems.map((item) => (
           <MemoizedArtboardItem
             key={item.id}
             item={item}
-            onItemSelect={onItemSelect}
+            onItemSelect={handleItemSelect}
             onItemDragStart={handleItemMouseDown}
             onItemResizeStart={handleItemResizeStart}
             selectedItemId={selectedItemId}

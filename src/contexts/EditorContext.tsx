@@ -9,7 +9,7 @@ import type {
   PreviewState,
   SelectionEntry,
   VariableState,
-  PreviewBackground, // ★ 追加
+  PreviewBackground,
 } from "../types";
 import {
   type Node,
@@ -45,6 +45,13 @@ export interface EditorContextType {
   activeLogicGraphId: string | null;
   
   onItemUpdate: (itemId: string, updatedProps: Partial<PlacedItemType>) => void;
+
+  // ★ 追加: 重ね順
+  onItemMoveToFront: (itemId: string) => void;
+  onItemMoveToBack: (itemId: string) => void;
+  onItemMoveForward: (itemId: string) => void;
+  onItemMoveBackward: (itemId: string) => void;
+
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -63,8 +70,11 @@ export interface EditorContextType {
   
   onOpenBackgroundModal: (itemId: string, src: string) => void;
   
-  // ★ 追加
   previewBackground: PreviewBackground;
+
+  // ★ 修正: グリッド/スナップ機能
+  gridSize: number | null;
+  setGridSize: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 // --- Context オブジェクトの作成 ---

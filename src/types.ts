@@ -1,5 +1,3 @@
-// src/types.ts
-
 import type { Node, Edge } from "reactflow";
 
 // アートボードに配置されたアイテムが持つデータの型
@@ -25,6 +23,9 @@ export interface PlacedItemType {
     isTransparent?: boolean;
     isArtboardBackground?: boolean;
     artboardBackgroundPosition?: string;
+    
+    // ★ 追加: 文字色
+    color?: string;
 
     [key: string]: any; // 将来的な他のデータ
   };
@@ -91,8 +92,52 @@ export interface SelectionEntry {
   label: string; // タブに表示する名前
 }
 
-// ★ 追加: プレビュー用の背景情報
+// プレビュー用の背景情報
 export interface PreviewBackground {
   src: string | null;
   position: string | undefined;
+}
+
+// ★ --- ここからタスク1で追加 --- ★
+
+// UIコントロールの種類
+export type PropertyControlType = 
+  | 'text' 
+  | 'number' 
+  | 'textarea' 
+  | 'select' 
+  | 'checkbox' 
+  | 'color'; // (PropertiesPanel.tsx ですでにカラーピッカーを実装済みの前提)
+
+// select 用の選択肢の型
+export interface PropertySelectOption {
+  label: string;
+  value: string | number;
+}
+
+// 1つのUIコントロール（プロパティ）を定義する型
+export interface PropertyConfig {
+  name: string; // (data オブジェクトのキーと一致。例: "durationS")
+  label: string; // (UI上の表示ラベル。例: "遅延 (秒)")
+  type: PropertyControlType;
+  defaultValue?: any;
+  step?: number;
+  min?: number;
+  
+  // select の場合にのみ使用
+  options?: PropertySelectOption[];
+  
+  // 特定の条件でUIを表示/非表示にするための設定 (オプション)
+  // 例: { name: "animationMode", value: "relative" }
+  // (これが設定されていると、data.animationMode が "relative" の時だけこのUIを表示する)
+  condition?: {
+    name: string;
+    value: any;
+  };
+}
+
+// 各ノードが export するトップレベルの設定オブジェクトの型
+export interface NodePropertyConfig {
+  title: string; // (アコーディオンのタイトル。例: "遅延ノードの設定")
+  properties: PropertyConfig[];
 }

@@ -1,0 +1,82 @@
+/* src/components/GridPopover.css */
+
+.grid-popover {
+  position: absolute;
+  top: 40px; /* ボタン(32px) + 隙間(8px) */
+  right: 0;
+  width: 220px;
+  background-color: #3a3a3a;
+  border: 1px solid #555;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  color: #eee;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.grid-popover-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grid-popover-label {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+}
+
+.grid-button-group {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.grid-snap-button {
+  font-family: inherit;
+  font-size: 0.9em;
+  font-weight: bold;
+  height: 30px;
+  padding: 0;
+  
+  background-color: #2a2a2a;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid-snap-button:hover {
+  background-color: #4a4a4a;
+  border-color: #777;
+}
+
+.grid-snap-button.active {
+  background-color: #007acc;
+  border-color: #007acc;
+  color: #fff;
+}
+
+/* 斜線アイコンのサイズ調整 */
+.grid-slash-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ★ 修正: トグルスイッチのスタイルをすべて削除 */
+/* .grid-toggle-switch { ... } */
+/* .grid-toggle-switch input { ... } */
+/* .grid-slider { ... } */
+/* .grid-slider:before { ... } */
+/* .grid-toggle-switch input:checked + .grid-slider { ... } */
+/* .grid-toggle-switch input:checked + .grid-slider:before { ... } */

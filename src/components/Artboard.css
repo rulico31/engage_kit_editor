@@ -17,14 +17,17 @@
   position: relative;
   transform-origin: 0 0;
 
-  /* ★ 修正: 背景画像用のスタイル */
+  /* 背景画像用のスタイル */
   background-size: cover;
   background-position: 50% 50%; /* デフォルトは中央 */
   background-repeat: no-repeat;
-  transition: background-image 0.2s ease; /* 変更時にフェードイン */
+  transition: background-image 0.2s ease;
 }
 
-/* (★ 変更なし) アートボード上の全アイテムの基本スタイル */
+/* ★ 修正: グリッド描画レイヤーのスタイルを削除 */
+/* .artboard-grid { ... } */
+
+/* アートボード上の全アイテムの基本スタイル */
 .artboard-item {
   position: absolute;
   background-color: #f0f0f0;
@@ -33,19 +36,19 @@
   padding: 10px 12px;
   font-size: 15px;
   font-weight: 500;
-  color: #333;
+  color: #333; /* ★ デフォルトの文字色 */
   cursor: move;
   user-select: none;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease,
               transform 0.2s ease, opacity 0.2s ease,
-              background-color 0.2s ease;
+              background-color 0.2s ease, color 0.2s ease; /* ★ color もトランジション */
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
 }
 
-/* (★ 変更なし) 選択状態のスタイル */
+/* 選択状態のスタイル */
 .artboard-item.selected {
   border-color: #007acc;
   box-shadow: 0 0 8px rgba(0, 122, 204, 0.7);
@@ -55,7 +58,7 @@
 /* --- アイテム種別ごとのスタイル --- */
 
 .item-text-content {
-  color: #333;
+  color: inherit; /* ★ 修正: 親(artboard-item)のインラインスタイルから色を継承 */
   width: 100%;
   word-break: break-word;
   white-space: pre-wrap;
@@ -88,7 +91,7 @@
   padding: 0;
   margin: 0;
   font: inherit;
-  color: inherit;
+  color: inherit; /* ★ 修正: 親(artboard-item)のインラインスタイルから色を継承 */
   cursor: inherit;
   outline: none;
   width: 100%;
@@ -117,7 +120,7 @@
   background: none;
   outline: none;
   font: inherit;
-  color: inherit;
+  color: inherit; /* ★ 修正: 親(artboard-item)のインラインスタイルから色を継承 */
   cursor: inherit;
   padding: 0;
   box-sizing: border-box; 
@@ -148,7 +151,7 @@
   cursor: pointer;
 }
 
-/* (★ 変更なし) リサイズハンドルのスタイル */
+/* リサイズハンドルのスタイル */
 .resize-handle {
   position: absolute;
   background: #ffffff;
@@ -187,28 +190,28 @@
 .resize-handle.middle-right { top: 50%; right: 0; cursor: ew-resize; }
 
 
-/* (★ 変更なし) プレビュー中のスタイル */
+/* プレビュー中のスタイル */
 .artboard.is-preview {
   margin: 20px auto;
   cursor: default;
 }
 
-/* (★ 変更なし) ボーダー非表示スタイル */
+/* ボーダー非表示スタイル */
 .artboard-item.no-border {
   border-color: transparent;
 }
 
-/* (★ 変更なし) 背景透過スタイル */
+/* 背景透過スタイル */
 .artboard-item.is-transparent {
   background-color: transparent;
 }
 
-/* (★ 変更なし) 選択時はボーダーを再表示 */
+/* 選択時はボーダーを再表示する (上書き) */
 .artboard-item.no-border.selected {
   border-color: #007acc;
 }
 
-/* (★ 変更なし) プレビュー中も非表示を維持 */
+/* プレビュー中も非表示を維持 */
 .artboard-item.no-border.preview {
   border-color: transparent;
 }

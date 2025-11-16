@@ -1,376 +1,71 @@
 // src/App.tsx
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback } from "react";
 import "./App.css";
-
-import {
-  type Node,
-  type Edge,
-  type OnNodesChange,
-  type OnEdgesChange,
-  applyNodeChanges,
-  applyEdgeChanges,
-  addEdge,
-  type Connection,
-  type OnConnect,
-} from "reactflow";
-
 import HomeScreen from "./components/HomeScreen";
-import type { 
-  PlacedItemType, 
-  ProjectData, 
-  PageData, 
-  NodeGraph, 
-  PageInfo, 
-  PreviewState, 
-  SelectionEntry, 
-  VariableState,
-  PreviewBackground // ★ 追加
-} from "./types";
-
-import { triggerEvent, type ActiveListeners } from "./logicEngine";
+import type { ProjectData } from "./types";
 import EditorView from "./components/EditorView";
-import { EditorContext, type EditorContextType } from "./contexts/EditorContext";
-
 import BackgroundPositionerModal from "./components/BackgroundPositionerModal";
 
-export type { NodeGraph } from "./types";
-
-const NODE_GRAPH_TEMPLATES: Record<string, NodeGraph> = {
-  "ボタン": {
-    nodes: [{
-      id: "btn-click",
-      type: "eventNode",
-      data: { label: "🎬 イベント: ボタンがクリックされた時", eventType: "click" },
-      position: { x: 50, y: 50 },
-    }],
-    edges: [],
-  },
-  "テキスト": {
-    nodes: [{
-      id: "text-load",
-      type: "eventNode",
-      data: { label: "🎬 イベント: テキスト表示時", eventType: "onLoad" },
-      position: { x: 50, y: 50 },
-    }],
-    edges: [],
-  },
-  "画像": {
-    nodes: [{
-      id: "img-load",
-      type: "eventNode",
-      data: { label: "🎬 イベント: 画像読み込み完了時", eventType: "onLoad" },
-      position: { x: 50, y: 50 },
-    }],
-    edges: [],
-  },
-  "テキスト入力欄": {
-    nodes: [{
-      id: "input-change",
-      type: "eventNode",
-      data: { label: "🎬 イベント: 入力完了時", eventType: "onInputComplete" },
-      position: { x: 50, y: 50 },
-    }],
-    edges: [],
-  },
-  "Default": {
-    nodes: [{
-      id: "default-load",
-      type: "eventNode",
-      data: { label: "🎬 イベント: ページ読み込み時", eventType: "onLoad" },
-      position: { x: 50, y: 50 },
-    }],
-    edges: [],
-  },
-};
-
-// ★ プレビュー背景の初期値
-const initialPreviewBackground: PreviewBackground = { src: null, position: undefined };
+// ★ Zustand ストアをインポート
+import { useEditorSettingsStore } from "./stores/useEditorSettingsStore";
+import { usePageStore } from "./stores/usePageStore";
+import { useSelectionStore } from "./stores/useSelectionStore";
+import { usePreviewStore } from "./stores/usePreviewStore";
 
 function App() {
-  // --- (1) ビュー管理 State ---
-  const [view, setView] = useState<"home" | "editor">("home");
-  const [projectName, setProjectName] = useState<string>("");
+  // ★ App.tsx は、どのストアを購読する必要もない
+  // ★ ただし、ストアのアクションをトリガーするために `getState` やフック外の `set` を使う
 
-  // --- (2) 複数ページ対応の State ---
-  const [pages, setPages] = useState<Record<string, PageData>>({});
-  const [pageOrder, setPageOrder] = useState<string[]>([]);
-  const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
-
-  // タブ/選択状態
-  const [selection, setSelection] = useState<SelectionEntry[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [activeLogicGraphId, setActiveLogicGraphId] = useState<string | null>(null);
-
-  // プレビュー用
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const [previewState, setPreviewState] = useState<PreviewState>({});
-  // ★ 追加: プレビュー用背景ステート
-  const [previewBackground, setPreviewBackground] = useState<PreviewBackground>(initialPreviewBackground);
-
-  // 変数
-  const [variables, setVariables] = useState<VariableState>({});
+  // ★ 編集ストアからビューとプロジェクト名を取得（これはAppレベルで必要）
+  const view = useEditorSettingsStore(state => state.view);
+  const projectName = useEditorSettingsStore(state => state.projectName);
   
-  // 背景画像モーダル用のState
-  const [bgModal, setBgModal] = useState({
+  // (★ 背景画像モーダル用のStateは、App.tsxに残す)
+  const [bgModal, setBgModal] = React.useState({
     isOpen: false,
     itemId: null as string | null,
     src: null as string | null,
   });
 
-  // 待機中のリスナーを保持するRef
-  const activeListeners = useRef<ActiveListeners>(new Map());
+  // --- (5) プロジェクト管理 (ストアを操作するよう変更) ---
 
-  const previewStateRef = useRef(previewState);
-  useEffect(() => { previewStateRef.current = previewState; }, [previewState]);
-
-  const variablesRef = useRef(variables);
-  useEffect(() => { variablesRef.current = variables; }, [variables]);
-
-  // Derived values
-  const derived = useMemo(() => {
-    if (!selectedPageId) return { placedItems: [] as PlacedItemType[], allItemLogics: {} as Record<string, NodeGraph>, currentGraph: undefined as NodeGraph | undefined };
-    const currentPage = pages[selectedPageId];
-    if (!currentPage) return { placedItems: [] as PlacedItemType[], allItemLogics: {} as Record<string, NodeGraph>, currentGraph: undefined as NodeGraph | undefined };
-
-    const currentLogicGraph = activeLogicGraphId ? currentPage.allItemLogics[activeLogicGraphId] : undefined;
-
-    return {
-      placedItems: currentPage.placedItems,
-      allItemLogics: currentPage.allItemLogics,
-      currentGraph: currentLogicGraph,
-    };
-  }, [pages, selectedPageId, activeLogicGraphId]);
-
-  const pageInfoList: PageInfo[] = useMemo(() => pageOrder.map(id => ({ id: id, name: pages[id]?.name || "無題" })), [pageOrder, pages]);
-
-  // --- (4) コールバック ---
-
-  const setPlacedItemsForCurrentPage = useCallback((action: React.SetStateAction<PlacedItemType[]>) => {
-    setPages(prevPages => {
-      if (!selectedPageId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-      const newPlacedItems = typeof action === 'function' ? (action as Function)(currentPage.placedItems) : action;
-      return { ...prevPages, [selectedPageId]: { ...currentPage, placedItems: newPlacedItems } };
-    });
-  }, [selectedPageId]);
-
-  const setAllItemLogicsForCurrentPage = useCallback((action: React.SetStateAction<Record<string, NodeGraph>>) => {
-    setPages(prevPages => {
-      if (!selectedPageId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-      const newAll = typeof action === 'function' ? (action as Function)(currentPage.allItemLogics) : action;
-      return { ...prevPages, [selectedPageId]: { ...currentPage, allItemLogics: newAll } };
-    });
-  }, [selectedPageId]);
-
-  const handleItemUpdate = useCallback((itemId: string, updatedProps: Partial<PlacedItemType>) => {
-    setPages(prevPages => {
-      if (!selectedPageId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-
-      const newPlacedItems = currentPage.placedItems.map(item => item.id === itemId ? { ...item, ...updatedProps } : item);
-
-      if (updatedProps.name) {
-        setSelection(prev => prev.map(s => s.id === itemId ? { ...s, label: `🔘 ${updatedProps.name}` } : s));
-      }
-      if (updatedProps.data && (updatedProps.data as any).text) {
-        const newLabel = (updatedProps.data as any).text;
-        setSelection(prev => prev.map(s => s.id === itemId ? { ...s, label: `🔘 ${newLabel}` } : s));
-      }
-
-      return { ...prevPages, [selectedPageId]: { ...currentPage, placedItems: newPlacedItems } };
-    });
-  }, [selectedPageId]);
-
-  const onNodesChange: OnNodesChange = useCallback((changes) => {
-    setPages(prevPages => {
-      if (!selectedPageId || !activeLogicGraphId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-      const currentGraph = currentPage.allItemLogics[activeLogicGraphId];
-      if (!currentGraph) return prevPages;
-
-      const newNodes = applyNodeChanges(changes, currentGraph.nodes);
-
-      setSelection(prevSel => {
-        const newSel = [...prevSel];
-        newNodes.forEach(node => {
-          const selEntry = newSel.find(s => s.id === node.id);
-          if (selEntry && selEntry.label !== node.data.label) {
-            selEntry.label = node.data.label;
-          }
-        });
-        return newSel;
-      });
-
-      const newAllItemLogics = { ...currentPage.allItemLogics, [activeLogicGraphId]: { ...currentGraph, nodes: newNodes } };
-      return { ...prevPages, [selectedPageId]: { ...currentPage, allItemLogics: newAllItemLogics } };
-    });
-  }, [selectedPageId, activeLogicGraphId]);
-
-  const onEdgesChange: OnEdgesChange = useCallback((changes) => {
-    setPages(prevPages => {
-      if (!selectedPageId || !activeLogicGraphId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-      const currentGraph = currentPage.allItemLogics[activeLogicGraphId];
-      if (!currentGraph) return prevPages;
-
-      const newEdges = applyEdgeChanges(changes, currentGraph.edges);
-      const newAllItemLogics = { ...currentPage.allItemLogics, [activeLogicGraphId]: { ...currentGraph, edges: newEdges } };
-      return { ...prevPages, [selectedPageId]: { ...currentPage, allItemLogics: newAllItemLogics } };
-    });
-  }, [selectedPageId, activeLogicGraphId]);
-
-  const onConnect: OnConnect = useCallback((connection: Connection) => {
-    setPages(prevPages => {
-      if (!selectedPageId || !activeLogicGraphId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-      const currentGraph = currentPage.allItemLogics[activeLogicGraphId];
-      if (!currentGraph) return prevPages;
-
-      const newEdges = addEdge(connection, currentGraph.edges);
-      const newAllItemLogics = { ...currentPage.allItemLogics, [activeLogicGraphId]: { ...currentGraph, edges: newEdges } };
-      return { ...prevPages, [selectedPageId]: { ...currentPage, allItemLogics: newAllItemLogics } };
-    });
-  }, [selectedPageId, activeLogicGraphId]);
-
-  const handleAddNode = useCallback((newNode: Node) => {
-    setPages(prevPages => {
-      if (!selectedPageId || !activeLogicGraphId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-      const currentGraph = currentPage.allItemLogics[activeLogicGraphId];
-      if (!currentGraph) return prevPages;
-
-      const newAllItemLogics = { ...currentPage.allItemLogics, [activeLogicGraphId]: { ...currentGraph, nodes: [...currentGraph.nodes, newNode] } };
-      return { ...prevPages, [selectedPageId]: { ...currentPage, allItemLogics: newAllItemLogics } };
-    });
-  }, [selectedPageId, activeLogicGraphId]);
-
-  const handleNodeDataChange = useCallback((nodeId: string, dataUpdate: any) => {
-    setPages(prevPages => {
-      if (!selectedPageId || !activeLogicGraphId) return prevPages;
-      const currentPage = prevPages[selectedPageId];
-      if (!currentPage) return prevPages;
-      const currentGraph = currentPage.allItemLogics[activeLogicGraphId];
-      if (!currentGraph) return prevPages;
-
-      const newNodes = currentGraph.nodes.map(node => node.id === nodeId ? { ...node, data: { ...node.data, ...dataUpdate } } : node);
-
-      if (dataUpdate.label) {
-        setSelection(prev => prev.map(s => s.id === nodeId ? { ...s, label: dataUpdate.label } : s));
-      }
-
-      const newAllItemLogics = { ...currentPage.allItemLogics, [activeLogicGraphId]: { ...currentGraph, nodes: newNodes } };
-      return { ...prevPages, [selectedPageId]: { ...currentPage, allItemLogics: newAllItemLogics } };
-    });
-  }, [selectedPageId, activeLogicGraphId]);
-
-  const handleDeleteItem = useCallback(() => {
-    setSelection(prevSel => {
-      const activeEntry = prevSel.find(s => s.id === activeTabId);
-      if (!activeEntry || activeEntry.type !== 'item' || !selectedPageId) return prevSel;
-      const itemIdToDelete = activeEntry.id;
-
-      setPages(prevPages => {
-        const currentPage = prevPages[selectedPageId];
-        if (!currentPage) return prevPages;
-        const newPlacedItems = currentPage.placedItems.filter(item => item.id !== itemIdToDelete);
-        const newAllItemLogics = { ...currentPage.allItemLogics };
-        delete newAllItemLogics[itemIdToDelete];
-        return { ...prevPages, [selectedPageId]: { ...currentPage, placedItems: newPlacedItems, allItemLogics: newAllItemLogics } };
-      });
-
-      setActiveTabId(null);
-      setActiveLogicGraphId(null);
-
-      return prevSel.filter(s => s.id !== itemIdToDelete);
-    });
-  }, [selectedPageId, activeTabId]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) { return; }
-      if (e.key === "Delete" || e.key === "Backspace") {
-        e.preventDefault();
-        handleDeleteItem();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleDeleteItem]);
-
-  const handleItemSelect = useCallback((itemId: string) => {
-    setSelection(prev => {
-      const exists = prev.find(s => s.id === itemId);
-      if (exists) return prev;
-      const item = derived.placedItems.find(p => p.id === itemId);
-      if (!item) return prev;
-      const label = item.data?.text || item.name;
-      return [...prev, { id: itemId, type: 'item', label: `🔘 ${label}` }];
-    });
-
-    setActiveTabId(itemId);
-    setActiveLogicGraphId(itemId);
-  }, [derived]);
-
-  const handleBackgroundClick = useCallback(() => setActiveTabId(null), []);
-
-  const handleNodeClick = useCallback((nodeId: string) => {
-    const node = derived.currentGraph?.nodes.find(n => n.id === nodeId);
-    if (!node) return;
-    setSelection(prev => {
-      const exists = prev.find(s => s.id === nodeId);
-      if (exists) return prev;
-      return [...prev, { id: nodeId, type: 'node', label: node.data.label || 'ノード' }];
-    });
-    setActiveTabId(nodeId);
-  }, [derived]);
-
-  // --- (5) プロジェクト管理 ---
-  const resetProjectState = useCallback(() => {
-    setPages({});
-    setPageOrder([]);
-    setSelectedPageId(null);
-    setSelection([]);
-    setActiveTabId(null);
-    setActiveLogicGraphId(null);
-    setIsPreviewing(false);
-    setPreviewState({});
-    setPreviewBackground(initialPreviewBackground); // ★ リセット
-    setVariables({});
-    activeListeners.current.clear();
-  }, []);
+  const resetAllStores = () => {
+    usePageStore.getState().resetPages();
+    useSelectionStore.getState().resetSelection();
+    useEditorSettingsStore.getState().resetEditorSettings();
+    usePreviewStore.getState().stopPreview();
+  };
 
   const handleNewProject = useCallback(() => {
     const name = prompt("新しいプロジェクト名を入力してください:", "新規プロジェクト");
     if (!name) return;
-    setProjectName(name);
-    resetProjectState();
-    const initialPageId = `page-${Date.now()}`;
-    const initialPage: PageData = { id: initialPageId, name: "Page 1", placedItems: [], allItemLogics: {} };
-    setPages({ [initialPageId]: initialPage });
-    setPageOrder([initialPageId]);
-    setSelectedPageId(initialPageId);
-    setView("editor");
-  }, [resetProjectState]);
+    
+    resetAllStores(); // (view: "home" 以外をリセット)
+    
+    useEditorSettingsStore.getState().setProjectName(name);
+    
+    // PageStore に初期ページを作成
+    usePageStore.getState().addPage("Page 1");
+    
+    useEditorSettingsStore.getState().setView("editor");
+  }, []);
 
   const handleGoHome = useCallback(() => {
     if (window.confirm("ホームに戻ると、保存していない変更は失われます。よろしいですか？")) {
-      setView("home");
-      setProjectName("");
-      resetProjectState();
+      resetAllStores();
+      useEditorSettingsStore.getState().setView("home");
     }
-  }, [resetProjectState]);
+  }, []);
 
   const handleExportProject = useCallback(() => {
+    // 各ストアから最新の状態を取得してエクスポートデータを構築
+    const { pages, pageOrder } = usePageStore.getState();
+    const { variables } = usePreviewStore.getState(); // 変数はPreviewStoreが持つ
+    const projectName = useEditorSettingsStore.getState().projectName;
+    
     const projectData: ProjectData = { projectName, pages, pageOrder, variables };
+    
     const jsonString = JSON.stringify(projectData, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -381,7 +76,7 @@ function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [projectName, pages, pageOrder, variables]);
+  }, []);
 
   const handleImportProject = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -392,16 +87,17 @@ function App() {
         const text = e.target?.result as string;
         const data = JSON.parse(text) as ProjectData;
         const firstPageId = data.pageOrder?.[0];
+        
         if (data.pages && data.pageOrder && firstPageId) {
-          setProjectName(data.projectName || "無題のプロジェクト");
-          setPages(data.pages);
-          setPageOrder(data.pageOrder);
-          setSelectedPageId(firstPageId);
-          setVariables(data.variables || {});
-          setSelection([]);
-          setActiveTabId(null);
-          setActiveLogicGraphId(null);
-          setView("editor");
+          // すべてのストアをリセット
+          resetAllStores();
+          
+          // 取得したデータでストアを初期化
+          useEditorSettingsStore.getState().setProjectName(data.projectName || "無題のプロジェクト");
+          usePageStore.getState().loadProjectData(data);
+          usePreviewStore.getState().setVariables(data.variables || {});
+          
+          useEditorSettingsStore.getState().setView("editor");
         } else {
           alert("有効なページデータが見つかりませんでした。");
         }
@@ -414,158 +110,7 @@ function App() {
     event.target.value = "";
   }, []);
 
-  const handleAddPage = useCallback(() => {
-    const newPageName = prompt("新しいページ名を入力してください:", `Page ${pageOrder.length + 1}`);
-    if (!newPageName) return;
-    const newPageId = `page-${Date.now()}`;
-    const newPage: PageData = { id: newPageId, name: newPageName, placedItems: [], allItemLogics: {} };
-    setPages(prev => ({ ...prev, [newPageId]: newPage }));
-    setPageOrder(prev => [...prev, newPageId]);
-    setSelectedPageId(newPageId);
-    setSelection([]);
-    setActiveTabId(null);
-    setActiveLogicGraphId(null);
-  }, [pageOrder.length]);
-
-  const handleSelectPage = useCallback((pageId: string) => {
-    if (pageId === selectedPageId) return;
-    setSelectedPageId(pageId);
-    setSelection([]);
-    setActiveTabId(null);
-    setActiveLogicGraphId(null);
-  }, [selectedPageId]);
-
-  const handleTabSelect = useCallback((tabId: string) => {
-    setActiveTabId(tabId);
-    setSelection(prev => prev);
-    const entry = selection.find(s => s.id === tabId);
-    if (entry && entry.type === 'item') {
-      setActiveLogicGraphId(tabId);
-    }
-  }, [selection]);
-
-  const handleCloseTab = useCallback((idToClose: string) => {
-    const closedEntry = selection.find(s => s.id === idToClose);
-    if (!closedEntry) return;
-
-    let newSelection = selection.filter(s => s.id !== idToClose);
-    let newActiveTabId = activeTabId;
-    if (activeTabId === idToClose) newActiveTabId = null;
-
-    if (closedEntry.type === 'item' && activeLogicGraphId === idToClose) {
-      const graph = derived.allItemLogics[idToClose];
-      if (graph) {
-        const nodeIds = graph.nodes.map(n => n.id);
-        newSelection = newSelection.filter(s => !nodeIds.includes(s.id));
-        if (newActiveTabId && nodeIds.includes(newActiveTabId)) newActiveTabId = null;
-      }
-      setActiveLogicGraphId(null);
-    }
-
-    setSelection(newSelection);
-    setActiveTabId(newActiveTabId);
-  }, [selection, activeTabId, activeLogicGraphId, derived]);
-
-  const handlePageChangeRequest = useCallback((targetPageId: string) => {
-    setPages(prev => {
-      if (!prev[targetPageId]) {
-        console.warn(`[App] 存在しないページ (ID: ${targetPageId}) への遷移リクエスト`);
-        return prev;
-      }
-      return prev;
-    });
-
-    if (!pages[targetPageId]) {
-      console.warn(`[App] 存在しないページ (ID: ${targetPageId}) への遷移リクエスト`);
-      return;
-    }
-
-    setSelectedPageId(targetPageId);
-
-    const targetPageData = pages[targetPageId];
-    const initialPreviewState: PreviewState = {};
-    // ★ ページ遷移時も背景を設定
-    const bgItem = targetPageData.placedItems.find(p => p.data.isArtboardBackground);
-    if (bgItem) {
-      setPreviewBackground({ src: bgItem.data.src, position: bgItem.data.artboardBackgroundPosition });
-    } else {
-      setPreviewBackground(initialPreviewBackground);
-    }
-    
-    targetPageData.placedItems.forEach(item => {
-      initialPreviewState[item.id] = { isVisible: true, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
-    });
-    setPreviewState(initialPreviewState);
-  }, [pages]);
-
-  // ★ 修正: handleTogglePreview (背景設定ロジックを追加)
-  const handleTogglePreview = useCallback(() => {
-    setIsPreviewing(prev => {
-      const next = !prev;
-      if (next) {
-        // --- プレビュー開始時 ---
-        setVariables({});
-        variablesRef.current = {};
-        
-        // ★ プレビュー用背景を設定
-        const bgItem = derived.placedItems.find(p => p.data.isArtboardBackground);
-        if (bgItem) {
-          setPreviewBackground({ src: bgItem.data.src, position: bgItem.data.artboardBackgroundPosition });
-        } else {
-          setPreviewBackground(initialPreviewBackground);
-        }
-        
-        setPreviewState(ps => {
-          const initial: PreviewState = {};
-          derived.placedItems.forEach(item => {
-            initial[item.id] = { isVisible: true, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
-          });
-          return initial;
-        });
-        
-      } else {
-        // --- プレビュー終了時 ---
-        setPreviewState({});
-        setPreviewBackground(initialPreviewBackground); // ★ 背景リセット
-        activeListeners.current.clear();
-      }
-      return next;
-    });
-  }, [derived]);
-
-  const handleVariableChangeFromItem = useCallback((variableName: string, value: any) => {
-    if (!variableName) return;
-    setVariables(prev => {
-      const newVars = { ...prev, [variableName]: value };
-      variablesRef.current = newVars;
-      return newVars;
-    });
-  }, []);
-
-  const handleItemEvent = useCallback((eventName: string, itemId: string) => {
-    if (!selectedPageId) return;
-    
-    const { placedItems, allItemLogics } = derived;
-    
-    const targetGraph = allItemLogics[itemId];
-    const dummyGraph: NodeGraph = { nodes: [], edges: [] };
-    const graphToUse = targetGraph || dummyGraph;
-
-    triggerEvent(
-      eventName,
-      itemId,
-      graphToUse,
-      placedItems,
-      () => previewStateRef.current,
-      (newState: PreviewState) => { previewStateRef.current = newState; setPreviewState(newState); },
-      handlePageChangeRequest,
-      () => variablesRef.current,
-      (newVars: VariableState) => { variablesRef.current = newVars; setVariables(newVars); },
-      activeListeners.current
-    );
-  }, [selectedPageId, pages, handlePageChangeRequest, derived]);
-  
-  // ★ 修正: 背景モーダル用ハンドラ (エラー修正)
+  // --- 背景画像モーダルのコールバック ---
   const handleOpenBackgroundModal = useCallback((itemId: string, src: string) => {
     if (!src) {
       alert("先に画像をアップロードしてください。");
@@ -579,113 +124,69 @@ function App() {
   }, []);
 
   const handleConfirmBackgroundModal = useCallback((newPosition: string) => {
-    if (bgModal.itemId && selectedPageId) {
+    if (bgModal.itemId) {
+      
+      // ★ 修正: エラーの原因となっていた updateItem 呼び出しを削除
+      // usePageStore.getState().updateItem(bgModal.itemId, {
+      //   data: {
+      //     isArtboardBackground: true,
+      //     artboardBackgroundPosition: newPosition,
+      //   }
+      // });
+      
+      // (★) このロジック (↓) が正解。
+      // (1) ストアから現在のページ状態を取得
+      const { pages, selectedPageId } = usePageStore.getState();
+      if (!selectedPageId) return;
       const currentPage = pages[selectedPageId];
       if (!currentPage) return;
       
-      const currentItem = currentPage.placedItems.find(p => p.id === bgModal.itemId);
-      if (!currentItem) return;
-
-      // ★ 修正: 他の背景フラグをリセットする
+      // (2) 新しい placedItems 配列を生成
       const newPlacedItems = currentPage.placedItems.map(item => {
         if (item.id === bgModal.itemId) {
           // これを背景にする
           return {
             ...item,
-            data: {
-              ...item.data,
-              isArtboardBackground: true,
-              artboardBackgroundPosition: newPosition,
-            }
+            data: { ...item.data, isArtboardBackground: true, artboardBackgroundPosition: newPosition }
           };
         } else if (item.data.isArtboardBackground) {
           // 他のアイテムは背景フラグを外す
           return {
             ...item,
-            data: {
-              ...item.data,
-              isArtboardBackground: false,
-              artboardBackgroundPosition: undefined,
-            }
+            data: { ...item.data, isArtboardBackground: false, artboardBackgroundPosition: undefined }
           };
         }
-        return item; // それ以外は変更なし
+        return item;
       });
       
-      // ★ 修正: handleItemUpdate ではなく、ページ全体を更新
-      setPages(prev => ({
-        ...prev,
-        [selectedPageId]: {
-          ...currentPage,
-          placedItems: newPlacedItems,
+      // (3) ストアの状態を直接更新
+      usePageStore.setState(state => ({
+        pages: {
+          ...state.pages,
+          [selectedPageId!]: {
+            ...currentPage,
+            placedItems: newPlacedItems,
+          }
         }
       }));
     }
     setBgModal({ isOpen: false, itemId: null, src: null });
-  }, [bgModal.itemId, selectedPageId, pages]);
+  }, [bgModal.itemId]);
 
 
-  // --- useMemo: context value を安定化 ---
-  const contextValue: EditorContextType = useMemo(() => ({
-    pages,
-    pageOrder,
-    selectedPageId,
-    isPreviewing,
-    previewState,
-    previewBackground, // ★ 追加
-    variables,
-    placedItems: derived.placedItems,
-    allItemLogics: derived.allItemLogics,
-    currentGraph: derived.currentGraph,
-    selection,
-    activeTabId,
-    activeLogicGraphId,
-    pageInfoList,
-    nodeGraphTemplates: NODE_GRAPH_TEMPLATES,
-
-    onSelectPage: handleSelectPage,
-    onAddPage: handleAddPage,
-    onItemEvent: handleItemEvent,
-    onVariableChange: handleVariableChangeFromItem,
-    setPlacedItems: setPlacedItemsForCurrentPage,
-    setAllItemLogics: setAllItemLogicsForCurrentPage,
-    onItemUpdate: handleItemUpdate,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    onAddNode: handleAddNode,
-    onNodeDataChange: handleNodeDataChange,
-    onItemSelect: handleItemSelect,
-    onBackgroundClick: handleBackgroundClick,
-    onNodeClick: handleNodeClick,
-    onTabSelect: handleTabSelect,
-    onTabClose: handleCloseTab,
-    
-    onOpenBackgroundModal: handleOpenBackgroundModal,
-  }), [
-    pages, pageOrder, selectedPageId, isPreviewing, previewState, previewBackground, variables, // ★ previewBackground 追加
-    selection, activeTabId, activeLogicGraphId,
-    handleSelectPage, handleAddPage, handleItemEvent, handleVariableChangeFromItem,
-    setPlacedItemsForCurrentPage, setAllItemLogicsForCurrentPage, handleItemUpdate,
-    onNodesChange, onEdgesChange, onConnect, handleAddNode, handleNodeDataChange,
-    handleItemSelect, handleBackgroundClick, handleNodeClick, handleTabSelect, handleCloseTab,
-    derived, pageInfoList, 
-    handleOpenBackgroundModal, handleCloseBackgroundModal, handleConfirmBackgroundModal
-  ]);
-
+  // --- (★ 変更) ContextProvider を削除 ---
   if (view === "home") {
     return <HomeScreen onNewProject={handleNewProject} onImportProject={handleImportProject} />;
   }
 
   return (
-    <EditorContext.Provider value={contextValue}>
+    <>
       <EditorView
         projectName={projectName}
-        isPreviewing={isPreviewing}
         onGoHome={handleGoHome}
         onExportProject={handleExportProject}
         onImportProject={handleImportProject}
-        onTogglePreview={handleTogglePreview}
+        onOpenBackgroundModal={handleOpenBackgroundModal}
       />
       
       {bgModal.isOpen && bgModal.src && (
@@ -695,7 +196,7 @@ function App() {
           onConfirm={handleConfirmBackgroundModal}
         />
       )}
-    </EditorContext.Provider>
+    </>
   );
 }
 

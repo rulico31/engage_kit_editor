@@ -3,6 +3,7 @@
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import "./WaitForClickNode.css";
+import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
 
 interface WaitForClickNodeProps extends NodeProps {}
 
@@ -29,3 +30,15 @@ const WaitForClickNode: React.FC<WaitForClickNodeProps> = ({
 };
 
 export default memo(WaitForClickNode);
+
+// ★ 以下をファイル末尾に追加
+export const waitForClickNodeConfig: NodePropertyConfig = {
+  title: "待機設定",
+  properties: [
+    {
+      name: "targetItemId",
+      label: "クリックを待つ対象:",
+      type: "select", // (PropertiesPanel側で placedItems から options を生成)
+    },
+  ],
+};

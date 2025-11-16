@@ -6,52 +6,113 @@ import Artboard from "./Artboard";
 import PropertiesPanel from "./PropertiesPanel";
 import NodeEditor from "./NodeEditor";
 import LeftPanel from "./LeftPanel";
-import { useEditorContext } from "../contexts/EditorContext";
+// import { useEditorContext } from "../contexts/EditorContext"; // 削除
 import "./EditorView.css";
+import { GridIcon } from "./icons/GridIcon";
+import { SlashIcon } from "./icons/SlashIcon";
+import "./GridPopover.css";
+
+// ★ Zustand ストアをインポート
+import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
+import { usePreviewStore } from "../stores/usePreviewStore";
 
 interface EditorViewProps {
   projectName: string;
-  isPreviewing: boolean;
+  // ★ App.tsx から渡される Props を修正
+  // isPreviewing: boolean; // (ストアから取得)
   onGoHome: () => void;
   onExportProject: () => void;
   onImportProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  onTogglePreview: () => void;
+  // onTogglePreview: () => void; // (ストアのアクションを呼ぶ)
+  onOpenBackgroundModal: (itemId: string, src: string) => void;
 }
+
+// ★ グリッド/スナップ設定のポップオーバー
+const GridPopover: React.FC = () => {
+  // ★ 修正: ストアから購読
+  const { gridSize, setGridSize } = useEditorSettingsStore(state => ({
+    gridSize: state.gridSize,
+    setGridSize: state.setGridSize,
+  }));
+
+  const snapOptions = [null, 1, 2, 4, 8, 16, 32];
+  
+  return (
+    <div className="grid-popover">
+      <div className="grid-popover-section">
+        <label className="grid-popover-label">スナップ (px)</label>
+        <div className="grid-button-group">
+          {snapOptions.map((size) => (
+            <button
+              key={size === null ? 'null' : size}
+              className={`grid-snap-button ${gridSize === size ? 'active' : ''}`}
+              onClick={() => setGridSize(size)}
+              title={
+                size === null ? "スナップ OFF" : 
+                size === 1 ? "ピクセル (1px) スナップ" : 
+                `${size}px グリッド`
+              }
+            >
+              {size === null ? <SlashIcon /> : size}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* (★ グリッド表示セクションは削除済み) */}
+    </div>
+  );
+};
+
 
 const EditorView: React.FC<EditorViewProps> = ({
   projectName,
-  isPreviewing,
   onGoHome,
   onExportProject,
   onImportProject,
-  onTogglePreview,
+  onOpenBackgroundModal, // (★ App.tsx から受け取る)
 }) => {
-  const { isPreviewing: isPreviewingFromContext } = useEditorContext();
   
-  // 画面モード
-  const [viewMode, setViewMode] = useState<ViewMode>("split");
+  // ★ 修正: ストアから購読
+  const { 
+    viewMode, 
+    setViewMode, 
+    isPreviewing, 
+    togglePreview 
+  } = useEditorSettingsStore(state => ({
+    viewMode: state.viewMode,
+    setViewMode: state.setViewMode,
+    isPreviewing: state.isPreviewing,
+    togglePreview: state.togglePreview,
+  }));
+  
+  // ★ プレビューストアのアクションを取得
+  const initPreview = usePreviewStore(state => state.initPreview);
+  const stopPreview = usePreviewStore(state => state.stopPreview);
+
+  // ★ 修正: onTogglePreview をラップ
+  const handleTogglePreview = () => {
+    if (!isPreviewing) {
+      initPreview(); // プレビュー開始時に状態を初期化
+    } else {
+      stopPreview(); // プレビュー終了時に状態をクリア
+    }
+    togglePreview(); // エディタの設定ストアの状態を切り替え
+  };
+  
+  // ★ グリッドポップオーバーの表示状態 (これはローカルUI状態)
+  const [isGridPopoverOpen, setIsGridPopoverOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   // =========================================================
-  // ★ リサイズ管理ステート
+  // ★ リサイズ管理ステート (これはローカルUI状態)
   // =========================================================
-
-  // 1. 上下分割の比率 (Splitモード時の上段の高さ)
-  const [splitRatio, setSplitRatio] = useState(0.6); // デフォルトは上6割
-
-  // 2. 左パネルの幅 (px)
+  const [splitRatio, setSplitRatio] = useState(0.6);
   const [leftWidth, setLeftWidth] = useState(260);
-
-  // 3. 右パネルの幅 (px)
   const [rightWidth, setRightWidth] = useState(280);
-
-  // ドラッグ管理
   const isDraggingSplitRef = useRef(false);
   const isDraggingLeftRef = useRef(false);
   const isDraggingRightRef = useRef(false);
-  
-  // コンテナ参照 (上下分割計算用)
   const workspaceRef = useRef<HTMLDivElement>(null);
-
 
   // =========================================================
   // ハンドラ定義
@@ -59,38 +120,29 @@ const EditorView: React.FC<EditorViewProps> = ({
 
   const handleMouseDown = useCallback((type: "split" | "left" | "right") => (e: React.MouseEvent) => {
     e.preventDefault();
-    
     if (type === "split") isDraggingSplitRef.current = true;
     if (type === "left") isDraggingLeftRef.current = true;
     if (type === "right") isDraggingRightRef.current = true;
-
     document.body.style.cursor = type === "split" ? "row-resize" : "col-resize";
-
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
   }, []);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    // 1. 上下分割 (workspace全体に対する比率)
     if (isDraggingSplitRef.current && workspaceRef.current) {
       const rect = workspaceRef.current.getBoundingClientRect();
       const relativeY = e.clientY - rect.top;
       let newRatio = relativeY / rect.height;
-      // 制限
       if (newRatio < 0.2) newRatio = 0.2;
       if (newRatio > 0.8) newRatio = 0.8;
       setSplitRatio(newRatio);
     }
-
-    // 2. 左パネル幅
     if (isDraggingLeftRef.current) {
       let newWidth = e.clientX;
       if (newWidth < 150) newWidth = 150;
       if (newWidth > 500) newWidth = 500;
       setLeftWidth(newWidth);
     }
-
-    // 3. 右パネル幅
     if (isDraggingRightRef.current) {
       let newWidth = window.innerWidth - e.clientX;
       if (newWidth < 200) newWidth = 200;
@@ -104,7 +156,6 @@ const EditorView: React.FC<EditorViewProps> = ({
     isDraggingLeftRef.current = false;
     isDraggingRightRef.current = false;
     document.body.style.cursor = "";
-
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
   }, [handleMouseMove]);
@@ -116,6 +167,21 @@ const EditorView: React.FC<EditorViewProps> = ({
     };
   }, [handleMouseMove, handleMouseUp]);
 
+  // ★ ポップオーバーの外側クリックで閉じる
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setIsGridPopoverOpen(false);
+      }
+    };
+    if (isGridPopoverOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isGridPopoverOpen]);
+
 
   return (
     <div className="editor-container">
@@ -125,32 +191,26 @@ const EditorView: React.FC<EditorViewProps> = ({
         onGoHome={onGoHome}
         onExportProject={onExportProject}
         onImportProject={onImportProject}
-        onTogglePreview={onTogglePreview}
+        onTogglePreview={handleTogglePreview} // ★ 修正
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={setViewMode} // ★ 修正
       />
 
-      {isPreviewingFromContext ? (
+      {isPreviewing ? ( // ★ 修正
         <div className="preview-viewport">
           <Artboard />
         </div>
       ) : (
-        // ワークスペース全体 (縦方向Flex)
         <div className="editor-workspace-vertical" ref={workspaceRef}>
           
-          {/* =============================================
-              上段エリア (Left + Center + Right)
-              Design/Logicモード時は高さ100%、Split時は可変
-             ============================================= */}
           <div 
             className="workspace-upper-row"
             style={{ 
               height: viewMode === 'split' ? `${splitRatio * 100}%` : '100%',
-              flexShrink: 0 // サイズ固定用
+              flexShrink: 0
             }}
           >
             
-            {/* (1) 左パネル (Logic以外で表示) */}
             {viewMode !== "logic" && (
               <>
                 <div className="panel-left" style={{ width: leftWidth }}>
@@ -166,16 +226,27 @@ const EditorView: React.FC<EditorViewProps> = ({
               </>
             )}
 
-            {/* (2) 中央メイン (Artboard または Logicモード時のNodeEditor) */}
             <div className="panel-center">
+              
+              {viewMode !== "logic" && (
+                <div className="grid-controls-wrapper" ref={popoverRef}>
+                  <button 
+                    className="grid-toggle-button" 
+                    onClick={() => setIsGridPopoverOpen(prev => !prev)}
+                    title="グリッドとスナップの設定"
+                  >
+                    <GridIcon className="grid-icon" />
+                  </button>
+                  {isGridPopoverOpen && <GridPopover />}
+                </div>
+              )}
+
               <div className="workspace-content">
-                {/* Logicモードならここにノードエディタを表示 (サイドバー付き) */}
                 {viewMode === "logic" ? (
                   <div className="workspace-section logic-section" style={{ flex: 1 }}>
                     <NodeEditor />
                   </div>
                 ) : (
-                  /* Design/Splitモードならここにアートボードを表示 */
                   <div className="workspace-section design-section" style={{ flex: 1 }}>
                     <div className="canvas-viewport">
                       <Artboard />
@@ -185,7 +256,6 @@ const EditorView: React.FC<EditorViewProps> = ({
               </div>
             </div>
 
-            {/* (3) 右パネル (常に表示) */}
             <>
               <div 
                 className="resize-separator-vertical"
@@ -195,14 +265,14 @@ const EditorView: React.FC<EditorViewProps> = ({
                 <div className="resize-handle-pill-vertical" />
               </div>
               <div className="panel-right" style={{ width: rightWidth }}>
-                <PropertiesPanel />
+                {/* ★ 修正: onOpenBackgroundModal を渡す */}
+                <PropertiesPanel 
+                  onOpenBackgroundModal={onOpenBackgroundModal}
+                />
               </div>
             </>
           </div>
 
-          {/* =============================================
-              リサイズハンドル (Splitモード時のみ)
-             ============================================= */}
           {viewMode === 'split' && (
             <div 
               className="resize-separator-horizontal"
@@ -215,10 +285,6 @@ const EditorView: React.FC<EditorViewProps> = ({
             </div>
           )}
 
-          {/* =============================================
-              下段エリア (Node Editor)
-              Splitモード時のみ表示 (全幅)
-             ============================================= */}
           {viewMode === 'split' && (
             <div className="workspace-lower-row" style={{ flex: 1 }}>
               <div className="workspace-section logic-section" style={{ width: '100%', height: '100%' }}>
