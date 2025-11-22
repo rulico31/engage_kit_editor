@@ -1,6 +1,3 @@
-// src/components/icons/MinimizeIcon.tsx
-import React from "react";
-
 export const MinimizeIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

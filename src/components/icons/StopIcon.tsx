@@ -1,6 +1,3 @@
-// src/components/icons/StopIcon.tsx
-import React from "react";
-
 export const StopIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

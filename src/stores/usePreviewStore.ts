@@ -5,11 +5,12 @@ import type {
   PreviewState, 
   VariableState, 
   PreviewBackground,
-  NodeGraph
+  // ★ 修正: NodeGraph を削除
 } from '../types';
 import { triggerEvent, type ActiveListeners } from '../logicEngine';
 import { usePageStore } from './usePageStore';
-import { useRef } from 'react';
+// ★ 修正: useRef を削除
+// import { useRef } from 'react';
 
 const initialPreviewBackground: PreviewBackground = { src: null, position: undefined };
 

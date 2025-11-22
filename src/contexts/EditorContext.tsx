@@ -13,7 +13,7 @@ import type {
 } from "../types";
 import {
   type Node,
-  type Edge,
+  // ★ 修正: Edge を削除
   type OnNodesChange,
   type OnEdgesChange,
   type OnConnect,

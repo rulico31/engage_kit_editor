@@ -1,6 +1,3 @@
-// src/components/icons/SlashIcon.tsx
-import React from "react";
-
 export const SlashIcon = ({ className = "grid-slash-icon" }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

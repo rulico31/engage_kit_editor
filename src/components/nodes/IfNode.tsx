@@ -3,26 +3,14 @@
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import "./IfNode.css";
-// (★ 削除)
-// import type { PlacedItemType } from "../../types";
-import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
+import type { NodePropertyConfig } from "../../types";
 
-// (★ 変更) Props の型から不要なものを削除
-interface IfNodeProps extends NodeProps {
-  // (★ 削除) placedItems: PlacedItemType[];
-  // (★ 削除) onDataChange: (nodeId: string, dataUpdate: any) => void;
-}
+// ★ 修正: id を削除
+interface IfNodeProps extends NodeProps {}
 
 const IfNode: React.FC<IfNodeProps> = ({
-  id,
   data,
-  // (★ 削除) placedItems,
-  // (★ 削除) onDataChange,
 }) => {
-  // (★ 削除) すべてのハンドラを削除
-  // const handleTargetChange = ...
-  // const handleConditionChange = ...
-
   return (
     <div className="if-node">
       {/* (1) 入力ハンドル (左) */}
@@ -31,22 +19,6 @@ const IfNode: React.FC<IfNodeProps> = ({
       {/* ノードの本文 */}
       <div className="if-node-label">{data.label || "もし〜なら"}</div>
       
-      {/* (★ 削除) ここからドロップダウンUIをすべて削除 */}
-      {/*
-      <div className="if-node-condition">
-        <label>IF (もし):</label>
-        <select ... >
-          ...
-        </select>
-        
-        <label>IS (が):</label>
-        <select ... >
-          ...
-        </select>
-      </div>
-      */}
-      {/* (★ 削除) ここまで */}
-
       {/* (3) 出力ハンドル (True / False) */}
       <div className="if-node-output-group">
         <div className="if-node-output-label">True (真)</div>
@@ -73,7 +45,6 @@ const IfNode: React.FC<IfNodeProps> = ({
 
 export default memo(IfNode);
 
-// ★ 以下をファイル末尾に追加
 export const ifNodeConfig: NodePropertyConfig = {
   title: "ノード設定",
   properties: [
@@ -87,11 +58,10 @@ export const ifNodeConfig: NodePropertyConfig = {
         { label: "変数の値", value: "variable" },
       ],
     },
-    // --- アイテムのプロパティ ---
     {
       name: "conditionTargetId",
       label: "IF (もし):",
-      type: "select", // (PropertiesPanel側で placedItems から options を生成)
+      type: "select",
       condition: {
         name: "conditionSource",
         value: "item",
@@ -111,7 +81,6 @@ export const ifNodeConfig: NodePropertyConfig = {
         value: "item",
       },
     },
-    // --- 変数の値 ---
     {
       name: "variableName",
       label: "変数名:",
@@ -139,7 +108,7 @@ export const ifNodeConfig: NodePropertyConfig = {
     {
       name: "comparison",
       label: "比較:",
-      type: "select", // (PropertiesPanel側で comparisonType に応じて options を生成)
+      type: "select",
       defaultValue: "==",
       condition: {
         name: "conditionSource",

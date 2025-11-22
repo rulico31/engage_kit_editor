@@ -7,12 +7,11 @@ import ReactFlow, {
   useReactFlow,
   type Node,
   type NodeProps,
-  ReactFlowProvider, // ★ Providerをインポート
+  ReactFlowProvider, 
 } from "reactflow";
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import NodeToolboxItem from "./NodeToolboxItem";
-// import { useEditorContext } from "../contexts/EditorContext"; // 削除
 import "reactflow/dist/style.css";
 import "./NodeEditor.css";
 
@@ -34,24 +33,16 @@ interface NodeToolDragItem { nodeType: string; nodeName: string; }
 type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
 
 // ★ 内部コンポーネント: ReactFlowProvider の子として動作する
-// useReactFlow() はこの中でしか使えないため分離する
 const NodeEditorContent: React.FC = () => {
-  // ★ 修正: ストアからの購読ロジックを修正 (安全な分離購読)
-  
-  // (A) activeLogicGraphId は selection ストアから取得
   const activeLogicGraphId = useSelectionStore((s) => s.activeLogicGraphId);
 
-  // (B) page store からは allItemLogics（ページに紐づく全ロジック群）を取得
   const { allItemLogics } = usePageStore((s) => {
     const page = s.selectedPageId ? s.pages[s.selectedPageId] : undefined;
     return { allItemLogics: page?.allItemLogics ?? {} };
   });
 
-  // (C) currentGraph を安全に決定（存在しなければ undefined）
-  // これにより、IDとロジック群の更新タイミングがズレてもクラッシュしない
   const currentGraph = activeLogicGraphId ? allItemLogics[activeLogicGraphId] : undefined;
 
-  // (D) アクション関数類は getState() で取り出す（関数だけなので購読は不要）
   const { 
     applyNodesChange: onNodesChange, 
     applyEdgesChange: onEdgesChange, 
@@ -61,11 +52,9 @@ const NodeEditorContent: React.FC = () => {
   
   const onNodeClick = useSelectionStore(state => state.handleNodeClick);
   
-  // currentGraph が undefined の場合、nodes も edges も undefined になり、安全にフォールバックする
   const nodes = currentGraph?.nodes;
   const edges = currentGraph?.edges;
   
-  // ★ useReactFlow は ReactFlowProvider の内部でのみ動作可能
   const { fitView, project } = useReactFlow();
   const dropRef = useRef<HTMLDivElement>(null);
 
@@ -103,7 +92,6 @@ const NodeEditorContent: React.FC = () => {
 
   useEffect(() => {
     if (nodes && nodes.length > 0) {
-      // 少し遅らせてfitViewすることで描画後のサイズに合わせる
       setTimeout(() => fitView({ duration: 200 }), 100);
     }
   }, [nodes ? nodes[0]?.id : undefined, fitView]);
@@ -119,11 +107,11 @@ const NodeEditorContent: React.FC = () => {
     waitForClickNode: (props: NodeProps) => <WaitForClickNode {...props} />,
   }), []); 
 
-  const handleNodeClick: NodeClickHandler = (event, node) => {
-    onNodeClick(node.id, node.data?.label); // ★ 修正: ?. で安全にアクセス
+  // ★ 修正: event を _event に変更
+  const handleNodeClick: NodeClickHandler = (_event, node) => {
+    onNodeClick(node.id, node.data?.label);
   };
 
-  // ★ 修正: nodes と edges が (currentGraph起因で) undefined の場合はフォールバック
   if (!nodes || !edges) return <div className="node-editor-placeholder">アイテムを選択してください</div>;
 
   return (
@@ -162,7 +150,6 @@ const NodeEditorContent: React.FC = () => {
   );
 };
 
-// ★ メインコンポーネント: Wrapperとして機能し、Providerを提供する
 const NodeEditor: React.FC = () => {
   return (
     <ReactFlowProvider>

@@ -1,7 +1,3 @@
-// src/components/icons/HomeIcon.tsx
-import React from "react";
-
-// (stroke-width 2.5 で少し太めに)
 export const HomeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
