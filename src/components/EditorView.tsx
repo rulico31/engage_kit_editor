@@ -1,7 +1,7 @@
 // src/components/EditorView.tsx
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import Header, { type ViewMode } from "./Header";
+import Header from "./Header";
 import Artboard from "./Artboard";
 import PropertiesPanel from "./PropertiesPanel";
 import NodeEditor from "./NodeEditor";
@@ -11,7 +11,9 @@ import { GridIcon } from "./icons/GridIcon";
 import { SlashIcon } from "./icons/SlashIcon";
 import "./GridPopover.css";
 
-// ★ Zustand ストアをインポート
+// ★ 修正: 未使用の ViewMode インポートを削除
+// import type { ViewMode } from "../types";
+
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePreviewStore } from "../stores/usePreviewStore";
 import { usePageStore } from "../stores/usePageStore";
@@ -22,10 +24,10 @@ interface EditorViewProps {
   onExportProject: () => void;
   onImportProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onOpenBackgroundModal: (itemId: string, src: string) => void;
-  onPublish: () => void; // ★ 追加: 埋め込み用コールバックの型定義
+  onPublish: () => void; 
 }
 
-// ★ グリッド/スナップ設定のポップオーバー
+// グリッド/スナップ設定のポップオーバー
 const GridPopover: React.FC = () => {
   const { gridSize, setGridSize, showGrid, setShowGrid } = useEditorSettingsStore(state => ({
     gridSize: state.gridSize,
@@ -84,7 +86,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   onExportProject,
   onImportProject,
   onOpenBackgroundModal,
-  onPublish, // ★ 追加: Propsから受け取る
+  onPublish, 
 }) => {
   
   const { 
@@ -223,7 +225,7 @@ const EditorView: React.FC<EditorViewProps> = ({
         onTogglePreview={handleTogglePreview}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        onPublish={onPublish} // ★ 追加: Headerに渡す
+        onPublish={onPublish}
       />
 
       {isPreviewing ? (

@@ -5,7 +5,7 @@ import type { SelectionEntry } from '../types';
 import type { Node } from 'reactflow';
 
 interface SelectionStoreState {
-  // ★ 変更: タブ管理と選択状態を分離
+  // タブ管理と選択状態を分離
   tabs: SelectionEntry[];        // プロパティパネルに表示するタブ一覧（履歴）
   selectedIds: string[];         // キャンバス上で選択されているアイテムID一覧
   
@@ -45,14 +45,11 @@ const initialState = {
   activeLogicGraphId: null,
 };
 
-export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
+// ★ 修正: 第二引数 get を削除 (使っていないため)
+export const useSelectionStore = create<SelectionStoreState>((set) => ({
   ...initialState,
   
   resetSelection: () => {
-    // 全選択解除するが、タブは残すかどうか？
-    // 通常「リセット」は選択解除を意味するので、selectedIdsのみクリアし、タブは残す方針とする
-    // ただし、ページ切り替え時などはタブもクリアしたい場合があるため、
-    // ここでは「完全リセット」として初期状態に戻す（タブも消える）
     set(initialState);
   },
   
@@ -82,10 +79,6 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
       }
 
       // 3. アクティブタブの更新
-      // 選択された(クリックされた)ものをアクティブにする
-      // 解除された場合でも、そのアイテムがまだタブにあればアクティブのままにするか、
-      // 最後に選択されたものをアクティブにするか。
-      // ここではシンプルに「クリックしたものをアクティブ化」する（選択解除操作であってもタブは見せる）
       return {
         tabs: newTabs,
         selectedIds: newSelectedIds,

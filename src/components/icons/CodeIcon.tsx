@@ -1,5 +1,4 @@
 // src/components/icons/CodeIcon.tsx
-import React from "react";
 
 export const CodeIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg

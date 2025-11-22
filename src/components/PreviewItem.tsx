@@ -1,15 +1,15 @@
 // src/components/PreviewItem.tsx
 
 import React from "react";
-// (★ 修正: NodeGraph も types からインポート)
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
-import { executeLogicGraph } from "../logicEngine";
-import "./PreviewItem.css"; // (専用のCSSをインポート)
+// ★ 修正: executeLogicGraph のインポートを削除
+// import { executeLogicGraph } from "../logicEngine";
+import "./PreviewItem.css"; 
+import { usePreviewStore } from "../stores/usePreviewStore"; // ★ ストアをインポート
 
-// (★ 修正: Props の型定義を更新)
 interface PreviewItemProps {
   item: PlacedItemType;
-  previewState: PreviewState; // (★ この行が重要です)
+  previewState: PreviewState;
   setPreviewState: (
     newState: PreviewState | ((prev: PreviewState) => PreviewState)
   ) => void;
@@ -19,58 +19,50 @@ interface PreviewItemProps {
 const PreviewItem: React.FC<PreviewItemProps> = ({
   item,
   previewState,
-  setPreviewState,
-  allItemLogics,
+  // setPreviewState, // ★ 使用しないため削除(Props定義には残すが無視)
+  // allItemLogics,   // ★ ストア側で処理するため基本不要だが互換性のため残す
 }) => {
-  const { id, name, x, y, width, height } = item;
+  const { id, name, width, height } = item;
 
-  // このアイテムに紐づくロジックグラフを取得
-  const logicGraph = allItemLogics[id];
+  // ★ ストアからイベントハンドラを取得
+  const onItemEvent = usePreviewStore(state => state.handleItemEvent);
 
-  // クリックイベントハンドラ
   const handleClick = () => {
-    // 1. "ボタンクリック時" のロジックグラフが存在するか確認
-    if (!logicGraph) return;
-
-    // 2. "btn-click" ノード (または "default-load" など) を探す
-    // (簡易的に、最初の eventNode をトリガーとします)
-    const eventNode = logicGraph.nodes.find(
-      (node) => node.type === "eventNode"
-    );
-    if (!eventNode) return;
-
-    // 3. ロジックエンジンを実行
-    executeLogicGraph(
-      eventNode.id,
-      logicGraph,
-      previewState, // (現在の状態を渡す)
-      setPreviewState // (状態更新関数を渡す)
-    );
+    // ★ ロジックエンジンを直接呼ぶのではなく、ストアのアクションを経由する
+    // これにより、triggerEvent が適切に呼び出され、状態管理が一元化される
+    if (name.includes("ボタン")) {
+        onItemEvent("click", id);
+    }
   };
 
-  // アイテムのタイプに応じてクラス名を変更 (例: ボタン)
   const itemClassName = `preview-item ${
     name.includes("ボタン") ? "is-button" : ""
   }`;
+  
+  const itemState = previewState[id];
+  // 万が一 state がない場合のフォールバック
+  if (!itemState) return null;
 
   return (
     <div
       className={itemClassName}
       style={{
         position: "absolute",
-        left: `${x}px`,
-        top: `${y}px`,
+        left: `${itemState.x}px`, // ★ item.x ではなく state から取得 (アニメーション対応)
+        top: `${itemState.y}px`,
         width: `${width}px`,
         height: `${height}px`,
         zIndex: 0,
+        opacity: itemState.opacity,
+        transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
+        transition: itemState.transition || 'none',
+        // プレビュー時はドラッグ無効などをCSSで制御
       }}
-      // (★ 修正: "ボタン" を含むアイテムのみ onClick をアタッチ)
-      onClick={name.includes("ボタン") ? handleClick : undefined}
+      onClick={handleClick}
     >
-      {name}
+      {item.data.text || name}
     </div>
   );
 };
 
 export default PreviewItem;
-

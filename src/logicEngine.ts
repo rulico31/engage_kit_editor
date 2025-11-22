@@ -14,7 +14,7 @@ export type ResumeListener = () => void;
 export type ActiveListeners = Map<string, ResumeListener[]>;
 
 /**
- * ロジック実行エンジン
+ * ロジック実行エンジン (内部処理用)
  */
 const processQueue = (
   executionQueue: string[],
@@ -34,7 +34,7 @@ const processQueue = (
     const node = allNodes.find((n) => n.id === nodeId);
     if (!node) continue;
 
-    console.log(`[LogicEngine] ⚡ 実行中: ${node.type} / ${node.id}`);
+    // console.log(`[LogicEngine] ⚡ 実行中: ${node.type} / ${node.id}`);
 
     // (1) アクションノード
     if (node.type === "actionNode") {
@@ -130,7 +130,7 @@ const processQueue = (
       pushNext(node.id, null, allEdges, nextQueue);
     }
     
-    // ★ 修正: (5) アニメーションノード (不透明度の相対値計算を修正)
+    // (5) アニメーションノード
     else if (node.type === "animateNode") {
       const { 
         targetItemId, 
@@ -142,7 +142,7 @@ const processQueue = (
         animationMode = 'absolute',
         loopMode = 'none',
         loopCount = 2,
-        relativeOperation = 'multiply' // ★ 追加 (multiply | subtract)
+        relativeOperation = 'multiply'
       } = node.data;
 
       if (targetItemId) {
@@ -154,23 +154,18 @@ const processQueue = (
           
           let cssProperty = '';
           const durationMs = (Number(durationS) + Number(delayS)) * 1000;
-          let toState: Partial<PreviewItemState>; // toState をここで宣言
+          let toState: Partial<PreviewItemState>;
 
-          // ループ再生（または1回再生）を管理する関数
           const playAnimation = (remaining: number) => {
-            
-            // 1.「開始状態」と「終了状態」を決定
             let fromState: PreviewItemState;
             
             if (animationMode === 'relative') {
-              // 相対モード: 開始状態 = 現在の状態
               fromState = { ...getPreviewState()[targetItemId], transition: 'none' };
               toState = { ...fromState };
               const numValue = Number(value || 0);
               
               if (animType === 'opacity') { 
                 cssProperty = 'opacity';
-                // ★ 修正: 乗算と減算を切り替え
                 if (relativeOperation === 'subtract') {
                   toState.opacity = fromState.opacity - numValue;
                 } else {
@@ -183,7 +178,6 @@ const processQueue = (
               else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = fromState.rotation + numValue; }
               
             } else {
-              // 絶対モード: 開始状態 = アイテムの初期状態
               fromState = {
                 ...getPreviewState()[targetItemId],
                 x: initialItem.x, y: initialItem.y, opacity: 1, scale: 1, rotation: 0,
@@ -203,8 +197,6 @@ const processQueue = (
               return;
             }
 
-            // ★ 修正: 「2回起動」防止チェック
-            // 絶対値モードで、かつ現在の状態がすでに目標値なら、リセットも再生もせず終了
             if (animationMode === 'absolute') {
               const current = getPreviewState()[targetItemId];
               if (
@@ -214,20 +206,16 @@ const processQueue = (
                 (animType === 'scale' && current.scale === toState.scale) ||
                 (animType === 'rotate' && current.rotation === toState.rotation)
               ) {
-                console.log("[LogicEngine] アニメーション: 既に目標値のためスキップ");
-                // 即座に次のノードへ
                 pushNext(node.id, null, allEdges, nextQueue);
                 return;
               }
             }
             
-            // 2. (リセット) アニメーションの「前」の状態に瞬時にセット
             setPreviewState({
               ...getPreviewState(),
               [targetItemId]: fromState,
             });
 
-            // 3. (再生) DOMがリセットされるのを待ってから「後」の状態をセット
             setTimeout(() => {
               setPreviewState({
                 ...getPreviewState(),
@@ -237,28 +225,23 @@ const processQueue = (
                   transition: `${cssProperty} ${durationS}s ${easing} ${delayS}s`
                 },
               });
-            }, 10); // 10ms
+            }, 10);
 
-            // 4. (続行またはループ) アニメーション終了を待つ
             setTimeout(() => {
               if (loopMode === 'count' && remaining > 1) {
                 const nextRemaining = remaining - 1;
                 playAnimation(nextRemaining);
               } else {
-                // 繰り返し終了。次のノードへ進む
                 const nextNode = findNextNode(node.id, null, allEdges);
                 if (nextNode) {
                   processQueue([nextNode], allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
                 }
               }
-            }, durationMs + 20); // リセット時間も考慮
+            }, durationMs + 20);
           };
 
-          // ★ アニメーション開始
           const initialPlays = (loopMode === 'count') ? Number(loopCount) : 1;
           playAnimation(initialPlays);
-
-          // animateNode は非同期で次のノードを呼ぶため、キュー処理はここで終了
           
         } else {
           pushNext(node.id, null, allEdges, nextQueue);
@@ -277,7 +260,6 @@ const processQueue = (
           processQueue([nextNode], allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
         }
       }, Number(durationS) * 1000);
-      // ここでキュー処理を終了
     }
 
     // (7) イベントノード
@@ -290,13 +272,10 @@ const processQueue = (
       const { targetItemId } = node.data;
       
       if (targetItemId) {
-        console.log(`[LogicEngine] 🛑 クリック待機中... ターゲット: ${targetItemId}`);
-        
         const nextNodeId = findNextNode(node.id, null, allEdges);
         
         if (nextNodeId) {
           const resumeFlow = () => {
-            console.log(`[LogicEngine] ▶️ 待機解除: フロー再開`);
             processQueue(
               [nextNodeId], 
               allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners
@@ -310,11 +289,9 @@ const processQueue = (
       } else {
         pushNext(node.id, null, allEdges, nextQueue);
       }
-      // ここでキュー処理を中断
     }
   }
 
-  // 次の同期キューがあれば処理
   if (nextQueue.length > 0) {
     processQueue(nextQueue, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
   }
@@ -338,7 +315,7 @@ export const triggerEvent = (
   eventName: string,
   targetItemId: string,
   currentPageGraph: NodeGraph,
-  placedItems: PlacedItemType[], // ★ 追加
+  placedItems: PlacedItemType[],
   getPreviewState: () => PreviewState,
   setPreviewState: (newState: PreviewState) => void,
   requestPageChange: (pageId: string) => void,
@@ -372,4 +349,22 @@ export const triggerEvent = (
         processQueue(nextQueue, nodes, edges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
     }
   }
+};
+
+// ★ 追加: PreviewItem.tsx から呼ばれる executeLogicGraph を実装
+export const executeLogicGraph = (
+  startNodeId: string,
+  graph: NodeGraph,
+  previewState: PreviewState,
+  setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void
+) => {
+  // 引数を使用することで TS6133 エラーを回避
+  console.warn(
+    "executeLogicGraph is deprecated.", 
+    startNodeId, 
+    graph, 
+    previewState, 
+    setPreviewState
+  );
+  console.warn("Use usePreviewStore.handleItemEvent instead.");
 };

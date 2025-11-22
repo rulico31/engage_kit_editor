@@ -1,7 +1,8 @@
 // src/stores/useEditorSettingsStore.ts
 
 import create from 'zustand';
-import type { ViewMode } from '../components/Header';
+// ★ 修正: インポート元を Header ではなく types に変更
+import type { ViewMode } from '../types';
 
 interface EditorSettingsStoreState {
   view: "home" | "editor";
@@ -10,7 +11,7 @@ interface EditorSettingsStoreState {
   isPreviewing: boolean;
   gridSize: number | null;
   
-  // ★ 追加: グリッド表示のON/OFF状態
+  // グリッド表示のON/OFF状態
   showGrid: boolean;
   
   // --- Actions ---
@@ -20,7 +21,7 @@ interface EditorSettingsStoreState {
   togglePreview: () => void;
   setGridSize: (size: number | null) => void;
   
-  // ★ 追加: グリッド表示の切り替えアクション
+  // グリッド表示の切り替えアクション
   setShowGrid: (show: boolean) => void;
   
   resetEditorSettings: () => void;

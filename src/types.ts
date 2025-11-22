@@ -1,4 +1,9 @@
+// src/types.ts
+
 import type { Node, Edge } from "reactflow";
+
+// ★ 追加: ヘッダーとエディタで共有する表示モードの型
+export type ViewMode = "design" | "logic" | "split";
 
 // アートボードに配置されたアイテムが持つデータの型
 export interface PlacedItemType {

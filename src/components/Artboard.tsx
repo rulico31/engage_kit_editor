@@ -262,7 +262,6 @@ const Artboard: React.FC = () => {
     handleBackgroundClick: state.handleBackgroundClick,
   }));
   
-  // ★ 修正: showGrid を取得
   const { isPreviewing, gridSize, showGrid } = useEditorSettingsStore(state => ({
     isPreviewing: state.isPreviewing,
     gridSize: state.gridSize,
@@ -284,7 +283,6 @@ const Artboard: React.FC = () => {
   const dragStartItemStates = useRef<Record<string, { x: number, y: number }>>({});
   const isDraggingRef = useRef(false);
 
-  // マウスダウン時に選択処理を行った場合、続くClickイベントでの選択解除（トグル）を防ぐためのフラグ
   const ignoreNextClickRef = useRef(false);
 
   const resizeInfoRef = useRef<{
@@ -293,8 +291,6 @@ const Artboard: React.FC = () => {
     direction: ResizeDirection;
   } | null>(null);
 
-  // ★ 修正: showGrid を判定条件に追加
-  // グリッドを表示するのは「プレビュー中でない」かつ「showGridがtrue」かつ「gridSizeが2px以上」の場合のみ
   const showGridOverlay = !isPreviewing && showGrid && gridSize !== null && gridSize > 2;
 
   const gridStyle = useMemo<React.CSSProperties>(() => {
@@ -388,7 +384,6 @@ const Artboard: React.FC = () => {
   drop(artboardRef); 
 
   const onArtboardItemSelect = useCallback((e: React.MouseEvent, id: string, label: string) => {
-    // マウスダウン時(or 移動時)に既に選択処理が行われた場合は、ここでの処理（トグル等）をスキップする
     if (ignoreNextClickRef.current) {
       ignoreNextClickRef.current = false;
       return;
@@ -401,7 +396,6 @@ const Artboard: React.FC = () => {
   const onArtboardItemDragStart = useCallback((e: React.MouseEvent, itemId: string) => {
     if (isPreviewing) return;
     
-    // フラグをリセット
     ignoreNextClickRef.current = false;
 
     const item = placedItems.find((p) => p.id === itemId);
@@ -412,10 +406,8 @@ const Artboard: React.FC = () => {
     const isMultiSelect = e.ctrlKey || e.metaKey;
 
     if (selectedIds.includes(itemId)) {
-      // 既に選択済みのアイテムをクリックした場合
       targets = new Set(selectedIds);
     } else {
-      // 未選択のアイテムをクリックした場合
       handleItemSelect(itemId, item.data.text || item.name, isMultiSelect);
       ignoreNextClickRef.current = true;
 
@@ -522,8 +514,6 @@ const Artboard: React.FC = () => {
     const dx = (e.clientX - startPos.x) / zoomLevel;
     const dy = (e.clientY - startPos.y) / zoomLevel;
     
-    let newX = startItem.x;
-    let newY = startItem.y;
     let newWidth = startItem.width;
     let newHeight = startItem.height;
     
@@ -537,19 +527,22 @@ const Artboard: React.FC = () => {
     const snappedWidth = snapToGrid(newWidth, gridSize, minDim);
     const snappedHeight = snapToGrid(newHeight, gridSize, minDim);
     
-    let snappedX = startItem.x;
-    let snappedY = startItem.y;
+    // ★ 修正: newX, newY を計算式の中で直接使用し、変数を削除
+    // let snappedX = startItem.x;
+    // let snappedY = startItem.y;
 
-    if (direction.includes("left")) {
-      snappedX = snapToGrid(startItem.x + (startItem.width - snappedWidth), gridSize);
-    }
-    if (direction.includes("top")) {
-      snappedY = snapToGrid(startItem.y + (startItem.height - snappedHeight), gridSize);
-    }
+    // ↓↓↓ 直接計算と代入を行う形に修正 ↓↓↓
+    const finalX = direction.includes("left") 
+        ? snapToGrid(startItem.x + (startItem.width - snappedWidth), gridSize) 
+        : startItem.x;
+        
+    const finalY = direction.includes("top") 
+        ? snapToGrid(startItem.y + (startItem.height - snappedHeight), gridSize)
+        : startItem.y;
 
     updateItem(startItem.id, {
-      x: snappedX,
-      y: snappedY,
+      x: finalX,
+      y: finalY,
       width: snappedWidth,
       height: snappedHeight,
     }, true);
@@ -653,7 +646,6 @@ const Artboard: React.FC = () => {
         }}
         onClick={handleBackgroundClick}
       >
-        {/* ★ グリッドオーバーレイ */}
         {showGridOverlay && <div className="artboard-grid-overlay" style={gridStyle} />}
 
         {renderChildren(undefined)}

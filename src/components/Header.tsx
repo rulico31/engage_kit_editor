@@ -4,15 +4,17 @@ import React, { useState, useEffect, useCallback } from "react";
 import "./Header.css";
 
 import { HomeIcon } from "./icons/HomeIcon";
-// import { SaveIcon } from "./icons/SaveIcon"; // 下記で使用
-import { UploadIcon } from "./icons/UploadIcon"; // 既存のImportボタン用
+// import { SaveIcon } from "./icons/SaveIcon"; 
+// import { UploadIcon } from "./icons/UploadIcon"; // ★ 削除: 未使用のため
 import { PlayIcon } from "./icons/PlayIcon";
 import { StopIcon } from "./icons/StopIcon";
 import { MaximizeIcon } from "./icons/MaximizeIcon";
 import { MinimizeIcon } from "./icons/MinimizeIcon";
 import { UndoIcon } from "./icons/UndoIcon";
 import { RedoIcon } from "./icons/RedoIcon";
-import { CodeIcon } from "./icons/CodeIcon"; // ★ 追加
+import { CodeIcon } from "./icons/CodeIcon"; 
+
+import type { ViewMode } from "../types"; // ★ 変更: types.tsからインポート
 
 // ★ 追加: クラウドアイコン（保存用）
 const CloudIcon = ({ className }: { className?: string }) => (
@@ -25,9 +27,7 @@ const CloudIcon = ({ className }: { className?: string }) => (
 
 // ★ ストアからアクションを取得するためのインポート
 import { usePageStore } from "../stores/usePageStore";
-import { useProjectStore } from "../stores/useProjectStore"; // ★ 追加
-
-export type ViewMode = "design" | "logic" | "split";
+import { useProjectStore } from "../stores/useProjectStore"; 
 
 interface HeaderProps {
   projectName: string;
@@ -37,11 +37,9 @@ interface HeaderProps {
   onImportProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onTogglePreview: () => void;
   
-  // ViewMode型を使用
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
 
-  // ★ 追加
   onPublish: () => void;
 }
 
@@ -49,12 +47,13 @@ const Header: React.FC<HeaderProps> = ({
   projectName,
   isPreviewing,
   onGoHome,
-  onExportProject,
-  onImportProject,
+  // ★ 修正: 未使用変数のエラー回避のため _ をつける (あるいは削除する)
+  onExportProject: _onExportProject, 
+  onImportProject: _onImportProject,
   onTogglePreview,
   viewMode,
   onViewModeChange,
-  onPublish, // ★ 追加
+  onPublish,
 }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -176,7 +175,7 @@ const Header: React.FC<HeaderProps> = ({
               {isSaving ? "保存中..." : "保存"}
             </button>
 
-            {/* ★ 追加: 埋め込みコード発行ボタン */}
+            {/* 埋め込みコード発行ボタン */}
             <button 
               className="header-button" 
               onClick={onPublish}

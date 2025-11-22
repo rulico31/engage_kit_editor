@@ -12,13 +12,12 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({
-  onNewProject, // (注: App.tsxでの実装変更に伴い、これは使わず内部で createProject を呼ぶ形にします)
+  onNewProject: _onNewProject, // ★ 修正: 未使用のため _ を付与
   onImportProject,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user, signOut } = useAuthStore();
   
-  // ★ ProjectStore を使用
   const { 
     savedProjects, 
     fetchProjects, 
