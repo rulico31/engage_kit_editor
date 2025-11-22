@@ -3,30 +3,25 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import ToolboxItem from "./ToolboxItem";
 import ContentBrowser from "./ContentBrowser";
-// import { useEditorContext } from "../contexts/EditorContext"; // 削除
-
-// ★ Zustand ストアをインポート
+import { LayerPanel } from "./LayerPanel"; // ★ 新規
 import { usePageStore } from "../stores/usePageStore";
-
-// ★ 新しいCSSファイルをインポート
 import "./LeftPanel.css";
 
+type LeftTab = 'tools' | 'layers';
+
 export const LeftPanel: React.FC = React.memo(() => {
-  // ★ 修正: ストアから購読
   const { 
     pageInfoList, 
     selectedPageId, 
     onSelectPage, 
     onAddPage 
   } = usePageStore(state => ({
-    // 派生状態 (セレクタで計算)
     pageInfoList: state.pageOrder.map(id => ({ id: id, name: state.pages[id]?.name || "無題" })),
     selectedPageId: state.selectedPageId,
     onSelectPage: state.setSelectedPageId,
-    onAddPage: state.addPage, // (★ addPage はプロンプトを必要とする...ストアの実装を修正)
+    onAddPage: state.addPage,
   }));
 
-  // ★ 修正: addPage のラップ
   const handleAddPageClick = () => {
     const newPageName = prompt("新しいページ名を入力してください:", `Page ${pageInfoList.length + 1}`);
     if (newPageName) {
@@ -34,9 +29,11 @@ export const LeftPanel: React.FC = React.memo(() => {
     }
   };
 
-  // 上部（ツールボックス）の高さ比率
-  const [splitRatio, setSplitRatio] = useState(0.4);
-  
+  // タブ状態
+  const [activeTab, setActiveTab] = useState<LeftTab>('tools');
+
+  // リサイズ比率
+  const [splitRatio, setSplitRatio] = useState(0.5);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
@@ -50,14 +47,11 @@ export const LeftPanel: React.FC = React.memo(() => {
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDraggingRef.current || !containerRef.current) return;
-    
     const rect = containerRef.current.getBoundingClientRect();
     const relativeY = e.clientY - rect.top;
     let newRatio = relativeY / rect.height;
-
     if (newRatio < 0.2) newRatio = 0.2;
     if (newRatio > 0.8) newRatio = 0.8;
-    
     setSplitRatio(newRatio);
   }, []);
 
@@ -75,26 +69,41 @@ export const LeftPanel: React.FC = React.memo(() => {
     };
   }, [handleMouseMove, handleMouseUp]);
 
-
   return (
-    <div 
-      ref={containerRef} 
-      className="left-panel-container" // CSSクラスを使用
-    >
-      {/* (A) 上部: ツールボックス */}
-      <div 
-        style={{ height: `${splitRatio * 100}%` }}
-        className="tool-list-container panel-content"
-      >
-        <div className="tool-list" style={{ overflowY: "auto", flex: 1, paddingRight: "4px" }}>
-          <ToolboxItem name="テキスト" />
-          <ToolboxItem name="ボタン" />
-          <ToolboxItem name="画像" />
-          <ToolboxItem name="テキスト入力欄" />
-        </div>
+    <div ref={containerRef} className="left-panel-container">
+      {/* 上部: タブ切り替えエリア */}
+      <div className="left-panel-tabs">
+        <button 
+          className={`left-panel-tab ${activeTab === 'tools' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tools')}
+        >
+          ツール
+        </button>
+        <button 
+          className={`left-panel-tab ${activeTab === 'layers' ? 'active' : ''}`}
+          onClick={() => setActiveTab('layers')}
+        >
+          レイヤー
+        </button>
+      </div>
+
+      {/* 上部コンテンツエリア */}
+      <div style={{ height: `${splitRatio * 100}%` }} className="panel-content-area">
+        {activeTab === 'tools' ? (
+          <div className="tool-list-container">
+            <div className="tool-list">
+              <ToolboxItem name="テキスト" />
+              <ToolboxItem name="ボタン" />
+              <ToolboxItem name="画像" />
+              <ToolboxItem name="テキスト入力欄" />
+            </div>
+          </div>
+        ) : (
+          <LayerPanel />
+        )}
       </div>
       
-      {/* ★ 修正: CSSクラス (.left-panel-separator) を適用 */}
+      {/* リサイズバー */}
       <div 
         className="left-panel-separator"
         onMouseDown={handleMouseDown}
@@ -103,21 +112,13 @@ export const LeftPanel: React.FC = React.memo(() => {
         <div className="left-panel-handle" />
       </div>
       
-      {/* (B) 下部: コンテンツブラウザ */}
-      <div 
-        style={{ 
-          flex: 1, 
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column"
-        }}
-        className="panel-content"
-      >
+      {/* 下部: コンテンツブラウザ */}
+      <div style={{ flex: 1, overflow: "hidden" }} className="panel-content-area">
         <ContentBrowser
           pages={pageInfoList}
           selectedPageId={selectedPageId}
           onSelectPage={onSelectPage}
-          onAddPage={handleAddPageClick} // ★ 修正
+          onAddPage={handleAddPageClick}
         />
       </div>
     </div>

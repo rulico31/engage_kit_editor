@@ -1,13 +1,13 @@
+// src/components/PropertiesPanel.tsx
+
 import React, { useState, useRef, useEffect } from "react";
 import type { Node } from "reactflow";
 import "./PropertiesPanel.css";
 import "./NodePropertiesEditor.css";
-// import { useEditorContext } from "../contexts/EditorContext"; // 削除
 import type { 
   NodePropertyConfig, 
   PropertyConfig, 
   PropertySelectOption,
-  PageInfo, // ★ インポート
   PlacedItemType, // ★ インポート
 } from "../types";
 
@@ -24,6 +24,9 @@ import { waitForClickNodeConfig } from "./nodes/WaitForClickNode";
 // ★ Zustand ストアをインポート
 import { usePageStore } from "../stores/usePageStore";
 import { useSelectionStore } from "../stores/useSelectionStore";
+
+// ★ Supabaseクライアントをインポート (画像アップロード用)
+import { supabase } from "../lib/supabaseClient";
 
 // ★ ノードタイプと設定を紐付けるマップ
 const nodeConfigMap: Record<string, NodePropertyConfig | NodePropertyConfig[]> = {
@@ -67,9 +70,10 @@ interface InspectorTabsProps {
 }
 const InspectorTabs: React.FC<InspectorTabsProps> = () => {
   
-  const { selection, activeTabId, handleTabSelect, handleTabClose } = useSelectionStore(
+  // ★ 変更: selection ではなく tabs を取得
+  const { tabs, activeTabId, handleTabSelect, handleTabClose } = useSelectionStore(
     (s) => ({
-      selection: s.selection,
+      tabs: s.tabs,
       activeTabId: s.activeTabId,
       handleTabSelect: s.handleTabSelect,
       handleTabClose: s.handleTabClose,
@@ -81,26 +85,31 @@ const InspectorTabs: React.FC<InspectorTabsProps> = () => {
   useEffect(() => {
     const container = tabsContainerRef.current;
     if (!container) return;
+    
     const handleWheel = (e: WheelEvent) => {
-      if (e.deltaX !== 0) return;
+      // 縦スクロールの入力（マウスホイール）があった場合
       if (e.deltaY !== 0) {
+        // 親要素へのスクロール伝播などを防ぎ、横スクロールに変換する
         e.preventDefault();
-        container.scrollLeft -= e.deltaY;
+        // スクロール量を加算（+=）することで、ホイール下回転で右へ進む自然な挙動にする
+        container.scrollLeft += e.deltaY;
       }
     };
+    
+    // passive: false にしないと preventDefault が効かない
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
       container.removeEventListener("wheel", handleWheel);
     };
   }, []);
   
-  if (selection.length === 0) {
+  if (tabs.length === 0) {
     return null; 
   }
 
   return (
     <div className="inspector-tabs-container" ref={tabsContainerRef}>
-      {selection.map((entry) => (
+      {tabs.map((entry) => (
         <div
           key={entry.id}
           className={`inspector-tab ${entry.id === activeTabId ? "is-active" : ""}`}
@@ -364,6 +373,9 @@ const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = ({
   const [localY, setLocalY] = useState(item.y);
   const [localWidth, setLocalWidth] = useState(item.width);
   const [localHeight, setLocalHeight] = useState(item.height);
+  
+  // ★ アップロード中の状態管理
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     setLocalX(item.x);
@@ -441,66 +453,105 @@ const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = ({
   const handleBlur = () => { /* (テキスト入力欄は onBlur で何もしない) */ };
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => { e.target.select(); };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ★ Supabase Storage へのアップロード処理に変更
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // ファイル形式チェック
     if (!file.type.startsWith("image/")) {
       alert("画像ファイルを選択してください (jpg, png, gifなど)");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const base64data = loadEvent.target?.result;
-      if (typeof base64data === "string") {
-        
-        const img = new Image();
-        img.onload = () => {
-          const MAX_UPLOAD_WIDTH = 450;
-          const MAX_UPLOAD_HEIGHT = 300;
 
-          let newWidth = img.width;
-          let newHeight = img.height;
-          const newAspectRatio = img.height / img.width;
+    // 簡易サイズチェック (例: 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("ファイルサイズは5MB以下にしてください。");
+      return;
+    }
 
-          const widthRatio = img.width / MAX_UPLOAD_WIDTH;
-          const heightRatio = img.height / MAX_UPLOAD_HEIGHT;
+    setIsUploading(true);
 
-          if (widthRatio > 1 || heightRatio > 1) {
-            if (widthRatio > heightRatio) {
-              newWidth = MAX_UPLOAD_WIDTH;
-              newHeight = img.height * (MAX_UPLOAD_WIDTH / img.width);
-            } else {
-              newHeight = MAX_UPLOAD_HEIGHT;
-              newWidth = img.width * (MAX_UPLOAD_HEIGHT / img.height);
-            }
-          }
+    try {
+      // 1. ユニークなファイル名を生成 (タイムスタンプ + ランダム文字列 + 拡張子)
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `${fileName}`; // バケット直下に配置
 
-          newWidth = Math.round(newWidth);
-          newHeight = Math.round(newHeight);
+      // 2. Supabase Storage にアップロード
+      const { error: uploadError } = await supabase.storage
+        .from('project-assets')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
-          onItemUpdate(item.id, {
-            data: { 
-              ...item.data, 
-              src: base64data,
-              originalAspectRatio: newAspectRatio,
-              keepAspectRatio: true,
-              isTransparent: false,
-            },
-            width: newWidth,
-            height: newHeight,
-          });
-        };
-        img.onerror = () => {
-          alert("画像の読み込み中にエラーが発生しました。");
-        };
-        img.src = base64data;
+      if (uploadError) {
+        throw uploadError;
       }
-    };
-    reader.onerror = () => {
-      alert("ファイルの読み込みに失敗しました。");
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+
+      // 3. 公開URLを取得
+      const { data: { publicUrl } } = supabase.storage
+        .from('project-assets')
+        .getPublicUrl(filePath);
+
+      // 4. 画像をプリロードしてサイズを取得 (既存ロジック流用)
+      const img = new Image();
+      img.onload = () => {
+        const MAX_UPLOAD_WIDTH = 450;
+        const MAX_UPLOAD_HEIGHT = 300;
+
+        let newWidth = img.width;
+        let newHeight = img.height;
+        const newAspectRatio = img.height / img.width;
+
+        const widthRatio = img.width / MAX_UPLOAD_WIDTH;
+        const heightRatio = img.height / MAX_UPLOAD_HEIGHT;
+
+        if (widthRatio > 1 || heightRatio > 1) {
+          if (widthRatio > heightRatio) {
+            newWidth = MAX_UPLOAD_WIDTH;
+            newHeight = img.height * (MAX_UPLOAD_WIDTH / img.width);
+          } else {
+            newHeight = MAX_UPLOAD_HEIGHT;
+            newWidth = img.width * (MAX_UPLOAD_HEIGHT / img.height);
+          }
+        }
+
+        newWidth = Math.round(newWidth);
+        newHeight = Math.round(newHeight);
+
+        // 5. ストアを更新 (URLを保存)
+        onItemUpdate(item.id, {
+          data: { 
+            ...item.data, 
+            src: publicUrl, // ★ ここにURLが入る
+            originalAspectRatio: newAspectRatio,
+            keepAspectRatio: true,
+            isTransparent: false,
+          },
+          width: newWidth,
+          height: newHeight,
+        });
+        
+        setIsUploading(false);
+      };
+      
+      img.onerror = () => {
+        alert("アップロードされた画像の読み込みに失敗しました。");
+        setIsUploading(false);
+      };
+      
+      // URLをセットしてロード開始
+      img.src = publicUrl;
+
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      alert("画像のアップロードに失敗しました: " + error.message);
+      setIsUploading(false);
+    } finally {
+      e.target.value = ""; // inputをリセット
+    }
   };
   
   const handleImageRemove = () => {
@@ -644,12 +695,17 @@ const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = ({
               style={{ display: "none" }}
               accept="image/*"
               onChange={handleImageUpload}
+              disabled={isUploading} // アップロード中は無効化
             />
             <label
               htmlFor={`file-input-${item.id}`}
               className="prop-button"
+              style={{ 
+                opacity: isUploading ? 0.6 : 1, 
+                cursor: isUploading ? 'not-allowed' : 'pointer' 
+              }}
             >
-              画像をアップロード
+              {isUploading ? "アップロード中..." : "画像をアップロード"}
             </label>
           </div>
           
@@ -664,6 +720,7 @@ const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = ({
               <button
                 className="prop-button-danger"
                 onClick={handleImageRemove}
+                disabled={isUploading}
               >
                 画像を削除
               </button>
@@ -871,7 +928,6 @@ const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = ({
     </div>
   );
 };
-// ★★★ 新しいコンポーネントはここまで ★★★
 
 
 // --- (C) メインの PropertiesPanel (UIスイッチャー) ---
@@ -881,13 +937,13 @@ const PropertiesPanel: React.FC<{
   onOpenBackgroundModal
 }) => {
   
-  // ★ 修正: これらのフックは「常に」PropertiesPanelのトップレベルで呼ばれる
+  // ★ 修正: tabs と activeTabId を取得
   const { 
-    selection, 
+    tabs, 
     activeTabId, 
     activeLogicGraphId 
   } = useSelectionStore(state => ({
-    selection: state.selection,
+    tabs: state.tabs,
     activeTabId: state.activeTabId,
     activeLogicGraphId: state.activeLogicGraphId,
   }));
@@ -913,7 +969,8 @@ const PropertiesPanel: React.FC<{
     };
   });
   
-  const activeEntry = selection.find((s) => s.id === activeTabId);
+  // ★ 変更: selection ではなく tabs から active なものを探す
+  const activeEntry = tabs.find((s) => s.id === activeTabId);
 
   let content = null;
 
@@ -922,10 +979,6 @@ const PropertiesPanel: React.FC<{
     const item = placedItems.find((p) => p.id === activeEntry.id);
     
     if (item) {
-      // ★★★ ここが修正点 ★★★
-      // useState を直接呼ぶ代わりに、分離した ItemPropertiesEditor コンポーネントをレンダリングする
-      // key={item.id} を渡すことで、選択アイテムが切り替わったときに
-      // 内部の useState が正しくリセット（再マウント）される
       content = (
         <ItemPropertiesEditor
           key={item.id} 
@@ -943,7 +996,6 @@ const PropertiesPanel: React.FC<{
   // (2) ノードが選択されている場合
   else if (activeEntry && activeEntry.type === 'node') {
     
-    // (このロジックはストア間のタイミング問題を防ぐため、元のまま維持)
     if (!activeLogicGraphId || !allItemLogics) {
       content = (
         <div className="properties-panel-content">

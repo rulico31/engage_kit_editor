@@ -3,11 +3,14 @@ import type { Node, Edge } from "reactflow";
 // アートボードに配置されたアイテムが持つデータの型
 export interface PlacedItemType {
   id: string;
-  name: string; // (内部的な種類名: "テキスト", "画像" など)
+  name: string; // (内部的な種類名: "テキスト", "画像", "group" など)
   x: number;
   y: number;
   width: number;
   height: number;
+  // ★ 追加: グルーピング用ID (親グループのID)
+  groupId?: string;
+  
   data: {
     text: string; // (ユーザーが表示・編集するテキスト)
     src: string | null; // (画像ソース)
@@ -23,8 +26,9 @@ export interface PlacedItemType {
     isTransparent?: boolean;
     isArtboardBackground?: boolean;
     artboardBackgroundPosition?: string;
+    artboardBackgroundSize?: string;
     
-    // ★ 追加: 文字色
+    // 文字色
     color?: string;
 
     [key: string]: any; // 将来的な他のデータ
@@ -49,11 +53,8 @@ export type PreviewState = Record<string, PreviewItemState>;
 
 /**
  * プロジェクト全体で共有される変数の状態
- * (例: { "score": 10, "username": "Taro" })
  */
 export type VariableState = Record<string, any>;
-
-// (ここからページ管理用の型定義)
 
 // React Flow のノードグラフ
 export interface NodeGraph {
@@ -72,8 +73,8 @@ export interface PageData {
 // プロジェクト全体のデータ構造 (保存/読込用)
 export interface ProjectData {
   projectName: string;
-  pages: Record<string, PageData>; // ページIDをキーにしたマップ
-  pageOrder: string[]; // ページの順序を管理するID配列
+  pages: Record<string, PageData>; 
+  pageOrder: string[]; 
   variables: VariableState;
 }
 
@@ -98,8 +99,6 @@ export interface PreviewBackground {
   position: string | undefined;
 }
 
-// ★ --- ここからタスク1で追加 --- ★
-
 // UIコントロールの種類
 export type PropertyControlType = 
   | 'text' 
@@ -107,7 +106,7 @@ export type PropertyControlType =
   | 'textarea' 
   | 'select' 
   | 'checkbox' 
-  | 'color'; // (PropertiesPanel.tsx ですでにカラーピッカーを実装済みの前提)
+  | 'color';
 
 // select 用の選択肢の型
 export interface PropertySelectOption {
@@ -117,19 +116,13 @@ export interface PropertySelectOption {
 
 // 1つのUIコントロール（プロパティ）を定義する型
 export interface PropertyConfig {
-  name: string; // (data オブジェクトのキーと一致。例: "durationS")
-  label: string; // (UI上の表示ラベル。例: "遅延 (秒)")
+  name: string;
+  label: string;
   type: PropertyControlType;
   defaultValue?: any;
   step?: number;
   min?: number;
-  
-  // select の場合にのみ使用
   options?: PropertySelectOption[];
-  
-  // 特定の条件でUIを表示/非表示にするための設定 (オプション)
-  // 例: { name: "animationMode", value: "relative" }
-  // (これが設定されていると、data.animationMode が "relative" の時だけこのUIを表示する)
   condition?: {
     name: string;
     value: any;
@@ -138,6 +131,16 @@ export interface PropertyConfig {
 
 // 各ノードが export するトップレベルの設定オブジェクトの型
 export interface NodePropertyConfig {
-  title: string; // (アコーディオンのタイトル。例: "遅延ノードの設定")
+  title: string;
   properties: PropertyConfig[];
+}
+
+// 保存済みプロジェクトの型
+export interface SavedProject {
+  id: string;
+  user_id: string;
+  name: string;
+  data: ProjectData;
+  created_at: string;
+  updated_at: string;
 }

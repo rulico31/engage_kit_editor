@@ -33,6 +33,13 @@
   flex: 1;
 }
 
+/* (★ 追加) 履歴コントロール */
+.history-controls {
+  display: flex;
+  gap: 2px;
+  margin-left: 4px;
+}
+
 /* (★ 追加) ビュー切り替えボタングループ */
 .view-mode-group {
   display: flex;
@@ -102,9 +109,13 @@
   background-color: #4a4a4a;
 }
 .header-button:disabled {
-  color: #777;
+  color: #555;
   cursor: not-allowed;
   background-color: transparent;
+}
+
+.header-button.icon-only {
+  padding: 6px;
 }
 
 .header-icon {

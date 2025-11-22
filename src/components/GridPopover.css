@@ -4,17 +4,17 @@
   position: absolute;
   top: 40px; /* ボタン(32px) + 隙間(8px) */
   right: 0;
-  width: 220px;
-  background-color: #3a3a3a;
-  border: 1px solid #555;
+  width: 240px; /* 少し幅を広げる */
+  background-color: #252526;
+  border: 1px solid #454545;
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   z-index: 100;
   color: #eee;
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .grid-popover-section {
@@ -23,33 +23,41 @@
   gap: 8px;
 }
 
+/* 上下に境界線を入れる場合に使用 */
+.grid-popover-divider {
+  height: 1px;
+  background-color: #3e3e3e;
+  width: 100%;
+}
+
 .grid-popover-label {
-  font-size: 0.8em;
+  font-size: 0.75em;
   font-weight: 600;
-  color: #aaa;
+  color: #999;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .grid-button-group {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 8px;
 }
 
 .grid-snap-button {
   font-family: inherit;
   font-size: 0.9em;
-  font-weight: bold;
-  height: 30px;
+  font-weight: 600;
+  height: 32px;
   padding: 0;
   
-  background-color: #2a2a2a;
+  background-color: #333;
   color: #ccc;
-  border: 1px solid #555;
+  border: 1px solid #444;
   border-radius: 4px;
   
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+  transition: all 0.2s;
   
   display: flex;
   align-items: center;
@@ -57,8 +65,9 @@
 }
 
 .grid-snap-button:hover {
-  background-color: #4a4a4a;
-  border-color: #777;
+  background-color: #444;
+  border-color: #666;
+  color: #fff;
 }
 
 .grid-snap-button.active {
@@ -73,10 +82,36 @@
   height: 14px;
 }
 
-/* ★ 修正: トグルスイッチのスタイルをすべて削除 */
-/* .grid-toggle-switch { ... } */
-/* .grid-toggle-switch input { ... } */
-/* .grid-slider { ... } */
-/* .grid-slider:before { ... } */
-/* .grid-toggle-switch input:checked + .grid-slider { ... } */
-/* .grid-toggle-switch input:checked + .grid-slider:before { ... } */
+/* ★ 追加: 表示/非表示トグルボタン用のスタイル */
+.grid-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.grid-visibility-button {
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.9em;
+  font-weight: 600;
+  height: 32px;
+  
+  background-color: #333;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.grid-visibility-button:hover {
+  background-color: #444;
+  border-color: #666;
+  color: #fff;
+}
+
+.grid-visibility-button.active {
+  background-color: #2a8a4a; /* 緑色 (ONの状態) */
+  border-color: #2a8a4a;
+  color: white;
+}

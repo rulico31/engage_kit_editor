@@ -1,48 +1,52 @@
 // src/components/BackgroundPositionerModal.tsx
 
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect } from 'react';
 import './BackgroundPositionerModal.css';
 
 interface BackgroundPositionerModalProps {
   imageUrl: string;
   onClose: () => void;
-  onConfirm: (position: string) => void;
+  onConfirm: (position: string, size: string) => void;
 }
 
-// アートボードの固定比率
-const ARTBOARD_ASPECT_RATIO = 1000 / 700; // 1.428...
+// アートボードの固定サイズ (比率計算用)
+const ARTBOARD_WIDTH = 1000;
+const ARTBOARD_HEIGHT = 700;
+const ARTBOARD_ASPECT_RATIO = ARTBOARD_WIDTH / ARTBOARD_HEIGHT;
 
 const BackgroundPositionerModal: React.FC<BackgroundPositionerModalProps> = ({
   imageUrl,
   onClose,
   onConfirm,
 }) => {
-  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
-  const [scaledImageSize, setScaledImageSize] = useState({ width: 0, height: 0 });
   
-  // X, Y のオフセット (px指定)
+  // 状態管理: ズーム倍率(scale) と 位置オフセット(x, y)
+  const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
+  const offsetStart = useRef({ x: 0, y: 0 });
   
   const overlayRef = useRef<HTMLDivElement>(null);
+  const windowRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  // 1. 画像が読み込まれたら、その「元サイズ」を取得
+  // 1. 画像読み込み完了時
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
-    setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
+    setImageNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
   };
 
-  // 2. 「切り抜き枠」と「プレビュー画像」のサイズを計算
+  // 2. 初期配置とウィンドウサイズ計算
   useLayoutEffect(() => {
-    if (overlayRef.current && imageSize.width > 0) {
+    if (overlayRef.current && imageNaturalSize.width > 0) {
       const overlayWidth = overlayRef.current.clientWidth;
       const overlayHeight = overlayRef.current.clientHeight;
 
-      // 2a. 「切り抜き枠」のサイズを決定 (画面の80%)
+      // 「切り抜き枠」のサイズ決定 (画面の80%)
       let frameW = overlayWidth * 0.8;
       let frameH = frameW / ARTBOARD_ASPECT_RATIO;
 
@@ -52,87 +56,109 @@ const BackgroundPositionerModal: React.FC<BackgroundPositionerModalProps> = ({
       }
       setWindowSize({ width: frameW, height: frameH });
 
-      // 2b. 「プレビュー画像」の 'cover' サイズを計算
-      // (アートボードの background-size: cover と同じ計算)
-      const imgRatio = imageSize.width / imageSize.height;
-      const frameRatio = frameW / frameH;
-
-      let imgScaledW: number, imgScaledH: number;
-      if (imgRatio > frameRatio) {
-        // 画像が枠より「横長」 -> 高さを枠に合わせる
-        imgScaledH = frameH;
-        imgScaledW = frameH * imgRatio;
-      } else {
-        // 画像が枠より「縦長」 -> 幅を枠に合わせる
-        imgScaledW = frameW;
-        imgScaledH = frameW / imgRatio;
-      }
-      setScaledImageSize({ width: imgScaledW, height: imgScaledH });
-      
-      // 初期位置を中央にセット (オフセット 0, 0 は中央寄せを意味する)
-      setOffset({ x: 0, y: 0 });
+      // 初期状態: 「全体を表示 (Fit)」を適用
+      fitImageToWindow(frameW, frameH, imageNaturalSize.width, imageNaturalSize.height);
     }
-  }, [imageSize]); // 画像サイズが確定した後
+  }, [imageNaturalSize]);
 
-  // 3. ドラッグ操作
+  // ★ 便利関数: 枠内に収める (Fit)
+  const fitImageToWindow = (frameW: number, frameH: number, imgW: number, imgH: number) => {
+    if (!imgW || !imgH) return;
+    const widthRatio = frameW / imgW;
+    const heightRatio = frameH / imgH;
+    // 小さい方の比率に合わせれば全体が入る
+    const newScale = Math.min(widthRatio, heightRatio) * 0.95; // 少し余白
+    setScale(newScale);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  // ★ 便利関数: 枠を埋める (Cover)
+  const coverImageToWindow = () => {
+    if (!imageNaturalSize.width || !windowSize.width) return;
+    const widthRatio = windowSize.width / imageNaturalSize.width;
+    const heightRatio = windowSize.height / imageNaturalSize.height;
+    // 大きい方の比率に合わせれば隙間なく埋まる
+    const newScale = Math.max(widthRatio, heightRatio);
+    setScale(newScale);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  // ★ 便利関数: 等倍に戻す (100%)
+  const resetImageScale = () => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  // 3. マウスホイールでのズーム
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomSensitivity = 0.001;
+      const delta = -e.deltaY * zoomSensitivity;
+      setScale(prevScale => {
+        const newScale = prevScale * (1 + delta);
+        return Math.min(Math.max(newScale, 0.01), 100); 
+      });
+    };
+
+    const overlay = overlayRef.current;
+    if (overlay) {
+      overlay.addEventListener('wheel', handleWheel, { passive: false });
+    }
+    return () => {
+      if (overlay) {
+        overlay.removeEventListener('wheel', handleWheel);
+      }
+    };
+  }, []);
+
+  // 4. ドラッグ操作
   const handleMouseDown = (e: React.MouseEvent) => {
+    // ツールバーやボタン上のクリックならドラッグを開始しない
+    if ((e.target as HTMLElement).closest('.bg-modal-toolbar')) return;
+
     e.preventDefault();
     isDragging.current = true;
-    dragStart.current = {
-      x: e.clientX - offset.x,
-      y: e.clientY - offset.y,
-    };
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    offsetStart.current = { ...offset };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging.current) return;
-    
-    let newX = e.clientX - dragStart.current.x;
-    let newY = e.clientY - dragStart.current.y;
-
-    // 画像が枠から出すぎないように制限
-    // (画像の右端 = newX + scaledW/2 が 枠の右端 = windowW/2 を下回らない)
-    // (newX は中央(0)からのオフセット)
-    const minX = (windowSize.width - scaledImageSize.width) / 2;
-    const maxX = (scaledImageSize.width - windowSize.width) / 2;
-    const minY = (windowSize.height - scaledImageSize.height) / 2;
-    const maxY = (scaledImageSize.height - windowSize.height) / 2;
-    
-    if (newX < minX) newX = minX;
-    if (newX > maxX) newX = maxX;
-    if (newY < minY) newY = minY;
-    if (newY > maxY) newY = maxY;
-
-    setOffset({ x: newX, y: newY });
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setOffset({
+      x: offsetStart.current.x + dx,
+      y: offsetStart.current.y + dy,
+    });
   };
 
   const handleMouseUp = () => {
     isDragging.current = false;
   };
 
-  // 4. OKボタン押下時
+  // 5. 完了
   const handleConfirm = () => {
-    if (!scaledImageSize.width || !windowSize.width) {
-      onConfirm('50% 50%'); // デフォルト
+    if (!windowRef.current || !imageRef.current) {
+      onClose();
       return;
     }
-    
-    // background-position は、(0% 0% = 左上), (100% 100% = 右下)
-    
-    // 枠に対する画像の「左上」の座標
-    const imgLeft = (windowSize.width / 2) - (scaledImageSize.width / 2) + offset.x;
-    const imgTop = (windowSize.height / 2) - (scaledImageSize.height / 2) + offset.y;
+    const frameRect = windowRef.current.getBoundingClientRect();
+    const imgRect = imageRef.current.getBoundingClientRect();
 
-    // はみ出している総量
-    const overflowX = scaledImageSize.width - windowSize.width;
-    const overflowY = scaledImageSize.height - windowSize.height;
+    const relativeX = imgRect.left - frameRect.left;
+    const relativeY = imgRect.top - frameRect.top;
+    const scaleFactor = ARTBOARD_WIDTH / frameRect.width;
 
-    // 0% (左寄せ) ～ 100% (右寄せ) のどの位置か
-    // (imgLeft は 0 ～ -overflowX の範囲で動く)
-    const percentX = (overflowX > 0) ? (-imgLeft / overflowX) * 100 : 50;
-    const percentY = (overflowY > 0) ? (-imgTop / overflowY) * 100 : 50;
-    
-    onConfirm(`${percentX.toFixed(2)}% ${percentY.toFixed(2)}%`);
+    const finalX = relativeX * scaleFactor;
+    const finalY = relativeY * scaleFactor;
+    const finalW = imgRect.width * scaleFactor;
+    const finalH = imgRect.height * scaleFactor;
+
+    const positionStr = `${Math.round(finalX)}px ${Math.round(finalY)}px`;
+    const sizeStr = `${Math.round(finalW)}px ${Math.round(finalH)}px`;
+
+    onConfirm(positionStr, sizeStr);
   };
 
   return (
@@ -144,23 +170,44 @@ const BackgroundPositionerModal: React.FC<BackgroundPositionerModalProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* プレビュー画像本体 (中央揃えで配置) */}
+      {/* ★ ツールバーを追加 */}
+      <div className="bg-modal-toolbar">
+        <div className="toolbar-title">位置調整</div>
+        <div className="toolbar-buttons">
+          <button onClick={() => fitImageToWindow(windowSize.width, windowSize.height, imageNaturalSize.width, imageNaturalSize.height)} title="全体を表示">
+            全体 (Fit)
+          </button>
+          <button onClick={coverImageToWindow} title="枠を埋める">
+            埋める (Cover)
+          </button>
+          <button onClick={resetImageScale} title="等倍表示">
+            100%
+          </button>
+        </div>
+        <div className="toolbar-instruction">
+          ホイール: 拡大縮小 / ドラッグ: 移動
+        </div>
+      </div>
+
+      {/* 画像 */}
       <img
         ref={imageRef}
         src={imageUrl}
         alt="背景プレビュー"
         className="bg-modal-image"
         style={{
-          width: scaledImageSize.width || 0,
-          height: scaledImageSize.height || 0,
-          transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
+          width: imageNaturalSize.width,
+          height: imageNaturalSize.height,
+          transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${scale})`,
+          opacity: imageNaturalSize.width ? 1 : 0,
         }}
         onLoad={onImageLoad}
         draggable={false}
       />
       
-      {/* アートボード比率の「切り抜き枠」 (暗転マスク) */}
+      {/* 切り抜き枠 */}
       <div 
+        ref={windowRef}
         className="bg-modal-window" 
         style={{
           width: windowSize.width || 0,
@@ -168,7 +215,7 @@ const BackgroundPositionerModal: React.FC<BackgroundPositionerModalProps> = ({
         }}
       />
 
-      {/* 右下のボタン */}
+      {/* 下部ボタン */}
       <div className="bg-modal-buttons">
         <button className="bg-modal-button cancel" onClick={onClose}>
           Cancel

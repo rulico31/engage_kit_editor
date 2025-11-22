@@ -6,69 +6,65 @@ import { ItemTypes } from "../ItemTypes";
 import type { PlacedItemType } from "../types";
 import "./PlacedItem.css";
 
-// (useResizeHandle フックは削除)
-
 interface PlacedItemProps {
   item: PlacedItemType;
-  onSelect: () => void;
+  onSelect: (e: React.MouseEvent) => void; // クリックイベントを受け取るように変更
   isSelected: boolean;
   
   // プレビュー用Props
   isPreviewing: boolean;
-  isVisible: boolean; // (プレビュー状態から渡される)
+  isVisible: boolean;
   onItemEvent: (eventName: string, itemId: string) => void;
+  
+  // ★ 追加: 子要素
+  children?: React.ReactNode;
 }
 
 const PlacedItem: React.FC<PlacedItemProps> = ({
   item,
   onSelect,
   isSelected,
-  // プレビュー用
   isPreviewing,
   isVisible,
   onItemEvent,
+  children,
 }) => {
   const { id, name, x, y, width, height } = item;
   
-  // (移動用の ref)
   const dragRef = useRef<HTMLDivElement>(null);
 
-  // --- (A) アイテム全体を「移動」させるための useDrag ---
   const [{ isDragging }, drag] = useDrag(
     () => ({
       type: ItemTypes.PLACED_ITEM,
-      item: { id, x, y },
+      item: { id, x, y }, // ドラッグ開始時の情報を渡す
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging(),
       }),
-      canDrag: !isPreviewing, // プレビュー中はドラッグを無効化
+      canDrag: !isPreviewing,
     }),
-    [id, x, y, isPreviewing] // 依存配列 (ジャンプバグ修正済み + isPreviewing)
+    [id, x, y, isPreviewing]
   );
-  drag(dragRef); // (A) ref を (1) に接続
+  drag(dragRef);
 
-  // ---
-
-  // クリックイベントハンドラ
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isPreviewing) {
-      // プレビューモード中: ロジックエンジンにイベントを送信
       onItemEvent("click", id);
     } else {
-      // 編集モード中: アイテムを選択
-      onSelect();
+      onSelect(e); // イベントオブジェクトを渡す
     }
   };
 
-  const itemClassName = `placed-item ${isSelected ? "is-selected" : ""} ${
-    isPreviewing ? "is-preview" : ""
-  }`;
+  let itemClassName = `placed-item ${isSelected ? "is-selected" : ""} ${isPreviewing ? "is-preview" : ""}`;
+  
+  // グループの場合のスタイル調整
+  if (item.id.startsWith("group")) {
+    itemClassName += " is-group";
+  }
 
   return (
-    // (1) シンプルな Div 構造に戻す
     <div
-      ref={dragRef} // (A) 移動用 ref
+      ref={dragRef}
       className={itemClassName}
       style={{
         position: "absolute",
@@ -76,15 +72,23 @@ const PlacedItem: React.FC<PlacedItemProps> = ({
         top: `${y}px`,
         width: `${width}px`,
         height: `${height}px`,
-        opacity: isDragging ? 0 : 1, // 移動中は非表示
-        zIndex: isSelected ? 1 : 0,
-        // プレビュー中の表示/非表示を制御
+        opacity: isDragging ? 0.5 : 1,
+        // 選択されている場合はz-indexを上げて手前に表示したいが、
+        // グループ内の相対順序を保つ必要もあるため、単純な zIndex: 1 は危険。
+        // 基本的にDOM順序（Artboardでのレンダリング順）に任せる。
+        // zIndex: isSelected ? 1000 : undefined, 
         display: isVisible ? "flex" : "none",
+        // グループの場合は枠線のみ、または透明にするなどのスタイル
+        border: item.id.startsWith("group") ? "1px dashed #aaa" : undefined,
+        backgroundColor: item.id.startsWith("group") ? "rgba(0,0,0,0.05)" : undefined,
       }}
-      onClick={handleClick} // (C) 選択 or イベント発火
+      onClick={handleClick}
     >
-      {name}
-      {/* (リサイズハンドルは削除) */}
+      {/* グループ以外なら名前を表示 */}
+      {!item.id.startsWith("group") && name}
+      
+      {/* 子要素のレンダリング */}
+      {children}
     </div>
   );
 };

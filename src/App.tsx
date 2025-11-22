@@ -1,69 +1,72 @@
 // src/App.tsx
 
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import HomeScreen from "./components/HomeScreen";
+import Login from "./components/Auth/Login";
 import type { ProjectData } from "./types";
 import EditorView from "./components/EditorView";
 import BackgroundPositionerModal from "./components/BackgroundPositionerModal";
+import PublishModal from "./components/PublishModal";
+import ViewerHost from "./components/ViewerHost"; // ★ 追加
 
 // ★ Zustand ストアをインポート
 import { useEditorSettingsStore } from "./stores/useEditorSettingsStore";
 import { usePageStore } from "./stores/usePageStore";
 import { useSelectionStore } from "./stores/useSelectionStore";
 import { usePreviewStore } from "./stores/usePreviewStore";
+import { useAuthStore } from "./stores/useAuthStore";
+import { useProjectStore } from "./stores/useProjectStore"; 
 
 function App() {
-  // ★ App.tsx は、どのストアを購読する必要もない
-  // ★ ただし、ストアのアクションをトリガーするために `getState` やフック外の `set` を使う
-
-  // ★ 編集ストアからビューとプロジェクト名を取得（これはAppレベルで必要）
+  const { user, isLoading, initializeAuth } = useAuthStore();
   const view = useEditorSettingsStore(state => state.view);
   const projectName = useEditorSettingsStore(state => state.projectName);
-  
-  // (★ 背景画像モーダル用のStateは、App.tsxに残す)
+  const currentProjectId = useProjectStore(state => state.currentProjectId);
+
+  // 背景画像モーダル
   const [bgModal, setBgModal] = React.useState({
     isOpen: false,
     itemId: null as string | null,
     src: null as string | null,
   });
 
-  // --- (5) プロジェクト管理 (ストアを操作するよう変更) ---
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
-  const resetAllStores = () => {
-    usePageStore.getState().resetPages();
-    useSelectionStore.getState().resetSelection();
-    useEditorSettingsStore.getState().resetEditorSettings();
-    usePreviewStore.getState().stopPreview();
-  };
+  // ★ 追加: ビューワーモード判定用のステート
+  const [viewerProjectId, setViewerProjectId] = useState<string | null>(null);
 
-  const handleNewProject = useCallback(() => {
-    const name = prompt("新しいプロジェクト名を入力してください:", "新規プロジェクト");
-    if (!name) return;
-    
-    resetAllStores(); // (view: "home" 以外をリセット)
-    
-    useEditorSettingsStore.getState().setProjectName(name);
-    
-    // PageStore に初期ページを作成
-    usePageStore.getState().addPage("Page 1");
-    
-    useEditorSettingsStore.getState().setView("editor");
-  }, []);
+  useEffect(() => {
+    // ★ URLルーティングの簡易実装
+    // パスが "/view/プロジェクトID" の形式かチェック
+    const path = window.location.pathname;
+    const viewMatch = path.match(/^\/view\/(.+)$/);
+
+    if (viewMatch && viewMatch[1]) {
+      setViewerProjectId(viewMatch[1]);
+    } else {
+      // 通常の認証フローを開始
+      initializeAuth();
+    }
+  }, [initializeAuth]);
+
+  // --- 画面遷移・プロジェクト管理 ---
 
   const handleGoHome = useCallback(() => {
     if (window.confirm("ホームに戻ると、保存していない変更は失われます。よろしいですか？")) {
-      resetAllStores();
+      usePageStore.getState().resetPages();
+      useSelectionStore.getState().resetSelection();
+      useEditorSettingsStore.getState().resetEditorSettings();
+      usePreviewStore.getState().stopPreview();
+      useProjectStore.getState().setCurrentProjectId(null);
       useEditorSettingsStore.getState().setView("home");
     }
   }, []);
 
   const handleExportProject = useCallback(() => {
-    // 各ストアから最新の状態を取得してエクスポートデータを構築
     const { pages, pageOrder } = usePageStore.getState();
-    const { variables } = usePreviewStore.getState(); // 変数はPreviewStoreが持つ
+    const { variables } = usePreviewStore.getState();
     const projectName = useEditorSettingsStore.getState().projectName;
-    
     const projectData: ProjectData = { projectName, pages, pageOrder, variables };
     
     const jsonString = JSON.stringify(projectData, null, 2);
@@ -89,14 +92,15 @@ function App() {
         const firstPageId = data.pageOrder?.[0];
         
         if (data.pages && data.pageOrder && firstPageId) {
-          // すべてのストアをリセット
-          resetAllStores();
-          
-          // 取得したデータでストアを初期化
+          usePageStore.getState().resetPages();
+          useSelectionStore.getState().resetSelection();
+          useEditorSettingsStore.getState().resetEditorSettings();
+          usePreviewStore.getState().stopPreview();
+          useProjectStore.getState().setCurrentProjectId(null);
+
           useEditorSettingsStore.getState().setProjectName(data.projectName || "無題のプロジェクト");
           usePageStore.getState().loadProjectData(data);
           usePreviewStore.getState().setVariables(data.variables || {});
-          
           useEditorSettingsStore.getState().setView("editor");
         } else {
           alert("有効なページデータが見つかりませんでした。");
@@ -110,7 +114,6 @@ function App() {
     event.target.value = "";
   }, []);
 
-  // --- 背景画像モーダルのコールバック ---
   const handleOpenBackgroundModal = useCallback((itemId: string, src: string) => {
     if (!src) {
       alert("先に画像をアップロードしてください。");
@@ -123,50 +126,42 @@ function App() {
     setBgModal({ isOpen: false, itemId: null, src: null });
   }, []);
 
-  const handleConfirmBackgroundModal = useCallback((newPosition: string) => {
+  const handleConfirmBackgroundModal = useCallback((newPosition: string, newSize: string) => {
     if (bgModal.itemId) {
-      
-      // ★ 修正: エラーの原因となっていた updateItem 呼び出しを削除
-      // usePageStore.getState().updateItem(bgModal.itemId, {
-      //   data: {
-      //     isArtboardBackground: true,
-      //     artboardBackgroundPosition: newPosition,
-      //   }
-      // });
-      
-      // (★) このロジック (↓) が正解。
-      // (1) ストアから現在のページ状態を取得
       const { pages, selectedPageId } = usePageStore.getState();
       if (!selectedPageId) return;
       const currentPage = pages[selectedPageId];
       if (!currentPage) return;
       
-      // (2) 新しい placedItems 配列を生成
       const newPlacedItems = currentPage.placedItems.map(item => {
         if (item.id === bgModal.itemId) {
-          // これを背景にする
           return {
             ...item,
-            data: { ...item.data, isArtboardBackground: true, artboardBackgroundPosition: newPosition }
+            data: { 
+              ...item.data, 
+              isArtboardBackground: true, 
+              artboardBackgroundPosition: newPosition,
+              artboardBackgroundSize: newSize
+            }
           };
         } else if (item.data.isArtboardBackground) {
-          // 他のアイテムは背景フラグを外す
           return {
             ...item,
-            data: { ...item.data, isArtboardBackground: false, artboardBackgroundPosition: undefined }
+            data: { 
+              ...item.data, 
+              isArtboardBackground: false, 
+              artboardBackgroundPosition: undefined,
+              artboardBackgroundSize: undefined 
+            }
           };
         }
         return item;
       });
       
-      // (3) ストアの状態を直接更新
       usePageStore.setState(state => ({
         pages: {
           ...state.pages,
-          [selectedPageId!]: {
-            ...currentPage,
-            placedItems: newPlacedItems,
-          }
+          [selectedPageId!]: { ...currentPage, placedItems: newPlacedItems }
         }
       }));
     }
@@ -174,11 +169,41 @@ function App() {
   }, [bgModal.itemId]);
 
 
-  // --- (★ 変更) ContextProvider を削除 ---
-  if (view === "home") {
-    return <HomeScreen onNewProject={handleNewProject} onImportProject={handleImportProject} />;
+  // --- レンダリング分岐 ---
+
+  // ★ 1. ビューワーモードの場合 (認証不要で表示)
+  if (viewerProjectId) {
+    return <ViewerHost projectId={viewerProjectId} />;
   }
 
+  // 2. ローディング中
+  if (isLoading) {
+    return (
+      <div style={{ 
+        display: 'flex', justifyContent: 'center', alignItems: 'center', 
+        height: '100vh', backgroundColor: '#1e1e1e', color: '#888' 
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  // 3. 未ログイン時
+  if (!user) {
+    return <Login />;
+  }
+
+  // 4. ホーム画面
+  if (view === "home") {
+    return (
+      <HomeScreen 
+        onNewProject={() => {}} 
+        onImportProject={handleImportProject} 
+      />
+    );
+  }
+
+  // 5. エディタ画面
   return (
     <>
       <EditorView
@@ -187,13 +212,21 @@ function App() {
         onExportProject={handleExportProject}
         onImportProject={handleImportProject}
         onOpenBackgroundModal={handleOpenBackgroundModal}
+        onPublish={() => setIsPublishModalOpen(true)}
       />
       
       {bgModal.isOpen && bgModal.src && (
         <BackgroundPositionerModal
           imageUrl={bgModal.src}
           onClose={handleCloseBackgroundModal}
-          onConfirm={handleConfirmBackgroundModal}
+          onConfirm={handleConfirmBackgroundModal} 
+        />
+      )}
+
+      {isPublishModalOpen && (
+        <PublishModal
+          onClose={() => setIsPublishModalOpen(false)}
+          projectId={currentProjectId}
         />
       )}
     </>

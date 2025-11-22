@@ -6,7 +6,6 @@ import Artboard from "./Artboard";
 import PropertiesPanel from "./PropertiesPanel";
 import NodeEditor from "./NodeEditor";
 import LeftPanel from "./LeftPanel";
-// import { useEditorContext } from "../contexts/EditorContext"; // 削除
 import "./EditorView.css";
 import { GridIcon } from "./icons/GridIcon";
 import { SlashIcon } from "./icons/SlashIcon";
@@ -15,32 +14,48 @@ import "./GridPopover.css";
 // ★ Zustand ストアをインポート
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePreviewStore } from "../stores/usePreviewStore";
+import { usePageStore } from "../stores/usePageStore";
 
 interface EditorViewProps {
   projectName: string;
-  // ★ App.tsx から渡される Props を修正
-  // isPreviewing: boolean; // (ストアから取得)
   onGoHome: () => void;
   onExportProject: () => void;
   onImportProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  // onTogglePreview: () => void; // (ストアのアクションを呼ぶ)
   onOpenBackgroundModal: (itemId: string, src: string) => void;
+  onPublish: () => void; // ★ 追加: 埋め込み用コールバックの型定義
 }
 
 // ★ グリッド/スナップ設定のポップオーバー
 const GridPopover: React.FC = () => {
-  // ★ 修正: ストアから購読
-  const { gridSize, setGridSize } = useEditorSettingsStore(state => ({
+  const { gridSize, setGridSize, showGrid, setShowGrid } = useEditorSettingsStore(state => ({
     gridSize: state.gridSize,
     setGridSize: state.setGridSize,
+    showGrid: state.showGrid,
+    setShowGrid: state.setShowGrid,
   }));
 
   const snapOptions = [null, 1, 2, 4, 8, 16, 32];
   
   return (
     <div className="grid-popover">
+      {/* グリッド表示設定セクション */}
       <div className="grid-popover-section">
-        <label className="grid-popover-label">スナップ (px)</label>
+        <label className="grid-popover-label">グリッド線</label>
+        <div className="grid-toggle-row">
+          <button 
+            className={`grid-visibility-button ${showGrid ? 'active' : ''}`}
+            onClick={() => setShowGrid(!showGrid)}
+          >
+            {showGrid ? "表示中 (ON)" : "非表示 (OFF)"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid-popover-divider" />
+
+      {/* スナップ設定セクション */}
+      <div className="grid-popover-section">
+        <label className="grid-popover-label">スナップ (PX)</label>
         <div className="grid-button-group">
           {snapOptions.map((size) => (
             <button
@@ -58,7 +73,6 @@ const GridPopover: React.FC = () => {
           ))}
         </div>
       </div>
-      {/* (★ グリッド表示セクションは削除済み) */}
     </div>
   );
 };
@@ -69,10 +83,10 @@ const EditorView: React.FC<EditorViewProps> = ({
   onGoHome,
   onExportProject,
   onImportProject,
-  onOpenBackgroundModal, // (★ App.tsx から受け取る)
+  onOpenBackgroundModal,
+  onPublish, // ★ 追加: Propsから受け取る
 }) => {
   
-  // ★ 修正: ストアから購読
   const { 
     viewMode, 
     setViewMode, 
@@ -85,26 +99,23 @@ const EditorView: React.FC<EditorViewProps> = ({
     togglePreview: state.togglePreview,
   }));
   
-  // ★ プレビューストアのアクションを取得
   const initPreview = usePreviewStore(state => state.initPreview);
   const stopPreview = usePreviewStore(state => state.stopPreview);
 
-  // ★ 修正: onTogglePreview をラップ
   const handleTogglePreview = () => {
     if (!isPreviewing) {
-      initPreview(); // プレビュー開始時に状態を初期化
+      initPreview(); 
     } else {
-      stopPreview(); // プレビュー終了時に状態をクリア
+      stopPreview(); 
     }
-    togglePreview(); // エディタの設定ストアの状態を切り替え
+    togglePreview();
   };
   
-  // ★ グリッドポップオーバーの表示状態 (これはローカルUI状態)
   const [isGridPopoverOpen, setIsGridPopoverOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // =========================================================
-  // ★ リサイズ管理ステート (これはローカルUI状態)
+  // リサイズ管理ステート
   // =========================================================
   const [splitRatio, setSplitRatio] = useState(0.6);
   const [leftWidth, setLeftWidth] = useState(260);
@@ -113,10 +124,6 @@ const EditorView: React.FC<EditorViewProps> = ({
   const isDraggingLeftRef = useRef(false);
   const isDraggingRightRef = useRef(false);
   const workspaceRef = useRef<HTMLDivElement>(null);
-
-  // =========================================================
-  // ハンドラ定義
-  // =========================================================
 
   const handleMouseDown = useCallback((type: "split" | "left" | "right") => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -167,7 +174,6 @@ const EditorView: React.FC<EditorViewProps> = ({
     };
   }, [handleMouseMove, handleMouseUp]);
 
-  // ★ ポップオーバーの外側クリックで閉じる
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
@@ -182,6 +188,29 @@ const EditorView: React.FC<EditorViewProps> = ({
     };
   }, [isGridPopoverOpen]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (useEditorSettingsStore.getState().isPreviewing) return;
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (usePageStore.getState().canRedo) usePageStore.getState().redo();
+          } else {
+            if (usePageStore.getState().canUndo) usePageStore.getState().undo();
+          }
+        } else if (e.key === 'y') {
+          e.preventDefault();
+          if (usePageStore.getState().canRedo) usePageStore.getState().redo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
 
   return (
     <div className="editor-container">
@@ -191,12 +220,13 @@ const EditorView: React.FC<EditorViewProps> = ({
         onGoHome={onGoHome}
         onExportProject={onExportProject}
         onImportProject={onImportProject}
-        onTogglePreview={handleTogglePreview} // ★ 修正
+        onTogglePreview={handleTogglePreview}
         viewMode={viewMode}
-        onViewModeChange={setViewMode} // ★ 修正
+        onViewModeChange={setViewMode}
+        onPublish={onPublish} // ★ 追加: Headerに渡す
       />
 
-      {isPreviewing ? ( // ★ 修正
+      {isPreviewing ? (
         <div className="preview-viewport">
           <Artboard />
         </div>
@@ -265,7 +295,6 @@ const EditorView: React.FC<EditorViewProps> = ({
                 <div className="resize-handle-pill-vertical" />
               </div>
               <div className="panel-right" style={{ width: rightWidth }}>
-                {/* ★ 修正: onOpenBackgroundModal を渡す */}
                 <PropertiesPanel 
                   onOpenBackgroundModal={onOpenBackgroundModal}
                 />
