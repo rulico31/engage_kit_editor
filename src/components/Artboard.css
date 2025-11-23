@@ -45,10 +45,12 @@
   justify-content: flex-start;
 }
 
-/* ★ 追加: テキスト入力欄のスタイル（白背景） */
+/* ★ 修正: テキスト入力欄のスタイル */
 .artboard-item.is-input {
   background-color: #ffffff; 
-  cursor: text; 
+  cursor: text;
+  /* ★ 追加: 入力欄の場合は外側のパディングをなくす（プレビューと合わせる） */
+  padding: 0;
 }
 
 /* 選択状態のスタイル (通常) */
@@ -58,7 +60,7 @@
   z-index: 1;
 }
 
-/* ★ アクティブ状態のスタイル (タブで選択中) - より強く強調 */
+/* アクティブ状態のスタイル (タブで選択中) */
 .artboard-item.active-item {
   border-color: #ffcc00; /* 黄色などで区別 */
   box-shadow: 0 0 8px rgba(255, 204, 0, 0.8);
@@ -142,7 +144,10 @@
   font: inherit;
   color: inherit; 
   cursor: inherit;
-  padding: 0;
+  
+  /* ★ 修正: 内側にパディングを持たせる（プレビューと合わせる） */
+  padding: 10px 12px;
+  
   box-sizing: border-box; 
   resize: none;
   overflow: hidden;
@@ -236,7 +241,7 @@
   border-color: transparent;
 }
 
-/* ★ 追加: グリッドオーバーレイ */
+/* グリッドオーバーレイ */
 .artboard-grid-overlay {
   position: absolute;
   top: 0;
