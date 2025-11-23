@@ -43,9 +43,9 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   let content: React.ReactNode = null;
 
-  // ★ 高さ自動調整の判定
-  // 画像は固定サイズ、それ以外（テキスト、ボタン、入力欄）は中身に合わせて伸びるようにする
   const isAutoHeight = !name.startsWith("画像") && !id.startsWith("group");
+  const isInput = name.startsWith("テキスト入力欄");
+  const isButton = name.includes("ボタン");
 
   if (name.startsWith("画像")) {
     if (item.data.src) {
@@ -61,7 +61,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
       content = <div className="preview-placeholder">No Image</div>;
     }
   } 
-  else if (name.startsWith("テキスト入力欄")) {
+  else if (isInput) {
     content = (
       <textarea
         className="preview-input-content"
@@ -87,9 +87,8 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     content = item.data.text || name;
   }
 
-  const itemClassName = `preview-item ${
-    name.includes("ボタン") ? "is-button" : ""
-  }`;
+  // クラス名の動的生成
+  const itemClassName = `preview-item ${isButton ? "is-button" : ""} ${isInput ? "is-input" : ""}`;
 
   return (
     <div
@@ -100,8 +99,6 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         top: `${itemState.y}px`,
         width: `${width}px`,
         
-        // ★ 修正: 高さを自動調整に対応させる
-        // isAutoHeight なら heightは 'auto' にし、エディタで設定した高さを minHeight（最小値）として使う
         height: isAutoHeight ? 'auto' : `${height}px`,
         minHeight: isAutoHeight ? `${height}px` : undefined,
         
@@ -110,6 +107,8 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
         color: item.data.color || '#333333',
+        
+        // 枠線の制御（入力欄はCSSで制御するためここではborder指定をスキップする場合もあるが、一貫性のため残す）
         border: (item.data.showBorder === false) ? 'none' : undefined,
         backgroundColor: (item.data.isTransparent) ? 'transparent' : undefined,
       }}

@@ -3,10 +3,9 @@
 .preview-item {
   background-color: #f0f0f0;
   border: 2px solid #ccc;
-  border-radius: 4px; /* 少し角丸に */
+  border-radius: 4px;
   user-select: none;
   
-  /* テキスト設定: 編集画面(PlacedItem.css)と合わせる */
   font-size: 15px;
   font-weight: 500;
   white-space: pre-wrap; 
@@ -15,40 +14,48 @@
   box-sizing: border-box;
   cursor: default; 
   
-  /* 中央揃え */
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 10px 12px; /* パディングも合わせる */
-  overflow: hidden; /* はみ出し防止 */
+  padding: 10px 12px;
+  overflow: hidden;
 }
 
-/* 画像コンテンツ用スタイル */
+/* ★ 追加: テキスト入力欄用のスタイル */
+.preview-item.is-input {
+  background-color: #ffffff; /* 背景を白にする */
+  cursor: text;
+  padding: 0; /* 入力欄自体がパディングを持つため、外側のパディングはなくす */
+}
+
+/* 画像コンテンツ */
 .preview-image-content {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* 枠に合わせてトリミング */
+  object-fit: cover;
   border-radius: 2px;
   display: block;
 }
 
-/* 画像プレースホルダー */
 .preview-placeholder {
   color: #999;
   font-style: italic;
   font-size: 0.9em;
 }
 
-/* 入力欄コンテンツ用スタイル */
+/* 入力欄の中身（textarea） */
 .preview-input-content {
   width: 100%;
   height: 100%;
   resize: none;
   border: none;
-  background: #fff;
+  background: transparent; /* 親の白背景を透かす */
   border-radius: 3px;
-  padding: 8px;
+  
+  /* 親のpaddingを消した代わりにこちらで余白を取る */
+  padding: 10px 12px; 
+  
   font-family: inherit;
   font-size: inherit;
   color: inherit;
@@ -56,17 +63,18 @@
   box-sizing: border-box;
 }
 .preview-input-content:focus {
-  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3);
+  /* フォーカス時の強調表示（お好みで） */
+  background-color: #fafafa;
 }
 
-/* ボタンタイプのアイテム */
+/* ボタン */
 .preview-item.is-button {
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
 }
 
 .preview-item.is-button:hover {
-  filter: brightness(0.95); /* 少し暗く */
+  filter: brightness(0.95);
 }
 
 .preview-item.is-button:active {
