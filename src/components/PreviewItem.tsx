@@ -23,19 +23,16 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const onVariableChange = usePreviewStore(state => state.handleVariableChangeFromItem);
   const variables = usePreviewStore(state => state.variables);
 
-  // テキスト入力欄用のステート
   const variableName = item.data.variableName || "";
   const [inputValue, setInputValue] = useState("");
 
-  // 変数の初期値を反映
   useEffect(() => {
     if (variableName && variables[variableName] !== undefined) {
       setInputValue(variables[variableName]);
     }
-  }, [variableName]); // variablesを依存に含めると無限ループの恐れがあるため、マウント時や名前変更時のみ
+  }, [variableName]); 
 
   const handleClick = () => {
-    // ボタン、または画像がボタンとして機能する場合
     if (name.includes("ボタン") || name.includes("画像")) {
         onItemEvent("click", id);
     }
@@ -44,10 +41,12 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const itemState = previewState[id];
   if (!itemState) return null;
 
-  // --- コンテンツの決定 ---
   let content: React.ReactNode = null;
 
-  // 1. 画像の場合
+  // ★ 高さ自動調整の判定
+  // 画像は固定サイズ、それ以外（テキスト、ボタン、入力欄）は中身に合わせて伸びるようにする
+  const isAutoHeight = !name.startsWith("画像") && !id.startsWith("group");
+
   if (name.startsWith("画像")) {
     if (item.data.src) {
       content = (
@@ -62,7 +61,6 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
       content = <div className="preview-placeholder">No Image</div>;
     }
   } 
-  // 2. テキスト入力欄の場合
   else if (name.startsWith("テキスト入力欄")) {
     content = (
       <textarea
@@ -78,15 +76,13 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            e.currentTarget.blur(); // フォーカスを外して onInputComplete を発火
+            e.currentTarget.blur(); 
           }
         }}
-        // 入力欄クリックでイベントが発火しないようにバブリングを止める
         onClick={(e) => e.stopPropagation()}
       />
     );
   }
-  // 3. その他（テキスト、ボタン）
   else {
     content = item.data.text || name;
   }
@@ -103,13 +99,17 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         left: `${itemState.x}px`,
         top: `${itemState.y}px`,
         width: `${width}px`,
-        height: `${height}px`,
-        zIndex: 0, // 必要に応じて調整
+        
+        // ★ 修正: 高さを自動調整に対応させる
+        // isAutoHeight なら heightは 'auto' にし、エディタで設定した高さを minHeight（最小値）として使う
+        height: isAutoHeight ? 'auto' : `${height}px`,
+        minHeight: isAutoHeight ? `${height}px` : undefined,
+        
+        zIndex: 0, 
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
         color: item.data.color || '#333333',
-        // 枠線と背景透過の設定
         border: (item.data.showBorder === false) ? 'none' : undefined,
         backgroundColor: (item.data.isTransparent) ? 'transparent' : undefined,
       }}
