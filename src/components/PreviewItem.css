@@ -6,12 +6,22 @@
   padding: 8px 12px;
   border-radius: 4px;
   user-select: none;
-  white-space: nowrap;
+  
+  /* ★ 修正: white-space を pre-wrap に変更 */
+  /* これにより、入力された改行やスペースがそのまま表示され、かつ枠端で自動折り返しされます */
+  white-space: pre-wrap; 
+  word-break: break-word; /* 長い単語も折り返す */
+
   box-sizing: border-box;
   
-  /* 編集用スタイル（cursor: move）は削除 */
   /* デフォルトのカーソル */
   cursor: default; 
+  
+  /* フレックスボックスで配置（ボタン内のテキスト中央揃えなどのため） */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center; /* テキスト自体も中央揃え */
 }
 
 /* ボタンタイプのアイテムのみ、クリック可能なカーソルに変更 */
@@ -30,5 +40,3 @@
 .preview-item[data-item-type="ボタン"]:active {
   transform: translateY(1px);
 }
-
-/* (選択状態のスタイル .is-selected はプレビューに不要なため削除) */
