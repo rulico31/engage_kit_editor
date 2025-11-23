@@ -149,6 +149,11 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     itemClassName += " is-transparent";
   }
 
+  // ★ 追加: テキスト入力欄のクラス付与
+  if (item.name.startsWith("テキスト入力欄")) {
+    itemClassName += " is-input";
+  }
+
   if (isGroup) {
     content = null;
   } else if (item.name.startsWith("ボタン")) {
@@ -527,11 +532,6 @@ const Artboard: React.FC = () => {
     const snappedWidth = snapToGrid(newWidth, gridSize, minDim);
     const snappedHeight = snapToGrid(newHeight, gridSize, minDim);
     
-    // ★ 修正: newX, newY を計算式の中で直接使用し、変数を削除
-    // let snappedX = startItem.x;
-    // let snappedY = startItem.y;
-
-    // ↓↓↓ 直接計算と代入を行う形に修正 ↓↓↓
     const finalX = direction.includes("left") 
         ? snapToGrid(startItem.x + (startItem.width - snappedWidth), gridSize) 
         : startItem.x;

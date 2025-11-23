@@ -45,6 +45,12 @@
   justify-content: flex-start;
 }
 
+/* ★ 追加: テキスト入力欄のスタイル（白背景） */
+.artboard-item.is-input {
+  background-color: #ffffff; 
+  cursor: text; 
+}
+
 /* 選択状態のスタイル (通常) */
 .artboard-item.selected {
   border-color: #007acc;
