@@ -1,96 +1,120 @@
-// src/components/PlacedItem.tsx
+// src/components/PreviewItem.tsx
 
-import React, { useRef } from "react";
-import { useDrag } from "react-dnd";
-import { ItemTypes } from "../ItemTypes";
-import type { PlacedItemType } from "../types";
-import "./PlacedItem.css";
+import React, { useState, useEffect } from "react";
+import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
+import "./PreviewItem.css"; 
+import { usePreviewStore } from "../stores/usePreviewStore"; 
 
-interface PlacedItemProps {
+interface PreviewItemProps {
   item: PlacedItemType;
-  onSelect: (e: React.MouseEvent) => void; // クリックイベントを受け取るように変更
-  isSelected: boolean;
-  
-  // プレビュー用Props
-  isPreviewing: boolean;
-  isVisible: boolean;
-  onItemEvent: (eventName: string, itemId: string) => void;
-  
-  // ★ 追加: 子要素
-  children?: React.ReactNode;
+  previewState: PreviewState;
+  setPreviewState: (
+    newState: PreviewState | ((prev: PreviewState) => PreviewState)
+  ) => void;
+  allItemLogics: Record<string, NodeGraph>;
 }
 
-const PlacedItem: React.FC<PlacedItemProps> = ({
+const PreviewItem: React.FC<PreviewItemProps> = ({
   item,
-  onSelect,
-  isSelected,
-  isPreviewing,
-  isVisible,
-  onItemEvent,
-  children,
+  previewState,
 }) => {
-  const { id, name, x, y, width, height } = item;
-  
-  const dragRef = useRef<HTMLDivElement>(null);
+  const { id, name, width, height } = item;
+  const onItemEvent = usePreviewStore(state => state.handleItemEvent);
+  const onVariableChange = usePreviewStore(state => state.handleVariableChangeFromItem);
+  const variables = usePreviewStore(state => state.variables);
 
-  const [{ isDragging }, drag] = useDrag(
-    () => ({
-      type: ItemTypes.PLACED_ITEM,
-      item: { id, x, y }, // ドラッグ開始時の情報を渡す
-      collect: (monitor) => ({
-        isDragging: !!monitor.isDragging(),
-      }),
-      canDrag: !isPreviewing,
-    }),
-    [id, x, y, isPreviewing]
-  );
-  drag(dragRef);
+  const variableName = item.data.variableName || "";
+  const [inputValue, setInputValue] = useState("");
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isPreviewing) {
-      onItemEvent("click", id);
-    } else {
-      onSelect(e); // イベントオブジェクトを渡す
+  useEffect(() => {
+    if (variableName && variables[variableName] !== undefined) {
+      setInputValue(variables[variableName]);
+    }
+  }, [variableName]); 
+
+  const handleClick = () => {
+    if (name.includes("ボタン") || name.includes("画像")) {
+        onItemEvent("click", id);
     }
   };
 
-  let itemClassName = `placed-item ${isSelected ? "is-selected" : ""} ${isPreviewing ? "is-preview" : ""}`;
-  
-  // グループの場合のスタイル調整
-  if (item.id.startsWith("group")) {
-    itemClassName += " is-group";
+  const itemState = previewState[id];
+  if (!itemState) return null;
+
+  let content: React.ReactNode = null;
+
+  // ★ 修正: 「テキスト入力欄」も自動高さの対象外にする（= 固定高さにする）
+  const isInput = name.startsWith("テキスト入力欄");
+  const isAutoHeight = !name.startsWith("画像") && !id.startsWith("group") && !isInput;
+  const isButton = name.includes("ボタン");
+
+  if (name.startsWith("画像")) {
+    if (item.data.src) {
+      content = (
+        <img 
+          src={item.data.src} 
+          alt={item.data.text || "image"} 
+          className="preview-image-content"
+          draggable={false}
+        />
+      );
+    } else {
+      content = <div className="preview-placeholder">No Image</div>;
+    }
+  } 
+  else if (isInput) {
+    content = (
+      <textarea
+        className="preview-input-content"
+        placeholder={item.data.placeholder || "入力してください"}
+        value={inputValue}
+        onChange={(e) => {
+          setInputValue(e.target.value);
+          onVariableChange(variableName, e.target.value);
+        }}
+        onBlur={() => {
+          onItemEvent("onInputComplete", id);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.currentTarget.blur(); 
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
   }
+  else {
+    content = item.data.text || name;
+  }
+
+  const itemClassName = `preview-item ${isButton ? "is-button" : ""} ${isInput ? "is-input" : ""}`;
 
   return (
     <div
-      ref={dragRef}
       className={itemClassName}
       style={{
         position: "absolute",
-        left: `${x}px`,
-        top: `${y}px`,
+        left: `${itemState.x}px`,
+        top: `${itemState.y}px`,
         width: `${width}px`,
-        height: `${height}px`,
-        opacity: isDragging ? 0.5 : 1,
-        // 選択されている場合はz-indexを上げて手前に表示したいが、
-        // グループ内の相対順序を保つ必要もあるため、単純な zIndex: 1 は危険。
-        // 基本的にDOM順序（Artboardでのレンダリング順）に任せる。
-        // zIndex: isSelected ? 1000 : undefined, 
-        display: isVisible ? "flex" : "none",
-        // グループの場合は枠線のみ、または透明にするなどのスタイル
-        border: item.id.startsWith("group") ? "1px dashed #aaa" : undefined,
-        backgroundColor: item.id.startsWith("group") ? "rgba(0,0,0,0.05)" : undefined,
+        
+        height: isAutoHeight ? 'auto' : `${height}px`,
+        minHeight: isAutoHeight ? `${height}px` : undefined,
+        
+        zIndex: 0, 
+        opacity: itemState.opacity,
+        transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
+        transition: itemState.transition || 'none',
+        color: item.data.color || '#333333',
+        border: (item.data.showBorder === false) ? 'none' : undefined,
+        backgroundColor: (item.data.isTransparent) ? 'transparent' : undefined,
       }}
       onClick={handleClick}
     >
-      {/* グループ以外なら名前を表示 */}
-      {!item.id.startsWith("group") && name}
-      
-      {/* 子要素のレンダリング */}
-      {children}
+      {content}
     </div>
   );
 };
 
-export default PlacedItem;
+export default PreviewItem;

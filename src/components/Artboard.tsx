@@ -57,7 +57,8 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const isActive = item.id === activeTabId;
   const isGroup = item.id.startsWith("group");
 
-  const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン") || item.name.startsWith("テキスト入力欄"));
+  // ★ 修正: 「テキスト入力欄」を自動高さ調整の対象外にする（固定サイズにする）
+  const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン"));
 
   const style: React.CSSProperties = {
     width: item.width,
@@ -98,13 +99,8 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     }
   }, [externalValue, isPreviewing]);
 
-  useEffect(() => {
-    if (item.name.startsWith("テキスト入力欄") && textareaRef.current) {
-      const el = textareaRef.current;
-      el.style.height = "0px";
-      el.style.height = `${el.scrollHeight}px`;
-    }
-  }, [inputValue, item.width, item.name]);
+  // ★ 修正: 入力欄の高さを自動で縮める useEffect を削除
+  // これにより、エディタ上でも「配置した通りの高さ」が維持されます。
 
   const handleClick = (e: React.MouseEvent) => {
     if (isPreviewing) {
@@ -149,7 +145,6 @@ const ArtboardItem: React.FC<ArtboardItemProps> = ({
     itemClassName += " is-transparent";
   }
 
-  // ★ 追加: テキスト入力欄のクラス付与
   if (item.name.startsWith("テキスト入力欄")) {
     itemClassName += " is-input";
   }
@@ -375,6 +370,7 @@ const Artboard: React.FC = () => {
         } else if (item.name === "テキスト") {
           newItem.width = 120; newItem.data.text = "テキスト";
         } else if (item.name === "テキスト入力欄") {
+          // ★ 修正: 初期の高さを少し調整（45px程度）
           newItem.width = 200; newItem.height = 45;
           newItem.data = {
             text: "", src: null, variableName: `input_${Date.now()}`, placeholder: "テキストを入力...", showBorder: true, isTransparent: false, color: "#333333"
