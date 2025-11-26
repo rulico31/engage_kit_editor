@@ -6,6 +6,7 @@ import { usePreviewStore } from "../stores/usePreviewStore";
 import { usePageStore } from "../stores/usePageStore";
 import PreviewHost from "./PreviewHost";
 import "./Artboard.css"; // デザイン用のCSSを流用
+import { logAnalyticsEvent } from "../lib/analytics"; // ★ 追加: 分析ログ用
 
 interface ViewerHostProps {
   projectId: string;
@@ -47,6 +48,13 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         setTimeout(() => {
           initPreview();
           setIsLoaded(true);
+          
+          // ★ 追加: PVとUUの計測開始
+          // プロジェクトロードと初期化が完了した時点でカウントします
+          logAnalyticsEvent('page_view', {
+             metadata: { referrer: document.referrer }
+          });
+          
         }, 100);
 
       } catch (err) {

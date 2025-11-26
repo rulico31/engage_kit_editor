@@ -8,6 +8,7 @@ import type {
   PreviewItemState,
   PlacedItemType 
 } from "./types";
+import { logAnalyticsEvent } from "./lib/analytics"; // ★ 追加: 分析モジュールのインポート
 
 // リスナー管理用の型定義
 export type ResumeListener = () => void;
@@ -34,7 +35,12 @@ const processQueue = (
     const node = allNodes.find((n) => n.id === nodeId);
     if (!node) continue;
 
-    // console.log(`[LogicEngine] ⚡ 実行中: ${node.type} / ${node.id}`);
+    // ★ 追加: ノード実行ログを送信 (ステップ別離脱率・通過数の計測用)
+    logAnalyticsEvent('node_execution', {
+      nodeId: node.id,
+      nodeType: node.type,
+      metadata: { label: node.data.label }
+    });
 
     // (1) アクションノード
     if (node.type === "actionNode") {
@@ -109,6 +115,18 @@ const processQueue = (
           }
         }
       }
+
+      // ★ 追加: ロジック分岐の結果をログ送信 (Aルート/Bルートの割合計測用)
+      logAnalyticsEvent('logic_branch', {
+        nodeId: node.id,
+        nodeType: node.type,
+        metadata: { 
+          result: conditionResult ? 'true' : 'false',
+          conditionSource,
+          variableName 
+        }
+      });
+
       pushNext(node.id, conditionResult ? "true" : "false", allEdges, nextQueue);
     }
     
