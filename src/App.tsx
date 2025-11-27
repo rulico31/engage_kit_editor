@@ -1,236 +1,113 @@
 // src/App.tsx
 
-import React, { useCallback, useEffect, useState } from "react";
-import "./App.css";
-import HomeScreen from "./components/HomeScreen";
-import Login from "./components/Auth/Login";
-import type { ProjectData } from "./types";
+import React, { useState, useEffect } from "react";
+// ★ 修正: 正しいコンポーネントをインポート
+import HomeView from "./components/HomeView"; 
 import EditorView from "./components/EditorView";
-import BackgroundPositionerModal from "./components/BackgroundPositionerModal";
-import PublishModal from "./components/PublishModal";
-import ViewerHost from "./components/ViewerHost"; // ★ 追加
+import ViewerHost from "./components/ViewerHost"; 
+import BackgroundModal from "./components/BackgroundModal";
+import { useProjectStore } from "./stores/useProjectStore";
+import "./App.css";
 
-// ★ Zustand ストアをインポート
-import { useEditorSettingsStore } from "./stores/useEditorSettingsStore";
-import { usePageStore } from "./stores/usePageStore";
-import { useSelectionStore } from "./stores/useSelectionStore";
-import { usePreviewStore } from "./stores/usePreviewStore";
-import { useAuthStore } from "./stores/useAuthStore";
-import { useProjectStore } from "./stores/useProjectStore"; 
+type AppRoute = "home" | "editor" | "viewer";
 
-function App() {
-  const { user, isLoading, initializeAuth } = useAuthStore();
-  const view = useEditorSettingsStore(state => state.view);
-  const projectName = useEditorSettingsStore(state => state.projectName);
-  const currentProjectId = useProjectStore(state => state.currentProjectId);
-
-  // 背景画像モーダル
-  const [bgModal, setBgModal] = React.useState({
-    isOpen: false,
-    itemId: null as string | null,
-    src: null as string | null,
-  });
-
-  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-
-  // ★ 追加: ビューワーモード判定用のステート
+const App: React.FC = () => {
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>("home");
   const [viewerProjectId, setViewerProjectId] = useState<string | null>(null);
 
+  const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
+  const [backgroundTargetItemId, setBackgroundTargetItemId] = useState<string | null>(null);
+  const [backgroundTargetSrc, setBackgroundTargetSrc] = useState<string | null>(null);
+
+  const { currentProjectId, projectMeta, createProject, loadProject } = useProjectStore((state) => ({
+    currentProjectId: state.currentProjectId,
+    projectMeta: state.projectMeta,
+    createProject: state.createProject,
+    loadProject: state.loadProject,
+  }));
+
   useEffect(() => {
-    // ★ URLルーティングの簡易実装
-    // パスが "/view/プロジェクトID" の形式かチェック
-    const path = window.location.pathname;
-    const viewMatch = path.match(/^\/view\/(.+)$/);
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get("project_id");
+    const mode = params.get("mode");
 
-    if (viewMatch && viewMatch[1]) {
-      setViewerProjectId(viewMatch[1]);
-    } else {
-      // 通常の認証フローを開始
-      initializeAuth();
-    }
-  }, [initializeAuth]);
-
-  // --- 画面遷移・プロジェクト管理 ---
-
-  const handleGoHome = useCallback(() => {
-    if (window.confirm("ホームに戻ると、保存していない変更は失われます。よろしいですか？")) {
-      usePageStore.getState().resetPages();
-      useSelectionStore.getState().resetSelection();
-      useEditorSettingsStore.getState().resetEditorSettings();
-      usePreviewStore.getState().stopPreview();
-      useProjectStore.getState().setCurrentProjectId(null);
-      useEditorSettingsStore.getState().setView("home");
+    if (pid && mode === "view") {
+      setViewerProjectId(pid);
+      setCurrentRoute("viewer");
     }
   }, []);
 
-  const handleExportProject = useCallback(() => {
-    const { pages, pageOrder } = usePageStore.getState();
-    const { variables } = usePreviewStore.getState();
-    const projectName = useEditorSettingsStore.getState().projectName;
-    const projectData: ProjectData = { projectName, pages, pageOrder, variables };
-    
-    const jsonString = JSON.stringify(projectData, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${projectName || "project"}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, []);
+  const handleCreateProject = async (name: string) => {
+    await createProject(name);
+    setCurrentRoute("editor");
+  };
 
-  const handleImportProject = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const data = JSON.parse(text) as ProjectData;
-        const firstPageId = data.pageOrder?.[0];
-        
-        if (data.pages && data.pageOrder && firstPageId) {
-          usePageStore.getState().resetPages();
-          useSelectionStore.getState().resetSelection();
-          useEditorSettingsStore.getState().resetEditorSettings();
-          usePreviewStore.getState().stopPreview();
-          useProjectStore.getState().setCurrentProjectId(null);
+  const handleOpenProject = async (id: string) => {
+    await loadProject(id);
+    setCurrentRoute("editor");
+  };
 
-          useEditorSettingsStore.getState().setProjectName(data.projectName || "無題のプロジェクト");
-          usePageStore.getState().loadProjectData(data);
-          usePreviewStore.getState().setVariables(data.variables || {});
-          useEditorSettingsStore.getState().setView("editor");
-        } else {
-          alert("有効なページデータが見つかりませんでした。");
-        }
-      } catch (err) {
-        console.error("プロジェクトの読み込みに失敗しました:", err);
-        alert("プロジェクトファイルの読み込みに失敗しました。");
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = "";
-  }, []);
+  const handleGoHome = () => {
+    setCurrentRoute("home");
+  };
 
-  const handleOpenBackgroundModal = useCallback((itemId: string, src: string) => {
-    if (!src) {
-      alert("先に画像をアップロードしてください。");
-      return;
+  const handleOpenBackgroundModal = (itemId: string, src: string) => {
+    setBackgroundTargetItemId(itemId);
+    setBackgroundTargetSrc(src);
+    setIsBackgroundModalOpen(true);
+  };
+
+  const handleCloseBackgroundModal = () => {
+    setIsBackgroundModalOpen(false);
+    setBackgroundTargetItemId(null);
+    setBackgroundTargetSrc(null);
+  };
+
+  const handlePublish = async () => {
+    if (!currentProjectId) return;
+    const url = `${window.location.origin}?mode=view&project_id=${currentProjectId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      alert(`公開用URLをクリップボードにコピーしました:\n${url}`);
+    } catch (err) {
+      console.error(err);
+      alert(`公開用URL:\n${url}`);
     }
-    setBgModal({ isOpen: true, itemId: itemId, src: src });
-  }, []);
-  
-  const handleCloseBackgroundModal = useCallback(() => {
-    setBgModal({ isOpen: false, itemId: null, src: null });
-  }, []);
+  };
 
-  const handleConfirmBackgroundModal = useCallback((newPosition: string, newSize: string) => {
-    if (bgModal.itemId) {
-      const { pages, selectedPageId } = usePageStore.getState();
-      if (!selectedPageId) return;
-      const currentPage = pages[selectedPageId];
-      if (!currentPage) return;
-      
-      const newPlacedItems = currentPage.placedItems.map(item => {
-        if (item.id === bgModal.itemId) {
-          return {
-            ...item,
-            data: { 
-              ...item.data, 
-              isArtboardBackground: true, 
-              artboardBackgroundPosition: newPosition,
-              artboardBackgroundSize: newSize
-            }
-          };
-        } else if (item.data.isArtboardBackground) {
-          return {
-            ...item,
-            data: { 
-              ...item.data, 
-              isArtboardBackground: false, 
-              artboardBackgroundPosition: undefined,
-              artboardBackgroundSize: undefined 
-            }
-          };
-        }
-        return item;
-      });
-      
-      usePageStore.setState(state => ({
-        pages: {
-          ...state.pages,
-          [selectedPageId!]: { ...currentPage, placedItems: newPlacedItems }
-        }
-      }));
-    }
-    setBgModal({ isOpen: false, itemId: null, src: null });
-  }, [bgModal.itemId]);
-
-
-  // --- レンダリング分岐 ---
-
-  // ★ 1. ビューワーモードの場合 (認証不要で表示)
-  if (viewerProjectId) {
-    return <ViewerHost projectId={viewerProjectId} />;
-  }
-
-  // 2. ローディング中
-  if (isLoading) {
-    return (
-      <div style={{ 
-        display: 'flex', justifyContent: 'center', alignItems: 'center', 
-        height: '100vh', backgroundColor: '#1e1e1e', color: '#888' 
-      }}>
-        Loading...
-      </div>
-    );
-  }
-
-  // 3. 未ログイン時
-  if (!user) {
-    return <Login />;
-  }
-
-  // 4. ホーム画面
-  if (view === "home") {
-    return (
-      <HomeScreen 
-        onNewProject={() => {}} 
-        onImportProject={handleImportProject} 
-      />
-    );
-  }
-
-  // 5. エディタ画面
   return (
-    <>
-      <EditorView
-        projectName={projectName}
-        onGoHome={handleGoHome}
-        onExportProject={handleExportProject}
-        onImportProject={handleImportProject}
-        onOpenBackgroundModal={handleOpenBackgroundModal}
-        onPublish={() => setIsPublishModalOpen(true)}
-      />
-      
-      {bgModal.isOpen && bgModal.src && (
-        <BackgroundPositionerModal
-          imageUrl={bgModal.src}
-          onClose={handleCloseBackgroundModal}
-          onConfirm={handleConfirmBackgroundModal} 
+    <div className="App">
+      {currentRoute === "home" && (
+        <HomeView 
+          onCreateProject={handleCreateProject}
+          onOpenProject={handleOpenProject}
         />
       )}
 
-      {isPublishModalOpen && (
-        <PublishModal
-          onClose={() => setIsPublishModalOpen(false)}
-          projectId={currentProjectId}
-        />
+      {currentRoute === "editor" && (
+        <>
+          <EditorView
+            projectName={projectMeta?.name || ""}
+            onGoHome={handleGoHome}
+            onPublish={handlePublish}
+            onOpenBackgroundModal={handleOpenBackgroundModal}
+          />
+          
+          {isBackgroundModalOpen && backgroundTargetItemId && backgroundTargetSrc && (
+            <BackgroundModal
+              itemId={backgroundTargetItemId}
+              imageSrc={backgroundTargetSrc}
+              onClose={handleCloseBackgroundModal}
+            />
+          )}
+        </>
       )}
-    </>
+
+      {currentRoute === "viewer" && viewerProjectId && (
+        <ViewerHost projectId={viewerProjectId} />
+      )}
+    </div>
   );
-}
+};
 
 export default App;
