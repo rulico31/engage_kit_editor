@@ -45,11 +45,10 @@
   justify-content: flex-start;
 }
 
-/* ★ 修正: テキスト入力欄のスタイル */
+/* テキスト入力欄のスタイル */
 .artboard-item.is-input {
   background-color: #ffffff; 
   cursor: text;
-  /* ★ 追加: 入力欄の場合は外側のパディングをなくす（プレビューと合わせる） */
   padding: 0;
 }
 
@@ -144,10 +143,7 @@
   font: inherit;
   color: inherit; 
   cursor: inherit;
-  
-  /* ★ 修正: 内側にパディングを持たせる（プレビューと合わせる） */
   padding: 10px 12px;
-  
   box-sizing: border-box; 
   resize: none;
   overflow: hidden;
@@ -250,4 +246,56 @@
   height: 100%;
   pointer-events: none;
   z-index: 0; /* アイテムより後ろに表示 */
+}
+
+/* ★ 追加: コンテキストメニューのスタイル */
+.context-menu {
+  position: fixed; /* viewportに対して固定 */
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  min-width: 160px;
+  padding: 4px 0;
+  color: #eee;
+  font-size: 13px;
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.1s;
+}
+
+.context-menu-item:hover {
+  background-color: #007acc;
+  color: white;
+}
+
+.context-menu-item.disabled {
+  color: #666;
+  cursor: default;
+}
+.context-menu-item.disabled:hover {
+  background-color: transparent;
+  color: #666;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: #444;
+  margin: 4px 0;
+}
+
+.shortcut-hint {
+  font-size: 11px;
+  color: #aaa;
+  margin-left: 12px;
+}
+.context-menu-item:hover .shortcut-hint {
+  color: #ddd;
 }

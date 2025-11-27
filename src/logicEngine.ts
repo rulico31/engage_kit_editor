@@ -8,11 +8,29 @@ import type {
   PreviewItemState,
   PlacedItemType 
 } from "./types";
-import { logAnalyticsEvent } from "./lib/analytics"; // ★ 追加: 分析モジュールのインポート
+import { logAnalyticsEvent } from "./lib/analytics";
+import { submitLeadData } from "./lib/leads"; // ★ 追加
 
 // リスナー管理用の型定義
 export type ResumeListener = () => void;
 export type ActiveListeners = Map<string, ResumeListener[]>;
+
+/**
+ * ヘルパー: 次のノード群を探してIDの配列を返す (1対多対応)
+ */
+const findNextNodes = (srcId: string, handle: string | null, edges: Edge[]): string[] => {
+  return edges
+    .filter((e) => e.source === srcId && e.sourceHandle === handle)
+    .map((e) => e.target);
+};
+
+/**
+ * ヘルパー: 次のノード群をキューに追加する
+ */
+const pushNext = (srcId: string, handle: string | null, edges: Edge[], queue: string[]) => {
+  const nextIds = findNextNodes(srcId, handle, edges);
+  queue.push(...nextIds);
+};
 
 /**
  * ロジック実行エンジン (内部処理用)
@@ -21,7 +39,7 @@ const processQueue = (
   executionQueue: string[],
   allNodes: Node[],
   allEdges: Edge[],
-  placedItems: PlacedItemType[], // 初期状態の参照用
+  placedItems: PlacedItemType[],
   getPreviewState: () => PreviewState,
   setPreviewState: (newState: PreviewState) => void,
   requestPageChange: (pageId: string) => void,
@@ -35,7 +53,6 @@ const processQueue = (
     const node = allNodes.find((n) => n.id === nodeId);
     if (!node) continue;
 
-    // ★ 追加: ノード実行ログを送信 (ステップ別離脱率・通過数の計測用)
     logAnalyticsEvent('node_execution', {
       nodeId: node.id,
       nodeType: node.type,
@@ -116,7 +133,6 @@ const processQueue = (
         }
       }
 
-      // ★ 追加: ロジック分岐の結果をログ送信 (Aルート/Bルートの割合計測用)
       logAnalyticsEvent('logic_branch', {
         nodeId: node.id,
         nodeType: node.type,
@@ -215,20 +231,6 @@ const processQueue = (
               return;
             }
 
-            if (animationMode === 'absolute') {
-              const current = getPreviewState()[targetItemId];
-              if (
-                (animType === 'opacity' && current.opacity === toState.opacity) ||
-                (animType === 'moveX' && current.x === toState.x) ||
-                (animType === 'moveY' && current.y === toState.y) ||
-                (animType === 'scale' && current.scale === toState.scale) ||
-                (animType === 'rotate' && current.rotation === toState.rotation)
-              ) {
-                pushNext(node.id, null, allEdges, nextQueue);
-                return;
-              }
-            }
-            
             setPreviewState({
               ...getPreviewState(),
               [targetItemId]: fromState,
@@ -250,9 +252,9 @@ const processQueue = (
                 const nextRemaining = remaining - 1;
                 playAnimation(nextRemaining);
               } else {
-                const nextNode = findNextNode(node.id, null, allEdges);
-                if (nextNode) {
-                  processQueue([nextNode], allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+                const nextNodeIds = findNextNodes(node.id, null, allEdges);
+                if (nextNodeIds.length > 0) {
+                  processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
                 }
               }
             }, durationMs + 20);
@@ -273,9 +275,9 @@ const processQueue = (
     else if (node.type === "delayNode") {
       const { durationS = 1.0 } = node.data;
       setTimeout(() => {
-        const nextNode = findNextNode(node.id, null, allEdges);
-        if (nextNode) {
-          processQueue([nextNode], allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+        const nextNodeIds = findNextNodes(node.id, null, allEdges);
+        if (nextNodeIds.length > 0) {
+          processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
         }
       }, Number(durationS) * 1000);
     }
@@ -290,12 +292,12 @@ const processQueue = (
       const { targetItemId } = node.data;
       
       if (targetItemId) {
-        const nextNodeId = findNextNode(node.id, null, allEdges);
+        const nextNodeIds = findNextNodes(node.id, null, allEdges);
         
-        if (nextNodeId) {
+        if (nextNodeIds.length > 0) {
           const resumeFlow = () => {
             processQueue(
-              [nextNodeId], 
+              nextNodeIds,
               allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners
             );
           };
@@ -308,6 +310,16 @@ const processQueue = (
         pushNext(node.id, null, allEdges, nextQueue);
       }
     }
+
+    // (9) データ送信ノード (★ 追加)
+    else if (node.type === "submitDataNode") {
+      // 現在の全変数を取得して送信
+      const currentVars = getVariables();
+      submitLeadData(currentVars);
+      
+      // 送信後もフローを継続（完了ページへの遷移などにつなげるため）
+      pushNext(node.id, null, allEdges, nextQueue);
+    }
   }
 
   if (nextQueue.length > 0) {
@@ -315,19 +327,8 @@ const processQueue = (
   }
 };
 
-// ヘルパー: 次のノードを探してキューに追加
-const pushNext = (srcId: string, handle: string | null, edges: Edge[], queue: string[]) => {
-  const next = findNextNode(srcId, handle, edges);
-  if (next) queue.push(next);
-};
-
-const findNextNode = (srcId: string, handle: string | null, edges: Edge[]): string | undefined => {
-  const edge = edges.find((e) => e.source === srcId && e.sourceHandle === handle);
-  return edge?.target;
-};
-
 /**
- * イベントトリガー (App.tsx から呼ばれる)
+ * イベントトリガー
  */
 export const triggerEvent = (
   eventName: string,
@@ -349,34 +350,35 @@ export const triggerEvent = (
     if (listeners) {
       listeners.forEach(resume => resume());
       activeListeners.delete(targetItemId);
-      return; 
     }
   }
 
-  // 2. 通常のイベント開始ノードを探す
+  // 2. イベント開始ノードを探す
   const startingNodes = nodes.filter(
     (n) => n.type === "eventNode" && n.data.eventType === eventName
   );
 
   if (startingNodes.length > 0) {
-    const nextQueue = startingNodes.map(n => {
-        return findNextNode(n.id, null, edges);
-    }).filter((id): id is string => !!id);
+    const initialQueue: string[] = [];
+    
+    startingNodes.forEach(startNode => {
+        const nextIds = findNextNodes(startNode.id, null, edges);
+        initialQueue.push(...nextIds);
+    });
 
-    if (nextQueue.length > 0) {
-        processQueue(nextQueue, nodes, edges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+    if (initialQueue.length > 0) {
+        processQueue(initialQueue, nodes, edges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
     }
   }
 };
 
-// ★ 追加: PreviewItem.tsx から呼ばれる executeLogicGraph を実装
+// 互換性維持
 export const executeLogicGraph = (
   startNodeId: string,
   graph: NodeGraph,
   previewState: PreviewState,
   setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void
 ) => {
-  // 引数を使用することで TS6133 エラーを回避
   console.warn(
     "executeLogicGraph is deprecated.", 
     startNodeId, 

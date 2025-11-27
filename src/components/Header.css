@@ -1,150 +1,200 @@
 /* src/components/Header.css */
 
-.app-header {
-  display: flex;
-  justify-content: space-between; /* 左・中央・右を配置 */
-  align-items: center;
-  background-color: #2a2a2a;
-  padding: 0 10px 0 20px;
-  height: 45px;
-  border-bottom: 1px solid #1e1e1e;
-  flex-shrink: 0;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  z-index: 10;
+:root {
+  --header-height: 56px;
+  --header-bg: #18181b;       /* Zinc-900: より深い黒に近いグレー */
+  --header-border: #27272a;   /* Zinc-800: 境界線 */
+  --text-main: #e4e4e7;       /* Zinc-200 */
+  --text-muted: #a1a1aa;      /* Zinc-400 */
+  --accent-color: #3b82f6;    /* Blue-500 */
+  --accent-hover: #2563eb;    /* Blue-600 */
+  --danger-color: #ef4444;
 }
 
-.header-left,
-.header-right {
+.editor-header {
+  height: var(--header-height);
+  background-color: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
   display: flex;
   align-items: center;
-  gap: 8px;
-  /* 幅を確保して中央揃えが崩れないようにする（簡易的な対応） */
+  justify-content: space-between;
+  padding: 0 16px;
+  user-select: none;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* --- 左側: ホーム & タイトル --- */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex: 1;
 }
 
-.header-right {
-  justify-content: flex-end; /* 右寄せ */
-}
-
-/* (★ 追加) 中央エリア */
-.header-center {
+.home-button {
+  width: 32px;
+  height: 32px;
   display: flex;
+  align-items: center;
   justify-content: center;
-  flex: 1;
-}
-
-/* (★ 追加) 履歴コントロール */
-.history-controls {
-  display: flex;
-  gap: 2px;
-  margin-left: 4px;
-}
-
-/* (★ 追加) ビュー切り替えボタングループ */
-.view-mode-group {
-  display: flex;
-  background-color: #1e1e1e; /* ヘッダーより少し暗くして凹んだ感じに */
-  padding: 3px;
   border-radius: 6px;
-  gap: 2px;
-}
-
-.view-mode-btn {
-  background: transparent;
-  border: none;
-  color: #888;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 4px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
-  white-space: nowrap;
+  font-size: 16px;
 }
 
-.view-mode-btn:hover {
-  color: #ccc;
-  background-color: #333;
+.home-button:hover {
+  background-color: #27272a;
+  color: var(--text-main);
 }
 
-.view-mode-btn.active {
-  background-color: #3a3a3a; /* アクティブ時の背景 */
-  color: #fff;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-}
-
-/* 既存スタイル */
-.header-title {
+.project-title {
   font-weight: 600;
-  font-size: 1.1em;
-  color: #eee;
+  font-size: 14px;
+  color: var(--text-main);
   white-space: nowrap;
-}
-.header-title span {
-  font-weight: 400;
-  color: #aaa;
-  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.header-button {
+/* --- 中央: ビュー切り替えタブ (Segmented Control風) --- */
+.header-center {
+  flex: 2;
+  display: flex;
+  justify-content: center;
+}
+
+.view-mode-tabs {
+  display: flex;
+  background-color: #27272a; /* 背景を一段階明るくして「くぼみ」を作る */
+  padding: 3px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.view-mode-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 80px;
+  text-align: center;
+}
+
+.view-mode-tab:hover {
+  color: var(--text-main);
+}
+
+.view-mode-tab.active {
+  background-color: #3f3f46; /* Zinc-700 */
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+}
+
+/* --- 右側: アクションボタン --- */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 16px;
+}
+
+.icon-button:hover {
+  background-color: #27272a;
+  color: var(--text-main);
+}
+
+.separator {
+  width: 1px;
+  height: 20px;
+  background-color: var(--header-border);
+  margin: 0 4px;
+}
+
+/* プレビューボタン */
+.preview-toggle-button {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background-color: transparent;
+  color: var(--text-main);
+  font-size: 13px;
   font-weight: 500;
-  background-color: transparent;
-  color: #ccc;
-  border: none;
-  padding: 6px 10px;
-  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-  white-space: nowrap;
-}
-.header-button:hover {
-  background-color: #3f3f3f;
-  color: #fff;
-}
-.header-button:active {
-  background-color: #4a4a4a;
-}
-.header-button:disabled {
-  color: #555;
-  cursor: not-allowed;
-  background-color: transparent;
+  transition: all 0.2s;
 }
 
-.header-button.icon-only {
-  padding: 6px;
+.preview-toggle-button:hover {
+  background-color: #27272a;
+  border-color: #52525b;
 }
 
-.header-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
+.preview-toggle-button.is-previewing {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--danger-color);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.preview-toggle-button.is-previewing:hover {
+  background-color: rgba(239, 68, 68, 0.2);
 }
 
-.header-button.preview-button {
-  background-color: #2a8a4a;
-  border-color: #2a8a4a;
-  color: #fff;
-}
-.header-button.preview-button:hover {
-  background-color: #3aa05a;
+/* 公開ボタン (Primary Action) */
+.publish-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  height: 32px;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s, transform 0.1s;
 }
 
-.header-button.edit-button {
-  background-color: #007acc;
-  border-color: #007acc;
-  color: #fff;
-}
-.header-button.edit-button:hover {
-  background-color: #008be6;
+.publish-button:hover {
+  background-color: var(--accent-hover);
 }
 
-.header-separator {
-  width: 1px;
-  height: 24px;
-  background-color: #444;
-  margin: 0 4px;
+.publish-button:active {
+  transform: translateY(1px);
 }

@@ -43,9 +43,8 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   let content: React.ReactNode = null;
 
-  // ★ 修正: 「テキスト入力欄」も自動高さの対象外にする（= 固定高さにする）
+  const isAutoHeight = !name.startsWith("画像") && !id.startsWith("group");
   const isInput = name.startsWith("テキスト入力欄");
-  const isAutoHeight = !name.startsWith("画像") && !id.startsWith("group") && !isInput;
   const isButton = name.includes("ボタン");
 
   if (name.startsWith("画像")) {
@@ -56,6 +55,10 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
           alt={item.data.text || "image"} 
           className="preview-image-content"
           draggable={false}
+          onLoad={() => {
+            // ★ 追加: 画像読み込み完了時にイベントを発火
+            onItemEvent("onImageLoad", id);
+          }}
         />
       );
     } else {
@@ -88,6 +91,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     content = item.data.text || name;
   }
 
+  // クラス名の動的生成
   const itemClassName = `preview-item ${isButton ? "is-button" : ""} ${isInput ? "is-input" : ""}`;
 
   return (
@@ -107,6 +111,8 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
         color: item.data.color || '#333333',
+        
+        // 枠線の制御（入力欄はCSSで制御するためここではborder指定をスキップする場合もあるが、一貫性のため残す）
         border: (item.data.showBorder === false) ? 'none' : undefined,
         backgroundColor: (item.data.isTransparent) ? 'transparent' : undefined,
       }}

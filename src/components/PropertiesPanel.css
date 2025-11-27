@@ -1,16 +1,16 @@
-/* PropertiesPanel.css */
+/* src/components/PropertiesPanel.css */
 
 .panel-content-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden; /* スクロールバーが2重に出ないように */
+  overflow: hidden;
 }
 
 .panel-content-scrollable {
   flex-grow: 1;
-  overflow-y: auto; /* ここでスクロール */
-  background-color: #2e2e2e; /* パネル背景色 */
+  overflow-y: auto;
+  background-color: #2e2e2e;
   color: #ccc;
 }
 
@@ -33,7 +33,7 @@
   width: 100%;
   background-color: #252526;
   border-bottom: 1px solid #333;
-  overflow-x: auto; /* タブが溢れたらスクロール */
+  overflow-x: auto;
 }
 
 .inspector-tab {
@@ -70,7 +70,6 @@
   background-color: #555;
   color: #fff;
 }
-
 
 /* --- アコーディオン --- */
 .accordion-section {
@@ -131,7 +130,7 @@
   color: #aaa;
   margin-right: 8px;
   font-size: 0.9em;
-  width: 15px; /* X, Y, W, H ラベルの幅を固定 */
+  width: 15px;
 }
 
 .prop-input,
@@ -144,7 +143,7 @@
   padding: 8px;
   color: #eee;
   font-size: 0.95em;
-  box-sizing: border-box; /* padding を含めて width: 100% */
+  box-sizing: border-box;
 }
 .prop-input:focus,
 .prop-select:focus {
@@ -223,7 +222,7 @@ textarea.prop-input {
   border-radius: 2px;
 }
 
-/* ★ 追加: 重ね順ボタン用のグリッドレイアウト */
+/* 重ね順ボタン用のグリッドレイアウト */
 .prop-grid-buttons-4 {
   display: grid;
   grid-template-columns: 1fr 1fr;

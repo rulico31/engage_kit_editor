@@ -1,14 +1,11 @@
-// src/components/PreviewHost.tsx
-
 import React from "react";
-import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import PreviewItem from "./PreviewItem";
+import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./Artboard.css"; // (Artboard のスタイルを流用)
 
 interface PreviewHostProps {
   placedItems: PlacedItemType[];
   previewState: PreviewState;
-  // (★ 修正: App.tsx のラッパー関数に型を合わせる)
   setPreviewState: (
     newState: PreviewState | ((prev: PreviewState) => PreviewState)
   ) => void;
@@ -21,13 +18,26 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
   setPreviewState,
   allItemLogics,
 }) => {
+  // コンテナのスタイル
+  // 背景設定は親コンポーネント（ViewerHostやEditorView）側で行うため、ここでは指定しない
+  const containerStyle: React.CSSProperties = {
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    overflow: "hidden", // アイテムがはみ出さないように
+  };
+
   return (
-    // Artboard と同じクラス名とレイアウトを使用
-    <div className="artboard">
+    <div style={containerStyle}>
       {placedItems.map((item) => {
         const itemState = previewState[item.id];
         
-        // アイテムが非表示状態なら null を返す
+        // ★ 修正: 背景として設定されているアイテムは描画しない
+        if (item.data.isArtboardBackground) {
+          return null;
+        }
+
+        // アイテムの状態が存在しない、または非表示設定の場合は描画しない
         if (!itemState || !itemState.isVisible) {
           return null;
         }
@@ -48,4 +58,3 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
 };
 
 export default PreviewHost;
-

@@ -6,28 +6,25 @@ import Artboard from "./Artboard";
 import PropertiesPanel from "./PropertiesPanel";
 import NodeEditor from "./NodeEditor";
 import LeftPanel from "./LeftPanel";
+import DashboardView from "./DashboardView";
 import "./EditorView.css";
 import { GridIcon } from "./icons/GridIcon";
 import { SlashIcon } from "./icons/SlashIcon";
 import "./GridPopover.css";
 
-// ★ 修正: 未使用の ViewMode インポートを削除
-// import type { ViewMode } from "../types";
-
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePreviewStore } from "../stores/usePreviewStore";
 import { usePageStore } from "../stores/usePageStore";
+import { useSelectionStore } from "../stores/useSelectionStore";
+import { useProjectStore } from "../stores/useProjectStore";
 
 interface EditorViewProps {
   projectName: string;
   onGoHome: () => void;
-  onExportProject: () => void;
-  onImportProject: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onOpenBackgroundModal: (itemId: string, src: string) => void;
   onPublish: () => void; 
 }
 
-// グリッド/スナップ設定のポップオーバー
 const GridPopover: React.FC = () => {
   const { gridSize, setGridSize, showGrid, setShowGrid } = useEditorSettingsStore(state => ({
     gridSize: state.gridSize,
@@ -40,7 +37,6 @@ const GridPopover: React.FC = () => {
   
   return (
     <div className="grid-popover">
-      {/* グリッド表示設定セクション */}
       <div className="grid-popover-section">
         <label className="grid-popover-label">グリッド線</label>
         <div className="grid-toggle-row">
@@ -52,10 +48,7 @@ const GridPopover: React.FC = () => {
           </button>
         </div>
       </div>
-
       <div className="grid-popover-divider" />
-
-      {/* スナップ設定セクション */}
       <div className="grid-popover-section">
         <label className="grid-popover-label">スナップ (PX)</label>
         <div className="grid-button-group">
@@ -64,11 +57,7 @@ const GridPopover: React.FC = () => {
               key={size === null ? 'null' : size}
               className={`grid-snap-button ${gridSize === size ? 'active' : ''}`}
               onClick={() => setGridSize(size)}
-              title={
-                size === null ? "スナップ OFF" : 
-                size === 1 ? "ピクセル (1px) スナップ" : 
-                `${size}px グリッド`
-              }
+              title={size === null ? "スナップ OFF" : size === 1 ? "ピクセル (1px) スナップ" : `${size}px グリッド`}
             >
               {size === null ? <SlashIcon /> : size}
             </button>
@@ -83,8 +72,6 @@ const GridPopover: React.FC = () => {
 const EditorView: React.FC<EditorViewProps> = ({
   projectName,
   onGoHome,
-  onExportProject,
-  onImportProject,
   onOpenBackgroundModal,
   onPublish, 
 }) => {
@@ -103,6 +90,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   
   const initPreview = usePreviewStore(state => state.initPreview);
   const stopPreview = usePreviewStore(state => state.stopPreview);
+  const saveProject = useProjectStore(state => state.saveProject);
 
   const handleTogglePreview = () => {
     if (!isPreviewing) {
@@ -112,13 +100,33 @@ const EditorView: React.FC<EditorViewProps> = ({
     }
     togglePreview();
   };
+
+  const handleSave = async () => {
+    try {
+      await saveProject();
+      alert("プロジェクトを保存しました (Supabase)");
+    } catch (e) {
+      console.error(e);
+      alert("保存に失敗しました");
+    }
+  };
+
+  // ★ 追加: 全画面表示の切り替えロジック
+  const handleEnterFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((e) => {
+        console.error(`Error attempting to enable fullscreen: ${e.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
   
   const [isGridPopoverOpen, setIsGridPopoverOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
-  // =========================================================
-  // リサイズ管理ステート
-  // =========================================================
   const [splitRatio, setSplitRatio] = useState(0.6);
   const [leftWidth, setLeftWidth] = useState(260);
   const [rightWidth, setRightWidth] = useState(280);
@@ -193,6 +201,7 @@ const EditorView: React.FC<EditorViewProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (useEditorSettingsStore.getState().isPreviewing) return;
+      
       if (e.metaKey || e.ctrlKey) {
         if (e.key === 'z') {
           e.preventDefault();
@@ -205,13 +214,34 @@ const EditorView: React.FC<EditorViewProps> = ({
           e.preventDefault();
           if (usePageStore.getState().canRedo) usePageStore.getState().redo();
         }
+        
+        else if (e.key === 'g') {
+          e.preventDefault();
+          const currentSelectedIds = useSelectionStore.getState().selectedIds;
+          
+          if (e.shiftKey) {
+            if (currentSelectedIds.length > 0) {
+              currentSelectedIds.forEach(id => {
+                 usePageStore.getState().ungroupItems(id);
+              });
+            }
+          } else {
+            if (currentSelectedIds.length >= 2) {
+              usePageStore.getState().groupItems(currentSelectedIds);
+            }
+          }
+        }
+        else if (e.key === 's') {
+          e.preventDefault();
+          handleSave();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, []); 
 
 
   return (
@@ -220,9 +250,9 @@ const EditorView: React.FC<EditorViewProps> = ({
         projectName={projectName}
         isPreviewing={isPreviewing}
         onGoHome={onGoHome}
-        onExportProject={onExportProject}
-        onImportProject={onImportProject}
+        onSave={handleSave}
         onTogglePreview={handleTogglePreview}
+        onEnterFullscreen={handleEnterFullscreen} // ★ 追加: 関数を渡す
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onPublish={onPublish}
@@ -235,95 +265,100 @@ const EditorView: React.FC<EditorViewProps> = ({
       ) : (
         <div className="editor-workspace-vertical" ref={workspaceRef}>
           
-          <div 
-            className="workspace-upper-row"
-            style={{ 
-              height: viewMode === 'split' ? `${splitRatio * 100}%` : '100%',
-              flexShrink: 0
-            }}
-          >
-            
-            {viewMode !== "logic" && (
-              <>
-                <div className="panel-left" style={{ width: leftWidth }}>
-                  <LeftPanel />
-                </div>
-                <div 
-                  className="resize-separator-vertical"
-                  onMouseDown={handleMouseDown("left")}
-                  title="ドラッグして左パネル幅を変更"
-                >
-                  <div className="resize-handle-pill-vertical" />
-                </div>
-              </>
-            )}
+          {viewMode === "dashboard" ? (
+            <div className="workspace-section dashboard-section" style={{ width: '100%', height: '100%' }}>
+              <DashboardView />
+            </div>
+          ) : (
+            <>
+              <div 
+                className="workspace-upper-row"
+                style={{ 
+                  height: viewMode === 'split' ? `${splitRatio * 100}%` : '100%',
+                  flexShrink: 0
+                }}
+              >
+                {viewMode !== "logic" && (
+                  <>
+                    <div className="panel-left" style={{ width: leftWidth }}>
+                      <LeftPanel />
+                    </div>
+                    <div 
+                      className="resize-separator-vertical"
+                      onMouseDown={handleMouseDown("left")}
+                      title="ドラッグして左パネル幅を変更"
+                    >
+                      <div className="resize-handle-pill-vertical" />
+                    </div>
+                  </>
+                )}
 
-            <div className="panel-center">
-              
-              {viewMode !== "logic" && (
-                <div className="grid-controls-wrapper" ref={popoverRef}>
-                  <button 
-                    className="grid-toggle-button" 
-                    onClick={() => setIsGridPopoverOpen(prev => !prev)}
-                    title="グリッドとスナップの設定"
+                <div className="panel-center">
+                  {viewMode !== "logic" && (
+                    <div className="grid-controls-wrapper" ref={popoverRef}>
+                      <button 
+                        className="grid-toggle-button" 
+                        onClick={() => setIsGridPopoverOpen(prev => !prev)}
+                        title="グリッドとスナップの設定"
+                      >
+                        <GridIcon className="grid-icon" />
+                      </button>
+                      {isGridPopoverOpen && <GridPopover />}
+                    </div>
+                  )}
+
+                  <div className="workspace-content">
+                    {viewMode === "logic" ? (
+                      <div className="workspace-section logic-section" style={{ flex: 1 }}>
+                        <NodeEditor />
+                      </div>
+                    ) : (
+                      <div className="workspace-section design-section" style={{ flex: 1 }}>
+                        <div className="canvas-viewport">
+                          <Artboard />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <>
+                  <div 
+                    className="resize-separator-vertical"
+                    onMouseDown={handleMouseDown("right")}
+                    title="ドラッグして右パネル幅を変更"
                   >
-                    <GridIcon className="grid-icon" />
-                  </button>
-                  {isGridPopoverOpen && <GridPopover />}
+                    <div className="resize-handle-pill-vertical" />
+                  </div>
+                  <div className="panel-right" style={{ width: rightWidth }}>
+                    <PropertiesPanel 
+                      onOpenBackgroundModal={onOpenBackgroundModal}
+                    />
+                  </div>
+                </>
+              </div>
+
+              {viewMode === 'split' && (
+                <div 
+                  className="resize-separator-horizontal"
+                  onMouseDown={handleMouseDown("split")}
+                  title="ドラッグして上下比率を変更"
+                >
+                  <div className="resize-handle-pill-horizontal">
+                    <div className="resize-handle-dots-horizontal"></div>
+                  </div>
                 </div>
               )}
 
-              <div className="workspace-content">
-                {viewMode === "logic" ? (
-                  <div className="workspace-section logic-section" style={{ flex: 1 }}>
+              {viewMode === 'split' && (
+                <div className="workspace-lower-row" style={{ flex: 1 }}>
+                  <div className="workspace-section logic-section" style={{ width: '100%', height: '100%' }}>
                     <NodeEditor />
                   </div>
-                ) : (
-                  <div className="workspace-section design-section" style={{ flex: 1 }}>
-                    <div className="canvas-viewport">
-                      <Artboard />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <>
-              <div 
-                className="resize-separator-vertical"
-                onMouseDown={handleMouseDown("right")}
-                title="ドラッグして右パネル幅を変更"
-              >
-                <div className="resize-handle-pill-vertical" />
-              </div>
-              <div className="panel-right" style={{ width: rightWidth }}>
-                <PropertiesPanel 
-                  onOpenBackgroundModal={onOpenBackgroundModal}
-                />
-              </div>
+                </div>
+              )}
             </>
-          </div>
-
-          {viewMode === 'split' && (
-            <div 
-              className="resize-separator-horizontal"
-              onMouseDown={handleMouseDown("split")}
-              title="ドラッグして上下比率を変更"
-            >
-              <div className="resize-handle-pill-horizontal">
-                <div className="resize-handle-dots-horizontal"></div>
-              </div>
-            </div>
           )}
-
-          {viewMode === 'split' && (
-            <div className="workspace-lower-row" style={{ flex: 1 }}>
-              <div className="workspace-section logic-section" style={{ width: '100%', height: '100%' }}>
-                <NodeEditor />
-              </div>
-            </div>
-          )}
-
         </div>
       )}
     </div>

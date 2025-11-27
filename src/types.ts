@@ -2,72 +2,60 @@
 
 import type { Node, Edge } from "reactflow";
 
-// ★ 追加: ヘッダーとエディタで共有する表示モードの型
-export type ViewMode = "design" | "logic" | "split";
+// ★ 修正: ダッシュボードモードを追加
+export type ViewMode = "design" | "logic" | "split" | "dashboard";
 
 // アートボードに配置されたアイテムが持つデータの型
 export interface PlacedItemType {
   id: string;
-  name: string; // (内部的な種類名: "テキスト", "画像", "group" など)
+  name: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  // ★ 追加: グルーピング用ID (親グループのID)
   groupId?: string;
   
   data: {
-    text: string; // (ユーザーが表示・編集するテキスト)
-    src: string | null; // (画像ソース)
-    variableName?: string; // (入力欄の変数名)
-    placeholder?: string; // (入力欄のプレースホルダー)
+    text: string;
+    src: string | null;
+    variableName?: string;
+    placeholder?: string;
     
-    // 画像の縦横比関連
     keepAspectRatio?: boolean;
     originalAspectRatio?: number;
     
-    // 外観
     showBorder?: boolean;
     isTransparent?: boolean;
+    initialVisibility?: boolean;
     isArtboardBackground?: boolean;
     artboardBackgroundPosition?: string;
     artboardBackgroundSize?: string;
     
-    // 文字色
     color?: string;
+    fontSize?: number;
 
-    [key: string]: any; // 将来的な他のデータ
+    [key: string]: any;
   };
 }
 
-// プレビューモード中の各アイテムが持つ状態の型
 export interface PreviewItemState {
   isVisible: boolean;
-  // アニメーション可能なプロパティ
   x: number;
   y: number;
   opacity: number;
   scale: number;
-  rotation: number; // (deg)
-  // アニメーションの制御
-  transition: string | null; // (例: "opacity 0.5s ease 0.1s")
+  rotation: number;
+  transition: string | null;
 }
 
-// プレビュー状態全体（アイテムIDと状態のマップ）
 export type PreviewState = Record<string, PreviewItemState>;
-
-/**
- * プロジェクト全体で共有される変数の状態
- */
 export type VariableState = Record<string, any>;
 
-// React Flow のノードグラフ
 export interface NodeGraph {
   nodes: Node[];
   edges: Edge[];
 }
 
-// 単一ページのデータ構造
 export interface PageData {
   id: string;
   name: string;
@@ -75,7 +63,6 @@ export interface PageData {
   allItemLogics: Record<string, NodeGraph>;
 }
 
-// プロジェクト全体のデータ構造 (保存/読込用)
 export interface ProjectData {
   projectName: string;
   pages: Record<string, PageData>; 
@@ -83,28 +70,22 @@ export interface ProjectData {
   variables: VariableState;
 }
 
-// コンテンツブラウザに渡すための簡易的なページ情報
 export interface PageInfo {
   id: string;
   name: string;
 }
 
-/**
- * プロパティパネルでタブとして開く選択対象の型
- */
 export interface SelectionEntry {
-  id: string; // Item ID または Node ID
-  type: 'item' | 'node'; // どちらの種類か
-  label: string; // タブに表示する名前
+  id: string;
+  type: 'item' | 'node';
+  label: string;
 }
 
-// プレビュー用の背景情報
 export interface PreviewBackground {
   src: string | null;
   position: string | undefined;
 }
 
-// UIコントロールの種類
 export type PropertyControlType = 
   | 'text' 
   | 'number' 
@@ -113,13 +94,11 @@ export type PropertyControlType =
   | 'checkbox' 
   | 'color';
 
-// select 用の選択肢の型
 export interface PropertySelectOption {
   label: string;
   value: string | number;
 }
 
-// 1つのUIコントロール（プロパティ）を定義する型
 export interface PropertyConfig {
   name: string;
   label: string;
@@ -134,13 +113,11 @@ export interface PropertyConfig {
   };
 }
 
-// 各ノードが export するトップレベルの設定オブジェクトの型
 export interface NodePropertyConfig {
   title: string;
   properties: PropertyConfig[];
 }
 
-// 保存済みプロジェクトの型
 export interface SavedProject {
   id: string;
   user_id: string;

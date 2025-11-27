@@ -5,12 +5,9 @@ import type {
   PreviewState, 
   VariableState, 
   PreviewBackground,
-  // ★ 修正: NodeGraph を削除
 } from '../types';
 import { triggerEvent, type ActiveListeners } from '../logicEngine';
 import { usePageStore } from './usePageStore';
-// ★ 修正: useRef を削除
-// import { useRef } from 'react';
 
 const initialPreviewBackground: PreviewBackground = { src: null, position: undefined };
 
@@ -58,7 +55,9 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
       
     const initialPS: PreviewState = {};
     currentPage.placedItems.forEach(item => {
-      initialPS[item.id] = { isVisible: true, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
+      // 初期表示設定を反映 (未設定の場合は true)
+      const isVisible = item.data.initialVisibility !== false;
+      initialPS[item.id] = { isVisible, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
     
     // 2. Refを初期化
@@ -118,7 +117,8 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     // 2. (内部ストア) プレビュー状態をリセット
     const initialPS: PreviewState = {};
     targetPageData.placedItems.forEach(item => {
-      initialPS[item.id] = { isVisible: true, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
+      const isVisible = item.data.initialVisibility !== false;
+      initialPS[item.id] = { isVisible, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
     
     const bgItem = targetPageData.placedItems.find(p => p.data.isArtboardBackground);
@@ -140,26 +140,39 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     set({ variables: variablesRef.current });
   },
   
-  handleItemEvent: (eventName, itemId) => {
+  handleItemEvent: (eventName, originItemId) => {
     const { pages, selectedPageId } = usePageStore.getState();
     const currentPage = pages[selectedPageId!];
     if (!currentPage) return;
     
     const { placedItems, allItemLogics } = currentPage;
-    const targetGraph = allItemLogics[itemId];
-    const graphToUse = targetGraph || { nodes: [], edges: [] };
-    
-    triggerEvent(
-      eventName,
-      itemId,
-      graphToUse,
-      placedItems,
-      () => previewStateRef.current,
-      get().setPreviewState,
-      get().handlePageChangeRequest,
-      () => variablesRef.current,
-      get().setVariables,
-      get().activeListeners
-    );
+
+    // ★ イベントバブリングの実装
+    // クリックされたアイテムから開始し、親グループ(groupId)を辿って順にロジックを実行する
+    let currentId: string | undefined = originItemId;
+
+    while (currentId) {
+      const targetGraph = allItemLogics[currentId];
+
+      // 該当アイテム(またはグループ)にロジックが設定されていれば実行
+      if (targetGraph && targetGraph.nodes.length > 0) {
+        triggerEvent(
+          eventName,
+          currentId, // ロジックの所有者IDとして実行
+          targetGraph,
+          placedItems,
+          () => previewStateRef.current,
+          get().setPreviewState,
+          get().handlePageChangeRequest,
+          () => variablesRef.current,
+          get().setVariables,
+          get().activeListeners
+        );
+      }
+
+      // 親グループを探してループ継続
+      const currentItem = placedItems.find(p => p.id === currentId);
+      currentId = currentItem?.groupId;
+    }
   },
 }));
