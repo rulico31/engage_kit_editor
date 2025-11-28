@@ -1,230 +1,245 @@
 /* src/components/PropertiesPanel.css */
 
+/* 全体のラッパー */
 .panel-content-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  background-color: #252526; /* ★ 変更: パネル背景 */
+  border-left: 1px solid #333;
+  color: #eee;
 }
 
+/* スクロール領域 */
 .panel-content-scrollable {
-  flex-grow: 1;
+  flex: 1;
   overflow-y: auto;
-  background-color: #2e2e2e;
-  color: #ccc;
-}
-
-.properties-panel-content {
   padding: 16px;
-  font-size: 0.9em;
 }
 
-.placeholder-text {
-  padding: 20px;
-  text-align: center;
-  color: #777;
-  font-style: italic;
-}
-
-/* --- タブ --- */
+/* --- インスペクタータブ --- */
 .inspector-tabs-container {
   display: flex;
-  flex-shrink: 0;
-  width: 100%;
-  background-color: #252526;
+  background-color: #1e1e1e;
   border-bottom: 1px solid #333;
   overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+.inspector-tabs-container::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
 }
 
 .inspector-tab {
-  padding: 8px 10px 8px 12px;
-  cursor: pointer;
-  border-right: 1px solid #333;
-  color: #888;
-  font-size: 0.85em;
-  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  background-color: #2d2d2d;
+  border-right: 1px solid #1e1e1e;
+  border-top: 2px solid transparent;
+  color: #999;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
 }
 .inspector-tab:hover {
   background-color: #333;
-  color: #eee;
+  color: #fff;
 }
 .inspector-tab.is-active {
-  background-color: #2e2e2e;
+  background-color: #252526;
   color: #fff;
-  font-weight: 600;
-}
-.tab-label {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tab-close {
-  font-size: 1.2em;
-  padding: 2px 4px;
-  border-radius: 4px;
-}
-.tab-close:hover {
-  background-color: #555;
-  color: #fff;
+  border-top-color: #007acc;
+  border-bottom: 1px solid #252526; /* 下線を消してパネルと一体化 */
 }
 
-/* --- アコーディオン --- */
-.accordion-section {
-  margin-bottom: 2px;
-  border-bottom: 1px solid #3f3f3f;
+.tab-close {
+  font-size: 14px;
+  opacity: 0.6;
+  border-radius: 50%;
+  width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
 }
+.tab-close:hover { opacity: 1; background-color: rgba(255,255,255,0.1); }
+
+
+/* --- アコーディオン (AccordionSection) --- */
+.accordion-section {
+  margin-bottom: 12px;
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: #2a2a2a; /* アコーディオンの背景 */
+}
+
 .accordion-header {
-  background-color: #3c3c3c;
-  padding: 8px 12px;
-  cursor: pointer;
   display: flex;
   align-items: center;
+  padding: 10px 12px;
+  background-color: #333;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #3f3f46;
+}
+.accordion-header:hover {
+  background-color: #383838;
+}
+
+.accordion-icon {
+  font-size: 10px;
+  margin-right: 8px;
+  transition: transform 0.2s;
+  color: #999;
+}
+.accordion-icon.is-open {
+  transform: rotate(180deg);
+}
+.accordion-title {
+  font-size: 13px;
   font-weight: 600;
   color: #eee;
 }
-.accordion-header:hover {
-  background-color: #444;
-}
-.accordion-icon {
-  display: inline-block;
-  transition: transform 0.2s ease;
-  margin-right: 8px;
-  font-size: 0.8em;
-}
-.accordion-icon.is-open {
-  transform: rotate(90deg);
-}
+
 .accordion-content {
-  padding: 12px 16px;
-  background-color: #333;
+  padding: 12px;
+  background-color: #252526; /* 中身の背景 */
 }
 
-/* --- フォーム要素 --- */
+
+/* --- プロパティ入力フォーム (共通) --- */
 .prop-group {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.prop-group:last-child {
-  margin-bottom: 0;
-}
+.prop-group:last-child { margin-bottom: 0; }
 
 .prop-label {
-  display: block;
-  font-size: 0.85em;
+  font-size: 12px;
   font-weight: 500;
   color: #aaa;
-  margin-bottom: 6px;
+}
+.prop-value {
+  font-size: 13px;
+  color: #fff;
+  padding: 4px 0;
 }
 
-.prop-row {
-  display: flex;
-  gap: 10px;
-}
-.prop-group-half {
-  flex-basis: 50%;
-}
-.prop-label-inline {
-  display: inline-block;
-  color: #aaa;
-  margin-right: 8px;
-  font-size: 0.9em;
-  width: 15px;
-}
-
-.prop-input,
-.prop-select,
-.prop-button {
+/* 入力フィールド */
+.prop-input, .prop-select {
   width: 100%;
-  background-color: #2a2a2a;
-  border: 1px solid #555;
+  padding: 8px 10px;
+  border: 1px solid #3f3f46;
   border-radius: 4px;
-  padding: 8px;
+  background-color: #18181b; /* フォーム背景を深く */
   color: #eee;
-  font-size: 0.95em;
+  font-size: 13px;
   box-sizing: border-box;
+  transition: border-color 0.2s;
 }
-.prop-input:focus,
-.prop-select:focus {
-  border-color: #007acc;
+
+.prop-input:focus, .prop-select:focus {
   outline: none;
+  border-color: #007acc;
 }
-.prop-input-disabled {
-  background-color: #3f3f3f;
-  color: #888;
+.prop-input:disabled {
+  background-color: #333;
+  color: #777;
+  cursor: not-allowed;
 }
 
 textarea.prop-input {
-  min-height: 80px;
   resize: vertical;
+  min-height: 80px;
 }
 
-.prop-button {
-  background-color: #4a4a4a;
+/* カラーピッカー */
+.prop-color-picker-wrapper {
+  display: flex;
+  gap: 8px;
+}
+.prop-color-picker {
+  width: 40px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid #3f3f46;
+  background-color: #18181b;
+  border-radius: 4px;
   cursor: pointer;
+}
+
+/* ボタン */
+.prop-button {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #3f3f46;
+  background-color: #333;
+  color: #eee;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
   text-align: center;
+  display: inline-block;
 }
 .prop-button:hover {
-  background-color: #5a5a5a;
+  background-color: #3c3c3c;
+  border-color: #555;
 }
+.prop-button:active {
+  transform: translateY(1px);
+}
+
 .prop-button-danger {
-  width: auto;
-  background-color: #7c2d2d;
-  color: #eee;
-  cursor: pointer;
-  font-size: 0.85em;
-  padding: 6px 12px;
+  @extend .prop-button;
+  background-color: #7f1d1d; /* Dark Red */
+  border-color: #991b1b;
+  color: #fecaca;
 }
 .prop-button-danger:hover {
-  background-color: #a03a3a;
+  background-color: #991b1b;
+}
+
+/* レイアウト用 (X, Y, W, H など) */
+.prop-row {
+  display: flex;
+  gap: 12px;
+}
+.prop-group-half {
+  flex: 1;
+}
+.prop-label-inline {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 4px;
+}
+
+.prop-grid-buttons-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .prop-image-preview {
   width: 100%;
   height: auto;
-  border-radius: 4px;
-  margin-top: 8px;
-  margin-bottom: 8px;
-  max-height: 200px;
+  max-height: 150px;
   object-fit: contain;
-  background-color: #222;
-}
-
-.prop-color-picker-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.prop-color-picker {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  width: 34px;
-  height: 34px; 
-  padding: 4px;
-  border: 1px solid #555;
+  border: 1px solid #3f3f46;
   border-radius: 4px;
-  background-color: #2a2a2a;
-  cursor: pointer;
-  box-sizing: border-box; 
-}
-.prop-color-picker::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-.prop-color-picker::-webkit-color-swatch {
-  border: 1px solid #777;
-  border-radius: 2px;
-}
-.prop-color-picker::-moz-color-swatch {
-  border: 1px solid #777;
-  border-radius: 2px;
+  background-color: #18181b;
+  padding: 4px;
 }
 
-/* 重ね順ボタン用のグリッドレイアウト */
-.prop-grid-buttons-4 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+/* プレースホルダーテキスト */
+.placeholder-text {
+  color: #777;
+  text-align: center;
+  margin-top: 40px;
+  font-size: 14px;
 }

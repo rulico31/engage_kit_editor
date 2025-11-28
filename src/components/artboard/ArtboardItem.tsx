@@ -1,25 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { PlacedItemType, PreviewState, VariableState } from "../../types";
-import "../Artboard.css"; // CSSは元の場所を参照するか、artboardフォルダに移動してください
-
-// リサイズハンドルの定義
-export type ResizeDirection = 
-  | "top-left" | "top-center" | "top-right"
-  | "middle-left" | "middle-right"
-  | "bottom-left" | "bottom-center" | "bottom-right";
-
-const RESIZE_HANDLES: ResizeDirection[] = [
-  "top-left", "top-center", "top-right",
-  "middle-left", "middle-right",
-  "bottom-left", "bottom-center", "bottom-right",
-];
+import "../Artboard.css";
 
 interface ArtboardItemProps {
   item: PlacedItemType;
   renderChildren: (parentId: string) => React.ReactNode;
   onItemSelect: (e: React.MouseEvent, id: string, label: string) => void;
   onItemDragStart: (e: React.MouseEvent, id: string) => void;
-  onItemResizeStart: (e: React.MouseEvent, id: string, direction: ResizeDirection) => void;
   selectedIds: string[];
   activeTabId: string | null;
   isPreviewing: boolean;
@@ -34,7 +21,6 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   renderChildren,
   onItemSelect,
   onItemDragStart,
-  onItemResizeStart,
   selectedIds,
   activeTabId,
   isPreviewing,
@@ -196,21 +182,6 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     >
       {content}
       {renderChildren(item.id)}
-
-      {isSelected && !isPreviewing && !item.data?.isArtboardBackground && (
-        <>
-          {RESIZE_HANDLES.map((dir) => (
-            <div
-              key={dir}
-              className={`resize-handle ${dir}`}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                onItemResizeStart(e, item.id, dir);
-              }}
-            />
-          ))}
-        </>
-      )}
     </div>
   );
 };

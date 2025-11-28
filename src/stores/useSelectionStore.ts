@@ -45,7 +45,6 @@ const initialState = {
   activeLogicGraphId: null,
 };
 
-// ★ 修正: 第二引数 get を削除 (使っていないため)
 export const useSelectionStore = create<SelectionStoreState>((set) => ({
   ...initialState,
   
@@ -134,8 +133,8 @@ export const useSelectionStore = create<SelectionStoreState>((set) => ({
   },
   
   handleBackgroundClick: () => {
-    // 選択解除（タブは残す）
-    set({ selectedIds: [], activeTabId: null });
+    // 選択解除（タブは残しつつ、アクティブIDとロジック表示IDをクリアする）
+    set({ selectedIds: [], activeTabId: null, activeLogicGraphId: null });
   },
   
   handleTabSelect: (tabId) => {

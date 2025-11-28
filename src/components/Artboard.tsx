@@ -52,7 +52,6 @@ const Artboard: React.FC = () => {
     contextMenu,
     setContextMenu,
     handleItemDragStart,
-    handleItemResizeStart,
     groupItems,
     ungroupItems,
     deleteItems,
@@ -109,7 +108,6 @@ const Artboard: React.FC = () => {
 
   // 背景スタイル計算
   const backgroundStyle = useMemo(() => {
-    // ★ 修正: && ではなく ? : を使用して、falseが返らないようにする
     const bgItem = !isPreviewing 
       ? placedItems.find(p => p.data.isArtboardBackground && p.data.src)
       : undefined;
@@ -141,7 +139,6 @@ const Artboard: React.FC = () => {
         renderChildren={renderChildren}
         onItemSelect={onArtboardItemSelect}
         onItemDragStart={(e, id) => handleItemDragStart(e, id, handleItemSelect)}
-        onItemResizeStart={handleItemResizeStart}
         selectedIds={selectedIds}
         activeTabId={activeTabId}
         isPreviewing={isPreviewing}
@@ -151,7 +148,7 @@ const Artboard: React.FC = () => {
         onVariableChange={onVariableChange}
       />
     ));
-  }, [placedItems, onArtboardItemSelect, handleItemDragStart, handleItemResizeStart, selectedIds, activeTabId, isPreviewing, previewState, onItemEvent, variables, onVariableChange, handleItemSelect]);
+  }, [placedItems, onArtboardItemSelect, handleItemDragStart, selectedIds, activeTabId, isPreviewing, previewState, onItemEvent, variables, onVariableChange, handleItemSelect]);
 
   const MemoizedArtboardItem = useMemo(() => React.memo(ArtboardItem), []);
 

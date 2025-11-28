@@ -28,6 +28,7 @@ import SetVariableNode from "./nodes/SetVariableNode";
 import AnimateNode from "./nodes/AnimateNode";
 import DelayNode from "./nodes/DelayNode";
 import WaitForClickNode from "./nodes/WaitForClickNode";
+import { submitDataNodeConfig } from "./nodes/SubmitDataNode"; // 設定のみimport (型定義用)
 
 interface NodeToolDragItem { nodeType: string; nodeName: string; }
 type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
@@ -36,12 +37,60 @@ type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
 const NodeEditorContent: React.FC = () => {
   const activeLogicGraphId = useSelectionStore((s) => s.activeLogicGraphId);
 
-  const { allItemLogics } = usePageStore((s) => {
+  const { allItemLogics, placedItems, setLogicGraph } = usePageStore((s) => {
     const page = s.selectedPageId ? s.pages[s.selectedPageId] : undefined;
-    return { allItemLogics: page?.allItemLogics ?? {} };
+    return { 
+      allItemLogics: page?.allItemLogics ?? {},
+      placedItems: page?.placedItems ?? [],
+      setLogicGraph: s.setLogicGraph,
+    };
   });
 
+  // ロジックデータが存在しない場合は初期化待ち、または空
   const currentGraph = activeLogicGraphId ? allItemLogics[activeLogicGraphId] : undefined;
+
+  // ★ 追加: ロジックがまだ存在しない場合、デフォルトのノード（イベント）を自動生成する
+  useEffect(() => {
+    if (activeLogicGraphId && !currentGraph) {
+      const item = placedItems.find(p => p.id === activeLogicGraphId);
+      if (item) {
+        const initialNodes: Node[] = [];
+        const timestamp = Date.now();
+
+        // アイテムタイプに応じて最適な初期イベントを1つだけ設定
+        if (item.name.startsWith("テキスト入力欄")) {
+          // 入力欄の場合: 入力完了時のみ
+          initialNodes.push({
+            id: `evt-input-${timestamp}`,
+            type: 'eventNode',
+            position: { x: 50, y: 50 },
+            data: { label: '✅ 入力完了時', eventType: 'onInputComplete' }
+          });
+        } 
+        else if (item.name.startsWith("画像")) {
+          // 画像の場合: 画像読み込み時のみ
+          initialNodes.push({
+            id: `evt-load-${timestamp}`,
+            type: 'eventNode',
+            position: { x: 50, y: 50 },
+            data: { label: '🖼️ 画像読み込み時', eventType: 'onImageLoad' }
+          });
+        } 
+        else if (!item.id.startsWith('group')) {
+          // その他（ボタン、テキスト等）の場合: クリック時のみ
+          initialNodes.push({
+            id: `evt-click-${timestamp}`,
+            type: 'eventNode',
+            position: { x: 50, y: 50 },
+            data: { label: '👆 クリック時', eventType: 'click' }
+          });
+        }
+
+        // グラフを初期化保存
+        setLogicGraph(activeLogicGraphId, { nodes: initialNodes, edges: [] });
+      }
+    }
+  }, [activeLogicGraphId, currentGraph, placedItems, setLogicGraph]);
 
   const { 
     applyNodesChange: onNodesChange, 
@@ -52,8 +101,8 @@ const NodeEditorContent: React.FC = () => {
   
   const onNodeClick = useSelectionStore(state => state.handleNodeClick);
   
-  const nodes = currentGraph?.nodes;
-  const edges = currentGraph?.edges;
+  const nodes = currentGraph?.nodes || [];
+  const edges = currentGraph?.edges || [];
   
   const { fitView, project } = useReactFlow();
   const dropRef = useRef<HTMLDivElement>(null);
@@ -67,7 +116,6 @@ const NodeEditorContent: React.FC = () => {
         const clientOffset = monitor.getClientOffset();
         if (!clientOffset || !dropRef.current) return;
         
-        // 座標変換
         const position = project({
           x: clientOffset.x - (dropRef.current.getBoundingClientRect().left ?? 0),
           y: clientOffset.y - (dropRef.current.getBoundingClientRect().top ?? 0),
@@ -91,10 +139,10 @@ const NodeEditorContent: React.FC = () => {
   drop(dropRef);
 
   useEffect(() => {
-    if (nodes && nodes.length > 0) {
+    if (nodes.length > 0) {
       setTimeout(() => fitView({ duration: 200 }), 100);
     }
-  }, [nodes ? nodes[0]?.id : undefined, fitView]);
+  }, [nodes.length > 0 ? nodes[0].id : null, fitView]);
 
   const nodeTypes = useMemo(() => ({
     eventNode: (props: NodeProps) => <EventNode {...props} />,
@@ -107,25 +155,28 @@ const NodeEditorContent: React.FC = () => {
     waitForClickNode: (props: NodeProps) => <WaitForClickNode {...props} />,
   }), []); 
 
-  // ★ 修正: event を _event に変更
   const handleNodeClick: NodeClickHandler = (_event, node) => {
     onNodeClick(node.id, node.data?.label);
   };
 
-  if (!nodes || !edges) return <div className="node-editor-placeholder">アイテムを選択してください</div>;
+  if (!activeLogicGraphId) return <div className="node-editor-placeholder">アイテムを選択してください</div>;
 
   return (
     <div className="node-editor-wrapper">
       <aside className="node-toolbox">
-        <div className="toolbox-header">ロジックノード</div>
-        <NodeToolboxItem nodeType="actionNode" nodeName="⚡ アクション: 表示/非表示">⚡ 表示/非表示</NodeToolboxItem>
-        <NodeToolboxItem nodeType="animateNode" nodeName="⚡ アクション: アニメーション">⚡ アニメーション</NodeToolboxItem>
-        <NodeToolboxItem nodeType="pageNode" nodeName="⚡ アクション: ページ遷移">⚡ ページ遷移</NodeToolboxItem>
-        <NodeToolboxItem nodeType="setVariableNode" nodeName="⚡ アクション: 変数をセット">⚡ 変数をセット</NodeToolboxItem>
+        {/* イベントノードの手動追加機能は削除 */}
+        
+        <div className="toolbox-header">アクション</div>
+        <NodeToolboxItem nodeType="actionNode" nodeName="⚡ 表示/非表示">⚡ 表示/非表示</NodeToolboxItem>
+        <NodeToolboxItem nodeType="animateNode" nodeName="⚡ アニメーション">⚡ アニメーション</NodeToolboxItem>
+        <NodeToolboxItem nodeType="pageNode" nodeName="⚡ ページ遷移">⚡ ページ遷移</NodeToolboxItem>
+        <NodeToolboxItem nodeType="setVariableNode" nodeName="⚡ 変数をセット">⚡ 変数をセット</NodeToolboxItem>
         <div style={{ height: 10 }} />
-        <NodeToolboxItem nodeType="delayNode" nodeName="⏱️ ロジック: 遅延">⏱️ 遅延 (Wait)</NodeToolboxItem>
-        <NodeToolboxItem nodeType="ifNode" nodeName="🧠 ロジック: もし〜なら">🧠 もし〜なら</NodeToolboxItem>
-        <NodeToolboxItem nodeType="waitForClickNode" nodeName="👆 ロジック: クリック待ち">👆 クリック待ち</NodeToolboxItem>
+        
+        <div className="toolbox-header">ロジック</div>
+        <NodeToolboxItem nodeType="delayNode" nodeName="⏱️ 遅延 (Wait)">⏱️ 遅延</NodeToolboxItem>
+        <NodeToolboxItem nodeType="ifNode" nodeName="🧠 もし〜なら">🧠 もし〜なら</NodeToolboxItem>
+        <NodeToolboxItem nodeType="waitForClickNode" nodeName="👆 クリック待ち">👆 クリック待ち</NodeToolboxItem>
       </aside>
 
       <div ref={dropRef} className="react-flow-drop-target">

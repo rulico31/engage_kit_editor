@@ -1,79 +1,211 @@
-/* src/components/LeftPanel.css */
+/* LeftPanel.css - 全体のダークテーマに合わせたスタイル */
 
-.left-panel-container {
+.left-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 100%;
-  overflow: hidden;
-  background-color: #252526;
+  background-color: #252526; /* 全体の背景色 */
+  color: #e0e0e0; /* 基本の文字色 */
+  border-right: 1px solid #333;
 }
 
-/* タブヘッダー */
+/* --- タブ切り替えエリア --- */
 .left-panel-tabs {
   display: flex;
   border-bottom: 1px solid #333;
+  background-color: #2d2d2d; /* タブエリアの背景 */
 }
 
-.left-panel-tab {
+.panel-tab {
   flex: 1;
-  padding: 8px;
-  text-align: center;
-  cursor: pointer;
-  font-size: 0.85em;
-  color: #888;
-  background-color: #252526;
+  padding: 10px;
+  background: none;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 2px solid transparent; /* アクティブ時の枠線用 */
+  color: #a0a0a0; /* 非アクティブ時の文字色 */
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  text-align: center;
 }
 
-.left-panel-tab:hover {
-  background-color: #333;
+.panel-tab:hover {
+  background-color: #383838;
+  color: #e0e0e0;
 }
 
-.left-panel-tab.active {
-  color: #fff;
-  font-weight: bold;
-  border-bottom: 2px solid #007acc;
+/* ★ 修正: アクティブなタブのスタイル */
+.panel-tab.active {
+  background-color: #3e3e3e; /* 白から少し明るいグレーに変更 */
+  color: #fff; /* アクティブ時の文字色を白に */
+  border-bottom-color: #007acc; /* アクセントカラーで強調 */
 }
 
-.panel-content-area {
+
+/* --- コンテンツエリア (ツール/レイヤー) --- */
+.left-panel-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  padding: 12px;
+  background-color: #252526;
+}
+
+/* ツール一覧 */
+.tools-grid {
   display: flex;
   flex-direction: column;
+  gap: 8px;
 }
 
-/* ツールボックスエリア */
-.tool-list-container {
-  overflow-y: auto;
-  padding: 10px;
-}
-
-/* リサイズハンドル */
-.left-panel-separator {
-  flex-shrink: 0;
-  height: 9px;
-  margin: 0;
-  z-index: 20;
-  cursor: row-resize;
+.tool-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background-color: #1a1a1a;
-  border-top: 1px solid #000;
-  border-bottom: 1px solid #000;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-  transition: background-color 0.2s ease;
+  padding: 10px 12px;
+  background-color: #333; /* ツールの背景色 */
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: grab;
+  transition: background-color 0.2s, border-color 0.2s;
 }
 
-.left-panel-separator:hover {
+.tool-item:hover {
+  background-color: #3e3e3e;
+  border-color: #555;
+}
+
+.tool-item.dragging {
+  opacity: 0.5;
+  border: 1px dashed #888;
+}
+
+.tool-icon {
+  margin-right: 10px;
+  font-size: 1.1em;
+}
+.tool-label {
+  font-weight: 500;
+}
+
+/* レイヤーリスト */
+.layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.layer-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
   background-color: #333;
+  border-radius: 4px;
+  font-size: 0.95em;
+}
+.layer-icon {
+  margin-right: 8px;
+  opacity: 0.8;
+}
+.layer-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.layer-empty {
+  color: #888;
+  text-align: center;
+  padding: 20px;
+  font-style: italic;
 }
 
-.left-panel-handle {
-  width: 30px;
-  height: 5px;
-  background-color: #555;
-  border-radius: 2px;
+
+/* --- フッター（ページリスト） --- */
+.left-panel-footer {
+  border-top: 1px solid #333;
+  background-color: #2d2d2d;
+  display: flex;
+  flex-direction: column;
+  /* 必要に応じてmax-heightを設定 */
+  max-height: 300px; 
+}
+
+.page-list-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.page-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.page-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+  color: #e0e0e0;
+  border-left: 3px solid transparent; /* 選択時のマーカー用 */
+}
+
+.page-list-item:hover {
+  background-color: #383838;
+}
+
+.page-list-item.selected {
+  background-color: #3e3e3e; /* 選択中の背景色 */
+  color: #fff;
+  border-left-color: #007acc; /* アクセントカラーで左端を強調 */
+  font-weight: 600;
+}
+
+.page-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-delete-btn {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 1.2em;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.2s, background-color 0.2s;
+}
+.page-delete-btn:hover {
+  color: #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.1);
+}
+
+/* ★ 修正: 「ページを追加」ボタンのスタイル */
+.add-page-button {
+  padding: 12px;
+  background-color: #2d2d2d; /* 白から周囲と同じ暗いグレーに変更 */
+  color: #e0e0e0;
+  border: none;
+  border-top: 1px solid #3c3c3c;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s, color 0.2s;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.add-page-button:hover {
+  background-color: #383838; /* ホバー時に少し明るく */
+  color: #fff;
+}
+
+.add-page-button:active {
+  background-color: #404040;
 }

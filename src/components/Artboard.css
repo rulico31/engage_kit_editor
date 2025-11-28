@@ -1,7 +1,17 @@
 /* src/components/Artboard.css */
 
+/* --- ラッパー (中央寄せ用) --- */
+.artboard-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+  background-color: #1e1e1e; /* キャンバス外の背景色（暗いグレー） */
+}
+
+/* --- アートボード本体 --- */
 .artboard {
-  /* 見た目 */
+  /* 見た目: 必ず白背景にする */
   background-color: #ffffff;
   color: #000000;
   border-radius: 4px;
@@ -9,7 +19,7 @@
   /* 影 */
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
 
-  /* サイズ */
+  /* サイズ (1000x700 固定) */
   width: 1000px;
   height: 700px;
 
@@ -19,12 +29,23 @@
 
   /* 背景画像用のスタイル */
   background-size: cover;
-  background-position: 50% 50%; /* デフォルトは中央 */
+  background-position: 50% 50%;
   background-repeat: no-repeat;
   transition: background-image 0.2s ease;
 }
 
-/* アートボード上の全アイテムの基本スタイル */
+/* --- グリッドオーバーレイ --- */
+.artboard-grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* --- アートボード上のアイテム --- */
 .artboard-item {
   position: absolute;
   background-color: #f0f0f0;
@@ -37,33 +58,24 @@
   cursor: move;
   user-select: none;
   box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease,
-              transform 0.2s ease, opacity 0.2s ease,
-              background-color 0.2s ease, color 0.2s ease;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
+  
+  transition: border-color 0.1s, box-shadow 0.1s;
 }
 
-/* テキスト入力欄のスタイル */
-.artboard-item.is-input {
-  background-color: #ffffff; 
-  cursor: text;
-  padding: 0;
-}
-
-/* 選択状態のスタイル (通常) */
+/* 選択状態 */
 .artboard-item.selected {
-  border-color: #007acc;
-  box-shadow: 0 0 5px rgba(0, 122, 204, 0.5);
-  z-index: 1;
+  border-color: #3b82f6; /* 青色 */
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5); /* 外光彩 */
+  z-index: 10;
 }
 
-/* アクティブ状態のスタイル (タブで選択中) */
+/* アクティブ（タブ選択中） */
 .artboard-item.active-item {
-  border-color: #ffcc00; /* 黄色などで区別 */
-  box-shadow: 0 0 8px rgba(255, 204, 0, 0.8);
-  z-index: 2;
+  border-color: #f59e0b; /* オレンジ/黄色 */
+  z-index: 11;
 }
 
 /* グループアイテム */
@@ -72,191 +84,87 @@
   background-color: rgba(0, 0, 0, 0.03);
 }
 .artboard-item.is-group.selected {
-  border-color: #007acc;
-  background-color: rgba(0, 122, 204, 0.05);
+  border-color: #3b82f6;
+  background-color: rgba(59, 130, 246, 0.05);
 }
 
-/* --- アイテム種別ごとのスタイル --- */
+/* 枠線なし・透過設定 */
+.artboard-item.no-border {
+  border-color: transparent;
+}
+.artboard-item.no-border.selected {
+  border-color: #3b82f6; /* 選択時は枠線を出す */
+}
+.artboard-item.is-transparent {
+  background-color: transparent;
+}
 
-.item-text-content {
-  color: inherit; 
+/* --- コンテンツ内部 --- */
+.item-text-content,
+.item-button-content {
   width: 100%;
   word-break: break-word;
   white-space: pre-wrap;
-}
-
-.item-image-content {
-  color: #555;
-  font-style: italic;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.item-image-content.is-placeholder {
-  padding: 10px 16px;
-}
-.item-image-content img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover; 
-  border-radius: 3px;
-}
-
-
-.item-button-content {
   background: none;
   border: none;
   padding: 0;
   margin: 0;
   font: inherit;
-  color: inherit; 
-  cursor: inherit;
-  outline: none;
-  width: 100%;
-  word-break: break-word;
-  text-align: center;
-  white-space: pre-wrap;
+  color: inherit;
 }
-.item-button-content:focus {
-  outline: none;
+
+.item-button-content {
+  text-align: center;
+  cursor: inherit;
+}
+
+.item-image-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.item-image-content img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.item-image-content.is-placeholder {
+  background-color: #e5e5e5;
+  color: #777;
+  font-size: 12px;
+  text-align: center;
 }
 
 .item-input-content {
   width: 100%;
   height: 100%;
-  padding: 0; 
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
-
 .artboard-item-textarea {
   width: 100%;
   height: 100%;
-  min-height: 20px;
   border: none;
   background: none;
-  outline: none;
-  font: inherit;
-  color: inherit; 
-  cursor: inherit;
-  padding: 10px 12px;
-  box-sizing: border-box; 
   resize: none;
+  outline: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
   overflow: hidden;
 }
 
-.artboard-item:not(.preview) .artboard-item-textarea {
-  pointer-events: none; 
-}
-.artboard-item.preview .artboard-item-textarea {
-  cursor: text;
-  background-color: #fff; 
-  border-radius: 3px;
-  padding: 8px 10px;
-}
-.artboard-item.preview.selected {
-  border-color: #ccc;
-  box-shadow: none;
-}
-
-/* --- プレビュー中のスタイル --- */
-
-.artboard-item.preview {
-  cursor: default; 
-}
-.artboard-item.preview .item-button-content {
-  cursor: pointer;
-}
-
-/* リサイズハンドル */
-.resize-handle {
-  position: absolute;
-  background: #ffffff;
-  border: 1px solid #959595;
-  transform: translate(-50%, -50%);
-  z-index: 10; /* ハンドルは常に最前面 */
-  box-sizing: border-box;
-}
-.resize-handle.top-left,
-.resize-handle.top-right,
-.resize-handle.bottom-left,
-.resize-handle.bottom-right {
-  width: 9px;
-  height: 9px;
-  border-radius: 0;
-}
-.resize-handle.top-center,
-.resize-handle.bottom-center {
-  width: 20px;
-  height: 6px;
-  border-radius: 3px;
-}
-.resize-handle.middle-left,
-.resize-handle.middle-right {
-  width: 6px;
-  height: 20px;
-  border-radius: 3px;
-}
-.resize-handle.top-left { top: 0; left: 0; cursor: nwse-resize; }
-.resize-handle.top-right { top: 0; right: 0; cursor: nesw-resize; }
-.resize-handle.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
-.resize-handle.bottom-right { bottom: 0; right: 0; cursor: nwse-resize; }
-.resize-handle.top-center { top: 0; left: 50%; cursor: ns-resize; }
-.resize-handle.bottom-center { bottom: 0; left: 50%; cursor: ns-resize; }
-.resize-handle.middle-left { top: 50%; left: 0; cursor: ew-resize; }
-.resize-handle.middle-right { top: 50%; right: 0; cursor: ew-resize; }
-
-
-/* プレビュー中のスタイル */
-.artboard.is-preview {
-  margin: 20px auto;
-  cursor: default;
-}
-
-/* ボーダー非表示スタイル */
-.artboard-item.no-border {
-  border-color: transparent;
-}
-
-/* 背景透過スタイル */
-.artboard-item.is-transparent {
-  background-color: transparent;
-}
-
-/* 選択時はボーダーを再表示する (上書き) */
-.artboard-item.no-border.selected {
-  border-color: #007acc;
-}
-
-/* プレビュー中も非表示を維持 */
-.artboard-item.no-border.preview {
-  border-color: transparent;
-}
-
-/* グリッドオーバーレイ */
-.artboard-grid-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 0; /* アイテムより後ろに表示 */
-}
-
-/* ★ 追加: コンテキストメニューのスタイル */
+/* --- コンテキストメニュー --- */
 .context-menu {
-  position: fixed; /* viewportに対して固定 */
+  position: fixed;
   background-color: #2a2a2a;
   border: 1px solid #444;
   border-radius: 4px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   z-index: 9999;
-  min-width: 160px;
+  min-width: 180px;
   padding: 4px 0;
   color: #eee;
   font-size: 13px;
@@ -268,14 +176,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: background-color 0.1s;
 }
-
 .context-menu-item:hover {
-  background-color: #007acc;
+  background-color: #3b82f6;
   color: white;
 }
-
 .context-menu-item.disabled {
   color: #666;
   cursor: default;
@@ -293,7 +198,7 @@
 
 .shortcut-hint {
   font-size: 11px;
-  color: #aaa;
+  color: #888;
   margin-left: 12px;
 }
 .context-menu-item:hover .shortcut-hint {

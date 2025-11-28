@@ -2,8 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { usePageStore } from "../../stores/usePageStore";
 import { useSelectionStore } from "../../stores/useSelectionStore";
 import { useEditorSettingsStore } from "../../stores/useEditorSettingsStore";
-import type { PlacedItemType } from "../../types";
-import type { ResizeDirection } from "./ArtboardItem";
 
 export const snapToGrid = (value: number, size: number | null, min: number = -Infinity): number => {
   if (size === null) return Math.max(min, value);
@@ -20,10 +18,9 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     viewMode: state.viewMode,
   }));
   
-  const { deleteItems, updateItems, updateItem, groupItems, ungroupItems, commitHistory } = usePageStore(state => ({
+  const { deleteItems, updateItems, groupItems, ungroupItems, commitHistory } = usePageStore(state => ({
     deleteItems: state.deleteItems,
     updateItems: state.updateItems,
-    updateItem: state.updateItem,
     groupItems: state.groupItems,
     ungroupItems: state.ungroupItems,
     commitHistory: state.commitHistory,
@@ -39,15 +36,10 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number } | null>(null);
 
-  // ドラッグ＆リサイズ用のRef
+  // ドラッグ用のRef
   const isDraggingRef = useRef(false);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const dragStartItemStates = useRef<Record<string, { x: number, y: number }>>({});
-  const resizeInfoRef = useRef<{
-    startPos: { x: number; y: number };
-    startItem: PlacedItemType;
-    direction: ResizeDirection;
-  } | null>(null);
   const ignoreNextClickRef = useRef(false);
 
   // --- キーボードショートカット (Zoom, Delete, Grouping) ---
@@ -123,7 +115,6 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
       const targetItem = placedItems.find(p => p.id === id);
       if (!targetItem) return;
       
-      // ★ 修正: 親グループの探索ロジックを安全にする
       const startGroupId = targetItem.groupId;
       let parent = startGroupId ? placedItems.find(p => p.id === startGroupId) || null : null;
       let parentIsTarget = false;
@@ -133,7 +124,6 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
           parentIsTarget = true; 
           break; 
         }
-        // ここで一旦変数に受けてから検索に使用する
         const nextGroupId = parent.groupId;
         parent = nextGroupId ? placedItems.find(p => p.id === nextGroupId) || null : null;
       }
@@ -160,20 +150,6 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     window.addEventListener("mouseup", handleMouseUp);
     e.stopPropagation();
   }, [isPreviewing, placedItems, selectedIds, zoomLevel, artboardRef]);
-
-  // --- リサイズロジック ---
-  const handleItemResizeStart = useCallback((e: React.MouseEvent, itemId: string, direction: ResizeDirection) => {
-    const item = placedItems.find((p) => p.id === itemId);
-    if (!item) return;
-    resizeInfoRef.current = {
-      startPos: { x: e.clientX, y: e.clientY },
-      startItem: { ...item },
-      direction: direction,
-    };
-    window.addEventListener("mousemove", handleResizing);
-    window.addEventListener("mouseup", handleResizeEnd);
-    e.stopPropagation();
-  }, [placedItems]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDraggingRef.current || !dragStartPos.current || !artboardRef.current) return;
@@ -208,45 +184,12 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     window.removeEventListener("mouseup", handleMouseUp);
   }, [commitHistory]);
 
-  const handleResizing = useCallback((e: MouseEvent) => {
-    if (!resizeInfoRef.current) return;
-    const { startPos, startItem, direction } = resizeInfoRef.current;
-    
-    const dx = (e.clientX - startPos.x) / zoomLevel;
-    const dy = (e.clientY - startPos.y) / zoomLevel;
-    
-    let newWidth = startItem.width;
-    let newHeight = startItem.height;
-    const minDim = snapToGrid(10, gridSize, 10);
-
-    if (direction.includes("bottom")) newHeight = startItem.height + dy;
-    if (direction.includes("top")) newHeight = startItem.height - dy;
-    if (direction.includes("right")) newWidth = startItem.width + dx;
-    if (direction.includes("left")) newWidth = startItem.width - dx;
-    
-    const snappedWidth = snapToGrid(newWidth, gridSize, minDim);
-    const snappedHeight = snapToGrid(newHeight, gridSize, minDim);
-    
-    const finalX = direction.includes("left") ? snapToGrid(startItem.x + (startItem.width - snappedWidth), gridSize) : startItem.x;
-    const finalY = direction.includes("top") ? snapToGrid(startItem.y + (startItem.height - snappedHeight), gridSize) : startItem.y;
-
-    updateItem(startItem.id, { x: finalX, y: finalY, width: snappedWidth, height: snappedHeight }, true);
-  }, [updateItem, zoomLevel, gridSize]);
-
-  const handleResizeEnd = useCallback(() => {
-    if (resizeInfoRef.current) commitHistory();
-    resizeInfoRef.current = null;
-    window.removeEventListener("mousemove", handleResizing);
-    window.removeEventListener("mouseup", handleResizeEnd);
-  }, [commitHistory]);
-
   return {
     zoomLevel,
     ignoreNextClickRef,
     contextMenu,
     setContextMenu,
     handleItemDragStart,
-    handleItemResizeStart,
     groupItems,
     ungroupItems,
     deleteItems,
