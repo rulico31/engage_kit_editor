@@ -2,13 +2,28 @@
 
 import React, { useEffect, useState } from "react";
 import { useProjectStore } from "../stores/useProjectStore";
-import { fetchProjectStats, downloadLeadsAsCSV, type LeadData, type AnalyticsStats } from "../lib/dashboardService";
-import "./DashboardView.css"; // スタイルは後述
+import {
+  fetchProjectStats,
+  downloadLeadsAsCSV,
+  type LeadData,
+  type AnalyticsStats,
+  type DailyStats,
+  type NodeStats,
+  type ABTestStats
+} from "../lib/dashboardService";
+import "./DashboardView.css";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, Cell
+} from 'recharts';
 
 const DashboardView: React.FC = () => {
   const currentProjectId = useProjectStore(state => state.currentProjectId);
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [leads, setLeads] = useState<LeadData[]>([]);
+  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [nodeStats, setNodeStats] = useState<NodeStats[]>([]);
+  const [abStats, setAbStats] = useState<ABTestStats[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,6 +37,9 @@ const DashboardView: React.FC = () => {
       const result = await fetchProjectStats(currentProjectId);
       setStats(result.stats);
       setLeads(result.leads);
+      setDailyStats(result.dailyStats);
+      setNodeStats(result.nodeStats);
+      setAbStats(result.abStats);
       setLoading(false);
     };
 
@@ -29,7 +47,7 @@ const DashboardView: React.FC = () => {
   }, [currentProjectId]);
 
   const handleDownloadCSV = () => {
-    downloadLeadsAsCSV(leads, `leads_${new Date().toISOString().slice(0,10)}.csv`);
+    downloadLeadsAsCSV(leads, `leads_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
   if (!currentProjectId) {
@@ -76,6 +94,77 @@ const DashboardView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* グラフエリア */}
+      <div className="dashboard-charts-section">
+        <div className="chart-container">
+          <h3 className="chart-title">日次推移 (PV / UU / CV)</h3>
+          <div style={{ width: '100%', height: 300 }}>
+            <ResponsiveContainer>
+              <LineChart data={dailyStats}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip />
+                <Legend />
+                <Line yAxisId="left" type="monotone" dataKey="pv" stroke="#8884d8" name="PV" />
+                <Line yAxisId="left" type="monotone" dataKey="uu" stroke="#82ca9d" name="UU" />
+                <Line yAxisId="right" type="monotone" dataKey="cv" stroke="#ff7300" name="CV" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {abStats.length > 0 && (
+          <div className="chart-container">
+            <h3 className="chart-title">A/Bテスト結果</h3>
+            <div style={{ width: '100%', height: 300 }}>
+              <ResponsiveContainer>
+                <BarChart data={abStats}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="variant" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="conversion_rate" name="CVR (%)" fill="#8884d8">
+                    {abStats.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.variant === 'A' ? '#0088FE' : '#00C49F'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ノード離脱分析 (簡易リスト) */}
+      {nodeStats.length > 0 && (
+        <div className="dashboard-table-section">
+          <h3 className="section-title">ノード別インタラクション (離脱分析用)</h3>
+          <div className="table-wrapper">
+            <table className="leads-table">
+              <thead>
+                <tr>
+                  <th>Node ID</th>
+                  <th>Interaction Count</th>
+                  <th>Unique Users</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nodeStats.map(ns => (
+                  <tr key={ns.node_id}>
+                    <td>{ns.node_id}</td>
+                    <td>{ns.interaction_count}</td>
+                    <td>{ns.unique_users}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* データ一覧テーブル */}
       <div className="dashboard-table-section">

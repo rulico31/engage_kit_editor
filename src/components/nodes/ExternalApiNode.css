@@ -1,0 +1,50 @@
+.external-api-node {
+    padding: 10px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #3498db;
+    min-width: 180px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    font-family: sans-serif;
+}
+
+.external-api-node-header {
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #2980b9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.external-api-node-icon {
+    font-size: 1.2em;
+}
+
+.external-api-node-info {
+    font-size: 0.8em;
+    color: #666;
+    text-align: left;
+    margin-bottom: 5px;
+    background: #f0f8ff;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.external-api-node-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 5px;
+}
+
+.external-api-node-label-success {
+    color: #2ecc71;
+}
+
+.external-api-node-label-error {
+    color: #e74c3c;
+}

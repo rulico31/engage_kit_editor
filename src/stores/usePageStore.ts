@@ -1,15 +1,14 @@
 // src/stores/usePageStore.ts
 
 import create from 'zustand';
-import { 
-  applyNodeChanges, 
-  applyEdgeChanges, 
+import {
+  applyNodeChanges,
+  applyEdgeChanges,
   addEdge,
   type NodeChange,
   type EdgeChange,
   type Connection,
   type Node
-  // 修正: 未使用の 'type Edge' を削除しました
 } from 'reactflow';
 import type { PlacedItemType, NodeGraph, ProjectData } from '../types';
 import { useSelectionStore } from './useSelectionStore';
@@ -40,27 +39,28 @@ interface PageStoreState {
 
   // Actions
   setSelectedPageId: (pageId: string) => void;
-  addPage: () => void;
+  addPage: (name?: string) => void;
   deletePage: (pageId: string) => void;
   updatePageName: (pageId: string, name: string) => void;
-  
+
   // アイテム操作
   addItem: (item: PlacedItemType) => void;
   updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, addToHistory?: boolean) => void;
   updateItems: (updates: { id: string, props: Partial<PlacedItemType> }[], addToHistory?: boolean) => void;
   deleteItems: (ids: string[]) => void;
-  
-  // グループ化
+
+  // グループ化・順序
   groupItems: (ids: string[]) => void;
-  ungroupItems: (groupId: string) => void;
-  
-  // 重なり順
+  ungroupItems: (id: string) => void;
   moveItemToFront: (id: string) => void;
   moveItemToBack: (id: string) => void;
   moveItemForward: (id: string) => void;
   moveItemBackward: (id: string) => void;
 
-  // ノード操作 (基本)
+  // 自動レイアウト
+  autoStackItems: () => void;
+
+  // ノード操作
   updateNodeData: (nodeId: string, data: any) => void;
   setLogicGraph: (itemId: string, graph: NodeGraph) => void;
 
@@ -91,35 +91,35 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
   pageOrder: ["page-1"],
   selectedPageId: "page-1",
-  
+
   history: [],
   historyIndex: -1,
   canUndo: false,
   canRedo: false,
 
   // --- ページ管理 ---
-  setSelectedPageId: (pageId) => set({ selectedPageId: pageId }),
-  
-  addPage: () => {
+  setSelectedPageId: (pageId: string) => set({ selectedPageId: pageId }),
+
+  addPage: (name?: string) => {
     const newId = `page-${Date.now()}`;
     set(state => ({
       pages: {
         ...state.pages,
-        [newId]: { id: newId, name: `Page ${state.pageOrder.length + 1}`, placedItems: [], allItemLogics: {} }
+        [newId]: { id: newId, name: name || `Page ${state.pageOrder.length + 1}`, placedItems: [], allItemLogics: {} }
       },
       pageOrder: [...state.pageOrder, newId],
       selectedPageId: newId
     }));
   },
 
-  deletePage: (pageId) => {
+  deletePage: (pageId: string) => {
     const { pageOrder, pages } = get();
-    if (pageOrder.length <= 1) return; 
-    
+    if (pageOrder.length <= 1) return;
+
     const newOrder = pageOrder.filter(id => id !== pageId);
     const newPages = { ...pages };
     delete newPages[pageId];
-    
+
     set({
       pages: newPages,
       pageOrder: newOrder,
@@ -127,7 +127,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
   },
 
-  updatePageName: (pageId, name) => {
+  updatePageName: (pageId: string, name: string) => {
     set(state => ({
       pages: {
         ...state.pages,
@@ -150,12 +150,12 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- アイテム操作 ---
-  addItem: (item) => {
+  addItem: (item: PlacedItemType) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
       const newItems = [...page.placedItems, item];
-      
+
       return {
         pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
       };
@@ -163,11 +163,11 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  updateItem: (id, updates, addToHistory = false) => {
+  updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, addToHistory = false) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
-      
+
       const newItems = page.placedItems.map(item => {
         if (item.id !== id) return item;
         if ('data' in updates) {
@@ -187,7 +187,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     if (addToHistory) get().commitHistory();
   },
 
-  updateItems: (updatesList, addToHistory = false) => {
+  updateItems: (updatesList: { id: string, props: Partial<PlacedItemType> }[], addToHistory = false) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
@@ -207,12 +207,12 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     if (addToHistory) get().commitHistory();
   },
 
-  deleteItems: (ids) => {
+  deleteItems: (ids: string[]) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
       const newItems = page.placedItems.filter(i => !ids.includes(i.id));
-      
+
       return {
         pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
       };
@@ -221,11 +221,11 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- グループ化 ---
-  groupItems: (ids) => {
+  groupItems: (ids: string[]) => {
     const { pages, selectedPageId } = get();
     const page = pages[selectedPageId!];
     const items = page.placedItems;
-    
+
     const targets = items.filter(i => ids.includes(i.id));
     if (targets.length < 2) return;
 
@@ -258,15 +258,15 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  ungroupItems: (targetId) => {
+  ungroupItems: (targetId: string) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
-      
+
       let groupId = targetId;
       const targetItem = page.placedItems.find(i => i.id === targetId);
       if (targetItem?.groupId) groupId = targetItem.groupId;
-      
+
       if (!targetId.startsWith("group") && !targetItem?.groupId) return state;
 
       const newItems = page.placedItems.map(item => {
@@ -284,7 +284,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- 重なり順 ---
-  moveItemToFront: (id) => {
+  moveItemToFront: (id: string) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const items = [...state.pages[pageId].placedItems];
@@ -295,7 +295,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       return { pages: { ...state.pages, [pageId]: { ...state.pages[pageId], placedItems: items } } };
     });
   },
-  moveItemToBack: (id) => {
+  moveItemToBack: (id: string) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const items = [...state.pages[pageId].placedItems];
@@ -306,7 +306,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       return { pages: { ...state.pages, [pageId]: { ...state.pages[pageId], placedItems: items } } };
     });
   },
-  moveItemForward: (id) => {
+  moveItemForward: (id: string) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const items = [...state.pages[pageId].placedItems];
@@ -316,7 +316,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       return { pages: { ...state.pages, [pageId]: { ...state.pages[pageId], placedItems: items } } };
     });
   },
-  moveItemBackward: (id) => {
+  moveItemBackward: (id: string) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const items = [...state.pages[pageId].placedItems];
@@ -327,13 +327,44 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
   },
 
+  // --- 自動レイアウト ---
+  autoStackItems: () => {
+    set(state => {
+      const pageId = state.selectedPageId!;
+      const page = state.pages[pageId];
+      const items = [...page.placedItems];
+
+      // Y座標でソート
+      items.sort((a, b) => a.y - b.y);
+
+      let currentY = 20;
+      const newItems = items.map(item => {
+        const newItem = { ...item };
+        newItem.mobileX = 20;
+        newItem.mobileY = currentY;
+        newItem.mobileWidth = 335; // モバイル幅 (375 - 40)
+
+        // 高さは維持するか、必要なら調整
+        newItem.mobileHeight = item.height;
+
+        currentY += newItem.mobileHeight + 20; // マージン
+        return newItem;
+      });
+
+      return {
+        pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
+      };
+    });
+    get().commitHistory();
+  },
+
   // --- ノード操作 (基本) ---
-  updateNodeData: (nodeId, data) => {
+  updateNodeData: (nodeId: string, data: any) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
       const newLogics = { ...page.allItemLogics };
-      
+
       Object.keys(newLogics).forEach(itemId => {
         const graph = newLogics[itemId];
         const nodeIndex = graph.nodes.findIndex(n => n.id === nodeId);
@@ -350,7 +381,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
   },
 
-  setLogicGraph: (itemId, graph) => {
+  setLogicGraph: (itemId: string, graph: NodeGraph) => {
     set(state => {
       const pageId = state.selectedPageId!;
       return {
@@ -369,7 +400,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- React Flow グラフ操作 ---
-  applyNodesChange: (changes) => {
+  applyNodesChange: (changes: NodeChange[]) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
@@ -394,7 +425,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
   },
 
-  applyEdgesChange: (changes) => {
+  applyEdgesChange: (changes: EdgeChange[]) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
@@ -419,7 +450,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
   },
 
-  applyConnect: (connection) => {
+  applyConnect: (connection: Connection) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
@@ -444,7 +475,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
   },
 
-  addNodeToCurrentGraph: (node) => {
+  addNodeToCurrentGraph: (node: Node) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
@@ -452,7 +483,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
       const page = state.pages[pageId];
       const currentGraph = page.allItemLogics[activeGraphId] || { nodes: [], edges: [] };
-      
+
       return {
         pages: {
           ...state.pages,
@@ -460,9 +491,9 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
             ...page,
             allItemLogics: {
               ...page.allItemLogics,
-              [activeGraphId]: { 
-                ...currentGraph, 
-                nodes: [...currentGraph.nodes, node] 
+              [activeGraphId]: {
+                ...currentGraph,
+                nodes: [...currentGraph.nodes, node]
               }
             }
           }
@@ -476,14 +507,14 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     set(state => {
       const pageId = state.selectedPageId;
       if (!pageId) return state;
-      
+
       const currentItems = state.pages[pageId].placedItems;
       const newHistory = state.history.slice(0, state.historyIndex + 1);
-      
+
       newHistory.push({ placedItems: JSON.parse(JSON.stringify(currentItems)) });
-      
+
       if (newHistory.length > MAX_HISTORY) newHistory.shift();
-      
+
       return {
         history: newHistory,
         historyIndex: newHistory.length - 1,
@@ -498,7 +529,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       if (state.historyIndex <= 0) return state;
       const newIndex = state.historyIndex - 1;
       const pageId = state.selectedPageId!;
-      
+
       return {
         historyIndex: newIndex,
         pages: {

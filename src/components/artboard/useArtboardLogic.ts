@@ -17,7 +17,7 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     gridSize: state.gridSize,
     viewMode: state.viewMode,
   }));
-  
+
   const { deleteItems, updateItems, groupItems, ungroupItems, commitHistory } = usePageStore(state => ({
     deleteItems: state.deleteItems,
     updateItems: state.updateItems,
@@ -74,7 +74,7 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
             return;
           }
         }
-        
+
         const { tabs, activeTabId } = useSelectionStore.getState();
         const activeEntry = tabs.find(t => t.id === activeTabId);
         if (activeEntry && activeEntry.type === 'node') return;
@@ -91,6 +91,48 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
   }, [deleteItems]);
 
   // --- ドラッグ移動ロジック ---
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDraggingRef.current || !dragStartPos.current || !artboardRef.current) return;
+
+    const artboardRect = artboardRef.current.getBoundingClientRect();
+    const mouseXInArtboard = (e.clientX - artboardRect.left) / zoomLevel;
+    const mouseYInArtboard = (e.clientY - artboardRect.top) / zoomLevel;
+
+    const dx = mouseXInArtboard - dragStartPos.current.x;
+    const dy = mouseYInArtboard - dragStartPos.current.y;
+
+    // モバイルビューの場合は、移動量をPC座標系に逆変換する
+    // Mobile Scale = 375 / 1000 = 0.375
+    // Delta PC = Delta Mobile / 0.375
+    const isMobileView = useEditorSettingsStore.getState().isMobileView;
+    const mobileScale = 375 / 1000;
+
+    const finalDx = isMobileView ? dx / mobileScale : dx;
+    // Y座標はスケーリングしていないのでそのまま (dy)
+
+    const updates = Object.entries(dragStartItemStates.current).map(([id, startState]) => ({
+      id,
+      props: {
+        x: snapToGrid(startState.x + finalDx, gridSize),
+        y: snapToGrid(startState.y + dy, gridSize)
+      }
+    }));
+
+    if (updates.length > 0) {
+      updateItems(updates, true);
+      ignoreNextClickRef.current = true;
+    }
+  }, [updateItems, zoomLevel, gridSize, artboardRef]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isDraggingRef.current) commitHistory();
+    isDraggingRef.current = false;
+    dragStartPos.current = null;
+    dragStartItemStates.current = {};
+    window.removeEventListener("mousemove", handleMouseMove);
+    window.removeEventListener("mouseup", handleMouseUp);
+  }, [commitHistory, handleMouseMove]);
+
   const handleItemDragStart = useCallback((e: React.MouseEvent, itemId: string, handleItemSelect: any) => {
     if (isPreviewing) return;
     ignoreNextClickRef.current = false;
@@ -114,20 +156,20 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     targets.forEach(id => {
       const targetItem = placedItems.find(p => p.id === id);
       if (!targetItem) return;
-      
+
       const startGroupId = targetItem.groupId;
       let parent = startGroupId ? placedItems.find(p => p.id === startGroupId) || null : null;
       let parentIsTarget = false;
 
       while (parent) {
-        if (targets.has(parent.id)) { 
-          parentIsTarget = true; 
-          break; 
+        if (targets.has(parent.id)) {
+          parentIsTarget = true;
+          break;
         }
         const nextGroupId = parent.groupId;
         parent = nextGroupId ? placedItems.find(p => p.id === nextGroupId) || null : null;
       }
-      
+
       if (!parentIsTarget) validTargets.add(id);
     });
 
@@ -135,11 +177,11 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     const artboardRect = artboardRef.current?.getBoundingClientRect();
     if (!artboardRect) return;
 
-    dragStartPos.current = { 
-      x: (e.clientX - artboardRect.left) / zoomLevel, 
-      y: (e.clientY - artboardRect.top) / zoomLevel 
+    dragStartPos.current = {
+      x: (e.clientX - artboardRect.left) / zoomLevel,
+      y: (e.clientY - artboardRect.top) / zoomLevel
     };
-    
+
     const initialStates: Record<string, { x: number, y: number }> = {};
     placedItems.forEach(p => {
       if (validTargets.has(p.id)) initialStates[p.id] = { x: p.x, y: p.y };
@@ -149,40 +191,7 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
     e.stopPropagation();
-  }, [isPreviewing, placedItems, selectedIds, zoomLevel, artboardRef]);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDraggingRef.current || !dragStartPos.current || !artboardRef.current) return;
-    
-    const artboardRect = artboardRef.current.getBoundingClientRect();
-    const mouseXInArtboard = (e.clientX - artboardRect.left) / zoomLevel;
-    const mouseYInArtboard = (e.clientY - artboardRect.top) / zoomLevel;
-
-    const dx = mouseXInArtboard - dragStartPos.current.x;
-    const dy = mouseYInArtboard - dragStartPos.current.y;
-
-    const updates = Object.entries(dragStartItemStates.current).map(([id, startState]) => ({
-      id,
-      props: {
-        x: snapToGrid(startState.x + dx, gridSize),
-        y: snapToGrid(startState.y + dy, gridSize)
-      }
-    }));
-
-    if (updates.length > 0) {
-      updateItems(updates, true);
-      ignoreNextClickRef.current = true;
-    }
-  }, [updateItems, zoomLevel, gridSize, artboardRef]);
-
-  const handleMouseUp = useCallback(() => {
-    if (isDraggingRef.current) commitHistory();
-    isDraggingRef.current = false;
-    dragStartPos.current = null;
-    dragStartItemStates.current = {};
-    window.removeEventListener("mousemove", handleMouseMove);
-    window.removeEventListener("mouseup", handleMouseUp);
-  }, [commitHistory]);
+  }, [isPreviewing, placedItems, selectedIds, zoomLevel, artboardRef, handleMouseMove, handleMouseUp]);
 
   return {
     zoomLevel,

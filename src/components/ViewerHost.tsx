@@ -19,7 +19,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   // ストアのアクションを取得
   const loadProject = useProjectStore(state => state.loadProject);
   const initPreview = usePreviewStore(state => state.initPreview);
-  
+
   // 描画に必要なデータをストアから取得
   const { placedItems, allItemLogics } = usePageStore(state => {
     const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
@@ -42,19 +42,19 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         // 1. データベースからプロジェクトをロード
         // (注: loadProjectは内部でEditorSettingsStoreを更新しますが、Viewerモードでは無視します)
         await loadProject(projectId);
-        
+
         // 2. ロード完了後、プレビュー状態を初期化
         // (少し待ってデータがストアに反映されてから実行)
         setTimeout(() => {
           initPreview();
           setIsLoaded(true);
-          
+
           // ★ 追加: PVとUUの計測開始
           // プロジェクトロードと初期化が完了した時点でカウントします
           logAnalyticsEvent('page_view', {
-             metadata: { referrer: document.referrer }
+            metadata: { referrer: document.referrer }
           });
-          
+
         }, 100);
 
       } catch (err) {
@@ -70,11 +70,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   if (error) {
     return (
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "center", 
-        alignItems: "center", 
-        height: "100vh", 
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100vh",
         color: "#ff6b6b",
         backgroundColor: "#111"
       }}>
@@ -85,11 +85,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   if (!isLoaded) {
     return (
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "center", 
-        alignItems: "center", 
-        height: "100vh", 
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        height: "100vh",
         color: "#888",
         backgroundColor: "#111"
       }}>
@@ -110,6 +110,18 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     position: "relative",
   };
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  // リサイズイベントでモバイル判定
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 480);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <div style={backgroundStyle}>
       <PreviewHost
@@ -117,6 +129,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         previewState={previewState}
         setPreviewState={setPreviewState}
         allItemLogics={allItemLogics}
+        isMobile={isMobile}
       />
     </div>
   );

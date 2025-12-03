@@ -10,6 +10,7 @@ interface PreviewHostProps {
     newState: PreviewState | ((prev: PreviewState) => PreviewState)
   ) => void;
   allItemLogics: Record<string, NodeGraph>;
+  isMobile?: boolean; // 追加
 }
 
 const PreviewHost: React.FC<PreviewHostProps> = ({
@@ -17,6 +18,7 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
   previewState,
   setPreviewState,
   allItemLogics,
+  isMobile = false,
 }) => {
   // コンテナのスタイル
   // 背景設定は親コンポーネント（ViewerHostやEditorView）側で行うため、ここでは指定しない
@@ -31,7 +33,7 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
     <div style={containerStyle}>
       {placedItems.map((item) => {
         const itemState = previewState[item.id];
-        
+
         // ★ 修正: 背景として設定されているアイテムは描画しない
         if (item.data.isArtboardBackground) {
           return null;
@@ -50,6 +52,7 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
             previewState={previewState}
             setPreviewState={setPreviewState}
             allItemLogics={allItemLogics}
+            isMobile={isMobile}
           />
         );
       })}

@@ -17,22 +17,23 @@ import { useArtboardLogic, snapToGrid } from "./artboard/useArtboardLogic";
 
 const Artboard: React.FC = () => {
   // ストアデータの取得
-  const { addItem } = usePageStore(state => ({ addItem: state.addItem }));
+  const { addItem, updateItem } = usePageStore(state => ({ addItem: state.addItem, updateItem: state.updateItem }));
   const { placedItems } = usePageStore(state => {
     const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
     return { placedItems: page?.placedItems || [] };
   });
-  
+
   const { activeTabId, handleItemSelect, handleBackgroundClick } = useSelectionStore(state => ({
     activeTabId: state.activeTabId,
     handleItemSelect: state.handleItemSelect,
     handleBackgroundClick: state.handleBackgroundClick,
   }));
 
-  const { isPreviewing, gridSize, showGrid } = useEditorSettingsStore(state => ({
+  const { isPreviewing, gridSize, showGrid, isMobileView } = useEditorSettingsStore(state => ({
     isPreviewing: state.isPreviewing,
     gridSize: state.gridSize,
     showGrid: state.showGrid,
+    isMobileView: state.isMobileView,
   }));
 
   const { previewState, previewBackground, variables, onItemEvent, onVariableChange } = usePreviewStore(state => ({
@@ -77,9 +78,9 @@ const Artboard: React.FC = () => {
       if (!artboardRect) return;
       const clientOffset = monitor.getClientOffset();
       if (!clientOffset) return;
-      
-      const x = (clientOffset.x - artboardRect.left) / zoomLevel;
-      const y = (clientOffset.y - artboardRect.top) / zoomLevel;
+
+      let x = (clientOffset.x - artboardRect.left) / zoomLevel;
+      let y = (clientOffset.y - artboardRect.top) / zoomLevel;
 
       const newItemId = `item-${Date.now()}`;
       const newItem: PlacedItemType = {
@@ -90,7 +91,7 @@ const Artboard: React.FC = () => {
         width: 100, height: 40,
         data: { text: item.name, src: null, showBorder: true, isTransparent: false, initialVisibility: true, isArtboardBackground: false, color: "#333333" },
       };
-      
+
       // アイテムごとの初期設定
       if (item.name === "画像") {
         newItem.width = 150; newItem.height = 100; newItem.data.text = "画像";
@@ -101,20 +102,45 @@ const Artboard: React.FC = () => {
         newItem.width = 200; newItem.height = 45;
         newItem.data = { ...newItem.data, text: "", variableName: `input_${Date.now()}`, placeholder: "テキストを入力..." };
       }
+
+      // モバイルモード時の自動配置 (Auto-Stack)
+      if (isMobileView) {
+        const mobileWidth = 375;
+        // 既存のアイテムの中で一番下にあるアイテムを探す
+        let maxY = 0;
+        let lastItemHeight = 0;
+
+        placedItems.forEach(p => {
+          if (p.y > maxY) {
+            maxY = p.y;
+            lastItemHeight = p.height;
+          }
+        });
+
+        // 一番下のアイテムの下に配置 (マージン 20px)
+        const nextY = maxY + lastItemHeight + 20;
+
+        // Y座標を更新 (最初のアイテムの場合は少し上を空ける)
+        newItem.y = placedItems.length === 0 ? 50 : nextY;
+
+        // X座標を中央揃えに
+        newItem.x = (mobileWidth - newItem.width) / 2;
+      }
+
       addItem(newItem);
     },
-  }), [addItem, zoomLevel, gridSize]);
+  }), [addItem, zoomLevel, gridSize, isMobileView, placedItems]);
   drop(artboardRef);
 
   // 背景スタイル計算
   const backgroundStyle = useMemo(() => {
-    const bgItem = !isPreviewing 
+    const bgItem = !isPreviewing
       ? placedItems.find(p => p.data.isArtboardBackground && p.data.src)
       : undefined;
 
     const src = isPreviewing ? previewBackground.src : bgItem?.data.src;
     const pos = isPreviewing ? previewBackground.position : bgItem?.data.artboardBackgroundPosition;
-    
+
     if (src) {
       return { backgroundImage: `url(${src})`, backgroundPosition: pos || '50% 50%', backgroundSize: 'cover' };
     }
@@ -123,7 +149,6 @@ const Artboard: React.FC = () => {
 
   const showGridOverlay = !isPreviewing && showGrid && gridSize !== null && gridSize > 2;
   const gridStyle = useMemo<React.CSSProperties>(() => {
-    if (!showGridOverlay || !gridSize) return { display: 'none' };
     return {
       backgroundSize: `${gridSize}px ${gridSize}px`,
       backgroundImage: `linear-gradient(to right, rgba(0, 0, 0, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 1px, transparent 1px)`,
@@ -142,26 +167,33 @@ const Artboard: React.FC = () => {
         selectedIds={selectedIds}
         activeTabId={activeTabId}
         isPreviewing={isPreviewing}
+        isMobileView={useEditorSettingsStore.getState().isMobileView}
         previewState={previewState}
         onItemEvent={onItemEvent}
         variables={variables}
         onVariableChange={onVariableChange}
+        zoomLevel={zoomLevel}
+        onItemUpdate={updateItem}
       />
     ));
-  }, [placedItems, onArtboardItemSelect, handleItemDragStart, selectedIds, activeTabId, isPreviewing, previewState, onItemEvent, variables, onVariableChange, handleItemSelect]);
+  }, [placedItems, onArtboardItemSelect, handleItemDragStart, selectedIds, activeTabId, isPreviewing, previewState, onItemEvent, variables, onVariableChange, handleItemSelect, zoomLevel, updateItem]);
 
   const MemoizedArtboardItem = useMemo(() => React.memo(ArtboardItem), []);
 
+  // アートボードのサイズ決定
+  const artboardWidth = isMobileView ? 375 : 1000;
+  const artboardHeight = isMobileView ? 667 : 700;
+
   return (
-    <div 
-      className="artboard-wrapper" 
-      style={{ width: `${1000 * zoomLevel}px`, height: `${700 * zoomLevel}px`, margin: "20px auto", position: "relative" }}
-      onContextMenu={(e) => { e.preventDefault(); if (!isPreviewing) setContextMenu({ visible: true, x: e.clientX, y: e.clientY }); }} 
+    <div
+      className="artboard-wrapper"
+      style={{ width: `${artboardWidth * zoomLevel}px`, height: `${artboardHeight * zoomLevel}px`, margin: "20px auto", position: "relative" }}
+      onContextMenu={(e) => { e.preventDefault(); if (!isPreviewing) setContextMenu({ visible: true, x: e.clientX, y: e.clientY }); }}
     >
       <div
         ref={artboardRef}
         className={`artboard ${isOver ? "is-over" : ""} ${backgroundStyle.backgroundImage !== 'none' ? 'has-background-image' : ''}`}
-        style={{ transform: `scale(${zoomLevel})`, margin: 0, ...backgroundStyle }}
+        style={{ transform: `scale(${zoomLevel})`, margin: 0, ...backgroundStyle, width: `${artboardWidth}px`, height: `${artboardHeight}px` }}
         onClick={handleBackgroundClick}
       >
         {showGridOverlay && <div className="artboard-grid-overlay" style={gridStyle} />}
@@ -169,7 +201,7 @@ const Artboard: React.FC = () => {
       </div>
 
       {contextMenu?.visible && (
-        <ContextMenu 
+        <ContextMenu
           x={contextMenu.x} y={contextMenu.y} selectedCount={selectedIds.length}
           onGroup={() => { groupItems(selectedIds); setContextMenu(null); }}
           onUngroup={() => { selectedIds.forEach(id => ungroupItems(id)); setContextMenu(null); }}

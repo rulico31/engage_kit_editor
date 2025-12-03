@@ -1,8 +1,7 @@
-// src/components/Header.tsx
-
 import React from "react";
 import "./Header.css";
 import type { ViewMode } from "../types";
+import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 
 interface HeaderProps {
   projectName: string;
@@ -10,10 +9,11 @@ interface HeaderProps {
   onGoHome: () => void;
   onSave: () => void;
   onTogglePreview: () => void;
-  onEnterFullscreen: () => void; // ★ 追加: 全画面表示用
+  onEnterFullscreen: () => void;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onPublish: () => void;
+  onEmbed: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -26,6 +26,7 @@ const Header: React.FC<HeaderProps> = ({
   viewMode,
   onViewModeChange,
   onPublish,
+  onEmbed,
 }) => {
   return (
     <header className="editor-header">
@@ -69,14 +70,52 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* 右側：アクション */}
       <div className="header-right">
-        
+
+        {/* PC/Mobile Switcher */}
+        <div className="device-switcher" style={{ display: 'flex', marginRight: '16px', border: '1px solid #ddd', borderRadius: '4px', overflow: 'hidden', width: '80px' }}>
+          <button
+            onClick={() => useEditorSettingsStore.getState().setIsMobileView(false)}
+            style={{
+              background: !useEditorSettingsStore.getState().isMobileView ? '#e0e0e0' : 'transparent',
+              border: 'none',
+              padding: '4px 0',
+              cursor: 'pointer',
+              fontSize: '16px',
+              flex: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}
+            title="PCモード"
+          >
+            💻
+          </button>
+          <button
+            onClick={() => useEditorSettingsStore.getState().setIsMobileView(true)}
+            style={{
+              background: useEditorSettingsStore.getState().isMobileView ? '#e0e0e0' : 'transparent',
+              border: 'none',
+              padding: '4px 0',
+              cursor: 'pointer',
+              fontSize: '16px',
+              flex: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}
+            title="モバイルモード"
+          >
+            📱
+          </button>
+        </div>
+
         <button className="icon-button" onClick={onSave} title="下書き保存 (クラウド)">
           ☁️
         </button>
 
         <div className="separator" />
 
-        {/* ★ 追加: 全画面表示ボタン */}
+        {/* 全画面表示ボタン */}
         <button className="icon-button" onClick={onEnterFullscreen} title="全画面表示 (F11)">
           ⛶
         </button>
@@ -95,7 +134,11 @@ const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </button>
-        
+
+        <button className="embed-button" onClick={onEmbed} title="埋め込みコードを取得">
+          &lt;/&gt;
+        </button>
+
         <button className="publish-button" onClick={onPublish}>
           公開する
         </button>

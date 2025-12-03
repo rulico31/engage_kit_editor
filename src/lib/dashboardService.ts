@@ -19,6 +19,27 @@ export interface AnalyticsStats {
   deviceBreakdown: { desktop: number; mobile: number; tablet: number };
 }
 
+export interface DailyStats {
+  date: string;
+  pv: number;
+  uu: number;
+  cv: number;
+  cvr: number;
+}
+
+export interface NodeStats {
+  node_id: string;
+  interaction_count: number;
+  unique_users: number;
+}
+
+export interface ABTestStats {
+  variant: string;
+  visitors: number;
+  conversions: number;
+  conversion_rate: number;
+}
+
 /**
  * プロジェクトの統計情報とリード一覧を取得
  */
@@ -41,10 +62,36 @@ export const fetchProjectStats = async (projectId: string) => {
 
   if (leadsError) console.error('Error fetching leads:', leadsError);
 
+  // 3. 日次統計の取得 (analytics_daily_stats view)
+  const { data: dailyStats, error: dailyError } = await supabase
+    .from('analytics_daily_stats')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('date', { ascending: true });
+
+  if (dailyError) console.error('Error fetching daily stats:', dailyError);
+
+  // 4. ノード別統計の取得 (analytics_node_stats view)
+  const { data: nodeStats, error: nodeError } = await supabase
+    .from('analytics_node_stats')
+    .select('*')
+    .eq('project_id', projectId);
+
+  if (nodeError) console.error('Error fetching node stats:', nodeError);
+
+  // 5. A/Bテスト結果の取得 (analytics_ab_test_stats view)
+  const { data: abStats, error: abError } = await supabase
+    .from('analytics_ab_test_stats')
+    .select('*')
+    .eq('project_id', projectId);
+
+  if (abError) console.error('Error fetching AB stats:', abError);
+
+
   const safeLeads = (leads as LeadData[]) || [];
   const totalViews = pvCount || 0;
   const totalLeads = safeLeads.length;
-  
+
   // デバイス別集計
   const devices = { desktop: 0, mobile: 0, tablet: 0 };
   safeLeads.forEach(l => {
@@ -60,6 +107,9 @@ export const fetchProjectStats = async (projectId: string) => {
       deviceBreakdown: devices,
     },
     leads: safeLeads,
+    dailyStats: (dailyStats as DailyStats[]) || [],
+    nodeStats: (nodeStats as NodeStats[]) || [],
+    abStats: (abStats as ABTestStats[]) || [],
   };
 };
 
@@ -78,7 +128,7 @@ export const downloadLeadsAsCSV = (leads: LeadData[], fileName: string = 'leads_
   leads.forEach(lead => {
     Object.keys(lead.data).forEach(k => dataKeys.add(k));
   });
-  
+
   const sortedDataKeys = Array.from(dataKeys).sort();
   const headers = ['ID', 'Date', 'IP Address', 'Device', 'Referrer', ...sortedDataKeys];
 

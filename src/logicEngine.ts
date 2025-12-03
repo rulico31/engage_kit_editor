@@ -1,15 +1,21 @@
 // src/logicEngine.ts
 
 import type { Node, Edge } from "reactflow";
-import type { 
-  PreviewState, 
-  NodeGraph, 
-  VariableState, 
+import type {
+  PreviewState,
+  NodeGraph,
+  VariableState,
   PreviewItemState,
-  PlacedItemType 
+  PlacedItemType
 } from "./types";
-import { logAnalyticsEvent } from "./lib/analytics";
-import { submitLeadData } from "./lib/leads"; // ★ 追加
+import type { AnalyticsEventType } from "./lib/analytics";
+
+// 実行コンテキスト（外部依存の注入用）
+export interface LogicRuntimeContext {
+  logEvent: (eventType: AnalyticsEventType, payload?: any) => void;
+  submitLead: (variables: Record<string, any>) => Promise<boolean>;
+  fetchApi: (url: string, options: RequestInit) => Promise<any>;
+}
 
 // リスナー管理用の型定義
 export type ResumeListener = () => void;
@@ -35,7 +41,7 @@ const pushNext = (srcId: string, handle: string | null, edges: Edge[], queue: st
 /**
  * ロジック実行エンジン (内部処理用)
  */
-const processQueue = (
+const processQueue = async (
   executionQueue: string[],
   allNodes: Node[],
   allEdges: Edge[],
@@ -45,7 +51,8 @@ const processQueue = (
   requestPageChange: (pageId: string) => void,
   getVariables: () => VariableState,
   setVariables: (newVars: VariableState) => void,
-  activeListeners: ActiveListeners
+  activeListeners: ActiveListeners,
+  context: LogicRuntimeContext
 ) => {
   const nextQueue: string[] = [];
 
@@ -53,7 +60,7 @@ const processQueue = (
     const node = allNodes.find((n) => n.id === nodeId);
     if (!node) continue;
 
-    logAnalyticsEvent('node_execution', {
+    context.logEvent('node_execution', {
       nodeId: node.id,
       nodeType: node.type,
       metadata: { label: node.data.label }
@@ -82,14 +89,14 @@ const processQueue = (
 
     // (2) If ノード
     else if (node.type === "ifNode") {
-      const { 
-        conditionSource = 'item', 
-        conditionTargetId, 
+      const {
+        conditionSource = 'item',
+        conditionTargetId,
         conditionType,
         variableName,
         comparisonType = 'string',
         comparison = '==',
-        comparisonValue 
+        comparisonValue
       } = node.data;
 
       let conditionResult = false;
@@ -106,8 +113,8 @@ const processQueue = (
         }
       } else if (conditionSource === 'variable') {
         const currentVars = getVariables();
-        const varValue = currentVars[variableName]; 
-        
+        const varValue = currentVars[variableName];
+
         if (comparisonType === 'number') {
           const numVarValue = Number(varValue || 0);
           const numCompValue = Number(comparisonValue || 0);
@@ -133,25 +140,25 @@ const processQueue = (
         }
       }
 
-      logAnalyticsEvent('logic_branch', {
+      context.logEvent('logic_branch', {
         nodeId: node.id,
         nodeType: node.type,
-        metadata: { 
+        metadata: {
           result: conditionResult ? 'true' : 'false',
           conditionSource,
-          variableName 
+          variableName
         }
       });
 
       pushNext(node.id, conditionResult ? "true" : "false", allEdges, nextQueue);
     }
-    
+
     // (3) ページ遷移ノード
     else if (node.type === "pageNode") {
       const { targetPageId } = node.data;
       if (targetPageId) requestPageChange(targetPageId);
     }
-    
+
     // (4) 変数セットノード
     else if (node.type === "setVariableNode") {
       const { variableName, operation = 'set', value } = node.data;
@@ -163,15 +170,15 @@ const processQueue = (
       }
       pushNext(node.id, null, allEdges, nextQueue);
     }
-    
+
     // (5) アニメーションノード
     else if (node.type === "animateNode") {
-      const { 
-        targetItemId, 
-        animType, 
+      const {
+        targetItemId,
+        animType,
         value,
-        durationS = 0.5, 
-        delayS = 0, 
+        durationS = 0.5,
+        delayS = 0,
         easing = 'ease',
         animationMode = 'absolute',
         loopMode = 'none',
@@ -185,32 +192,32 @@ const processQueue = (
         const initialItem = placedItems.find(p => p.id === targetItemId);
 
         if (targetItemState && initialItem) {
-          
+
           let cssProperty = '';
           const durationMs = (Number(durationS) + Number(delayS)) * 1000;
           let toState: Partial<PreviewItemState>;
 
           const playAnimation = (remaining: number) => {
             let fromState: PreviewItemState;
-            
+
             if (animationMode === 'relative') {
               fromState = { ...getPreviewState()[targetItemId], transition: 'none' };
               toState = { ...fromState };
               const numValue = Number(value || 0);
-              
-              if (animType === 'opacity') { 
+
+              if (animType === 'opacity') {
                 cssProperty = 'opacity';
                 if (relativeOperation === 'subtract') {
                   toState.opacity = fromState.opacity - numValue;
                 } else {
-                  toState.opacity = fromState.opacity * numValue; 
+                  toState.opacity = fromState.opacity * numValue;
                 }
               }
               else if (animType === 'moveX') { cssProperty = 'transform'; toState.x = fromState.x + numValue; }
               else if (animType === 'moveY') { cssProperty = 'transform'; toState.y = fromState.y + numValue; }
               else if (animType === 'scale') { cssProperty = 'transform'; toState.scale = fromState.scale * numValue; }
               else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = fromState.rotation + numValue; }
-              
+
             } else {
               fromState = {
                 ...getPreviewState()[targetItemId],
@@ -218,14 +225,14 @@ const processQueue = (
                 transition: 'none',
               };
               toState = { ...fromState };
-              
+
               if (animType === 'opacity') { cssProperty = 'opacity'; toState.opacity = Number(value); }
               else if (animType === 'moveX') { cssProperty = 'transform'; toState.x = Number(value); }
               else if (animType === 'moveY') { cssProperty = 'transform'; toState.y = Number(value); }
               else if (animType === 'scale') { cssProperty = 'transform'; toState.scale = Number(value); }
               else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = Number(value); }
             }
-            
+
             if (!cssProperty) {
               pushNext(node.id, null, allEdges, nextQueue);
               return;
@@ -239,8 +246,8 @@ const processQueue = (
             setTimeout(() => {
               setPreviewState({
                 ...getPreviewState(),
-                [targetItemId]: { 
-                  ...getPreviewState()[targetItemId], 
+                [targetItemId]: {
+                  ...getPreviewState()[targetItemId],
                   ...toState,
                   transition: `${cssProperty} ${durationS}s ${easing} ${delayS}s`
                 },
@@ -254,7 +261,7 @@ const processQueue = (
               } else {
                 const nextNodeIds = findNextNodes(node.id, null, allEdges);
                 if (nextNodeIds.length > 0) {
-                  processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+                  processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
                 }
               }
             }, durationMs + 20);
@@ -262,7 +269,7 @@ const processQueue = (
 
           const initialPlays = (loopMode === 'count') ? Number(loopCount) : 1;
           playAnimation(initialPlays);
-          
+
         } else {
           pushNext(node.id, null, allEdges, nextQueue);
         }
@@ -270,14 +277,14 @@ const processQueue = (
         pushNext(node.id, null, allEdges, nextQueue);
       }
     }
-    
+
     // (6) 遅延ノード
     else if (node.type === "delayNode") {
       const { durationS = 1.0 } = node.data;
       setTimeout(() => {
         const nextNodeIds = findNextNodes(node.id, null, allEdges);
         if (nextNodeIds.length > 0) {
-          processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+          processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
         }
       }, Number(durationS) * 1000);
     }
@@ -290,15 +297,15 @@ const processQueue = (
     // (8) クリック待ちノード
     else if (node.type === "waitForClickNode") {
       const { targetItemId } = node.data;
-      
+
       if (targetItemId) {
         const nextNodeIds = findNextNodes(node.id, null, allEdges);
-        
+
         if (nextNodeIds.length > 0) {
           const resumeFlow = () => {
             processQueue(
               nextNodeIds,
-              allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners
+              allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context
             );
           };
 
@@ -311,19 +318,92 @@ const processQueue = (
       }
     }
 
-    // (9) データ送信ノード (★ 追加)
+    // (10) A/Bテストノード
+    else if (node.type === "abTestNode") {
+      const { probability = 50 } = node.data;
+      const randomValue = Math.random() * 100;
+      const isPathA = randomValue < probability;
+      const resultPath = isPathA ? "pathA" : "pathB";
+
+      context.logEvent('logic_branch', {
+        nodeId: node.id,
+        nodeType: node.type,
+        metadata: {
+          result: resultPath,
+          probability,
+          randomValue
+        }
+      });
+
+      pushNext(node.id, resultPath, allEdges, nextQueue);
+    }
+
+    // (9) データ送信ノード (Legacy)
     else if (node.type === "submitDataNode") {
-      // 現在の全変数を取得して送信
       const currentVars = getVariables();
-      submitLeadData(currentVars);
-      
-      // 送信後もフローを継続（完了ページへの遷移などにつなげるため）
+      context.submitLead(currentVars);
       pushNext(node.id, null, allEdges, nextQueue);
+    }
+
+    // (11) フォーム送信ノード
+    else if (node.type === "submitFormNode") {
+      const currentVars = getVariables();
+
+      try {
+        const success = await context.submitLead(currentVars);
+        const resultPath = success ? "success" : "error";
+
+        context.logEvent('logic_branch', {
+          nodeId: node.id,
+          nodeType: node.type,
+          metadata: { result: resultPath }
+        });
+
+        pushNext(node.id, resultPath, allEdges, nextQueue);
+      } catch (e) {
+        console.error("Form submission error:", e);
+        pushNext(node.id, "error", allEdges, nextQueue);
+      }
+    }
+
+    // (12) 外部APIノード (★ 新規追加)
+    else if (node.type === "externalApiNode") {
+      const { url, method = "GET", variableName } = node.data;
+
+      if (!url) {
+        pushNext(node.id, "error", allEdges, nextQueue);
+        continue;
+      }
+
+      try {
+        const responseData = await context.fetchApi(url, { method });
+
+        if (variableName) {
+          const currentVars = getVariables();
+          setVariables({ ...currentVars, [variableName]: responseData });
+        }
+
+        context.logEvent('node_execution', {
+          nodeId: node.id,
+          nodeType: node.type,
+          metadata: { status: 'success', url }
+        });
+
+        pushNext(node.id, "success", allEdges, nextQueue);
+      } catch (e) {
+        console.error("API fetch error:", e);
+        context.logEvent('node_execution', {
+          nodeId: node.id,
+          nodeType: node.type,
+          metadata: { status: 'error', url, error: String(e) }
+        });
+        pushNext(node.id, "error", allEdges, nextQueue);
+      }
     }
   }
 
   if (nextQueue.length > 0) {
-    processQueue(nextQueue, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+    await processQueue(nextQueue, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
   }
 };
 
@@ -340,7 +420,8 @@ export const triggerEvent = (
   requestPageChange: (pageId: string) => void,
   getVariables: () => VariableState,
   setVariables: (newVars: VariableState) => void,
-  activeListeners: ActiveListeners
+  activeListeners: ActiveListeners,
+  context: LogicRuntimeContext
 ) => {
   const { nodes, edges } = currentPageGraph;
 
@@ -360,14 +441,14 @@ export const triggerEvent = (
 
   if (startingNodes.length > 0) {
     const initialQueue: string[] = [];
-    
+
     startingNodes.forEach(startNode => {
-        const nextIds = findNextNodes(startNode.id, null, edges);
-        initialQueue.push(...nextIds);
+      const nextIds = findNextNodes(startNode.id, null, edges);
+      initialQueue.push(...nextIds);
     });
 
     if (initialQueue.length > 0) {
-        processQueue(initialQueue, nodes, edges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners);
+      processQueue(initialQueue, nodes, edges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
     }
   }
 };
@@ -380,10 +461,10 @@ export const executeLogicGraph = (
   setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void
 ) => {
   console.warn(
-    "executeLogicGraph is deprecated.", 
-    startNodeId, 
-    graph, 
-    previewState, 
+    "executeLogicGraph is deprecated.",
+    startNodeId,
+    graph,
+    previewState,
     setPreviewState
   );
   console.warn("Use usePreviewStore.handleItemEvent instead.");

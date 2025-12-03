@@ -5,7 +5,6 @@ import type { Node, Edge } from "reactflow";
 // ★ 修正: ダッシュボードモードを追加
 export type ViewMode = "design" | "logic" | "split" | "dashboard";
 
-// アートボードに配置されたアイテムが持つデータの型
 export interface PlacedItemType {
   id: string;
   name: string;
@@ -14,26 +13,28 @@ export interface PlacedItemType {
   width: number;
   height: number;
   groupId?: string;
-  
+
+  // Mobile Layout
+  mobileX?: number;
+  mobileY?: number;
+  mobileWidth?: number;
+  mobileHeight?: number;
+
   data: {
-    text: string;
-    src: string | null;
+    text?: string;
+    src?: string | null;
     variableName?: string;
     placeholder?: string;
-    
     keepAspectRatio?: boolean;
     originalAspectRatio?: number;
-    
     showBorder?: boolean;
     isTransparent?: boolean;
     initialVisibility?: boolean;
     isArtboardBackground?: boolean;
     artboardBackgroundPosition?: string;
     artboardBackgroundSize?: string;
-    
     color?: string;
     fontSize?: number;
-
     [key: string]: any;
   };
 }
@@ -65,8 +66,8 @@ export interface PageData {
 
 export interface ProjectData {
   projectName: string;
-  pages: Record<string, PageData>; 
-  pageOrder: string[]; 
+  pages: Record<string, PageData>;
+  pageOrder: string[];
   variables: VariableState;
 }
 
@@ -86,12 +87,12 @@ export interface PreviewBackground {
   position: string | undefined;
 }
 
-export type PropertyControlType = 
-  | 'text' 
-  | 'number' 
-  | 'textarea' 
-  | 'select' 
-  | 'checkbox' 
+export type PropertyControlType =
+  | 'text'
+  | 'number'
+  | 'textarea'
+  | 'select'
+  | 'checkbox'
   | 'color';
 
 export interface PropertySelectOption {

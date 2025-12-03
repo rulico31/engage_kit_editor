@@ -1,200 +1,179 @@
 /* src/components/Header.css */
 
-:root {
-  --header-height: 56px;
-  --header-bg: #18181b;       /* Zinc-900: より深い黒に近いグレー */
-  --header-border: #27272a;   /* Zinc-800: 境界線 */
-  --text-main: #e4e4e7;       /* Zinc-200 */
-  --text-muted: #a1a1aa;      /* Zinc-400 */
-  --accent-color: #3b82f6;    /* Blue-500 */
-  --accent-hover: #2563eb;    /* Blue-600 */
-  --danger-color: #ef4444;
-}
-
 .editor-header {
-  height: var(--header-height);
-  background-color: var(--header-bg);
-  border-bottom: 1px solid var(--header-border);
+  height: 50px;
+  background-color: #2b2b2b;
+  border-bottom: 1px solid #3a3a3a;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
+  color: #e0e0e0;
   user-select: none;
-  box-sizing: border-box;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* --- 左側: ホーム & タイトル --- */
-.header-left {
+.header-left,
+.header-right {
   display: flex;
   align-items: center;
   gap: 12px;
   flex: 1;
 }
 
-.home-button {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background-color: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 16px;
+.header-right {
+  justify-content: flex-end;
 }
 
-.home-button:hover {
-  background-color: #27272a;
-  color: var(--text-main);
-}
-
-.project-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* --- 中央: ビュー切り替えタブ (Segmented Control風) --- */
 .header-center {
   flex: 2;
   display: flex;
   justify-content: center;
 }
 
+.home-button {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-button:hover {
+  background-color: #3a3a3a;
+  color: #fff;
+}
+
+.project-title {
+  font-weight: 500;
+  font-size: 14px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* View Mode Tabs */
 .view-mode-tabs {
   display: flex;
-  background-color: #27272a; /* 背景を一段階明るくして「くぼみ」を作る */
-  padding: 3px;
-  border-radius: 8px;
+  background-color: #1e1e1e;
+  border-radius: 6px;
+  padding: 2px;
   gap: 2px;
 }
 
 .view-mode-tab {
-  background: transparent;
+  background: none;
   border: none;
-  color: var(--text-muted);
-  padding: 6px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
+  color: #888;
+  padding: 4px 12px;
+  font-size: 12px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  min-width: 80px;
-  text-align: center;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
 .view-mode-tab:hover {
-  color: var(--text-main);
+  color: #ccc;
 }
 
 .view-mode-tab.active {
-  background-color: #3f3f46; /* Zinc-700 */
+  background-color: #3a3a3a;
   color: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  font-weight: 600;
+  font-weight: 500;
 }
 
-/* --- 右側: アクションボタン --- */
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  justify-content: flex-end;
-}
-
-.file-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
+/* Right Actions */
 .icon-button {
-  width: 32px;
-  height: 32px;
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  color: #aaa;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background-color: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 16px;
 }
 
 .icon-button:hover {
-  background-color: #27272a;
-  color: var(--text-main);
+  background-color: #3a3a3a;
+  color: #fff;
 }
 
 .separator {
   width: 1px;
   height: 20px;
-  background-color: var(--header-border);
+  background-color: #444;
   margin: 0 4px;
 }
 
-/* プレビューボタン */
 .preview-toggle-button {
   display: flex;
   align-items: center;
   gap: 6px;
+  background-color: #3a3a3a;
+  border: 1px solid #444;
+  color: #e0e0e0;
   padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #3f3f46;
-  background-color: transparent;
-  color: var(--text-main);
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: 4px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .preview-toggle-button:hover {
-  background-color: #27272a;
-  border-color: #52525b;
+  background-color: #444;
+  border-color: #555;
 }
 
 .preview-toggle-button.is-previewing {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--danger-color);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-.preview-toggle-button.is-previewing:hover {
-  background-color: rgba(239, 68, 68, 0.2);
+  background-color: #d32f2f;
+  /* Red for stop */
+  border-color: #b71c1c;
+  color: white;
 }
 
-/* 公開ボタン (Primary Action) */
+.preview-toggle-button.is-previewing:hover {
+  background-color: #b71c1c;
+}
+
 .publish-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 16px;
-  height: 32px;
-  background-color: var(--accent-color);
-  color: white;
+  background-color: #007bff;
+  /* Blue for publish */
   border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  transition: background-color 0.2s, transform 0.1s;
+  transition: background-color 0.2s;
 }
 
 .publish-button:hover {
-  background-color: var(--accent-hover);
+  background-color: #0056b3;
 }
 
-.publish-button:active {
-  transform: translateY(1px);
+.embed-button {
+  background: none;
+  border: 1px solid #555;
+  color: #aaa;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: monospace;
+  font-weight: bold;
+}
+
+.embed-button:hover {
+  background-color: #3a3a3a;
+  color: #fff;
+  border-color: #777;
 }

@@ -14,7 +14,8 @@ import { ifNodeConfig } from "../nodes/IfNode";
 import { pageNodeConfig } from "../nodes/PageNode";
 import { setVariableNodeConfig } from "../nodes/SetVariableNode";
 import { waitForClickNodeConfig } from "../nodes/WaitForClickNode";
-import { submitDataNodeConfig } from "../nodes/SubmitDataNode"; // ★ 追加
+import { submitDataNodeConfig } from "../nodes/SubmitDataNode";
+import { externalApiNodeConfig } from "../nodes/ExternalApiNode";
 
 const nodeConfigMap: Record<string, NodePropertyConfig | NodePropertyConfig[]> = {
   "actionNode": actionNodeConfig,
@@ -25,7 +26,8 @@ const nodeConfigMap: Record<string, NodePropertyConfig | NodePropertyConfig[]> =
   "pageNode": pageNodeConfig,
   "setVariableNode": setVariableNodeConfig,
   "waitForClickNode": waitForClickNodeConfig,
-  "submitDataNode": submitDataNodeConfig, // ★ 追加
+  "submitDataNode": submitDataNodeConfig,
+  "externalApiNode": externalApiNodeConfig,
 };
 
 // --- プロパティ入力コンポーネント ---
@@ -44,10 +46,10 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
     };
   });
   const activeLogicGraphId = useSelectionStore(state => state.activeLogicGraphId);
-  
+
   // placedItemsのfind結果がundefinedになる可能性があるためオプショナルチェーンを使用
   const parentItem = activeLogicGraphId ? placedItems.find(p => p.id === activeLogicGraphId) : undefined;
-  
+
   const isInputItem = parentItem?.name.startsWith("テキスト入力欄") || false;
   const isImageItem = parentItem?.name.startsWith("画像") || false;
 
@@ -62,7 +64,7 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
     if (type === 'checkbox') {
       newValue = (e.target as HTMLInputElement).checked;
     }
-    
+
     if (node.type === "waitForClickNode" && name === "targetItemId") {
       const selectedItem = placedItems.find(p => p.id === newValue);
       const newLabel = selectedItem ? `待ち: ${selectedItem.data.text || selectedItem.name}` : "ターゲット未設定";

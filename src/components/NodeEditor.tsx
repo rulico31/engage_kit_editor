@@ -7,7 +7,7 @@ import ReactFlow, {
   useReactFlow,
   type Node,
   type NodeProps,
-  ReactFlowProvider, 
+  ReactFlowProvider,
 } from "reactflow";
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
@@ -28,7 +28,10 @@ import SetVariableNode from "./nodes/SetVariableNode";
 import AnimateNode from "./nodes/AnimateNode";
 import DelayNode from "./nodes/DelayNode";
 import WaitForClickNode from "./nodes/WaitForClickNode";
-import { submitDataNodeConfig } from "./nodes/SubmitDataNode"; // 設定のみimport (型定義用)
+import ABTestNode from "./nodes/ABTestNode";
+import SubmitFormNode from "./nodes/SubmitFormNode";
+import ExternalApiNode from "./nodes/ExternalApiNode";
+
 
 interface NodeToolDragItem { nodeType: string; nodeName: string; }
 type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
@@ -39,7 +42,7 @@ const NodeEditorContent: React.FC = () => {
 
   const { allItemLogics, placedItems, setLogicGraph } = usePageStore((s) => {
     const page = s.selectedPageId ? s.pages[s.selectedPageId] : undefined;
-    return { 
+    return {
       allItemLogics: page?.allItemLogics ?? {},
       placedItems: page?.placedItems ?? [],
       setLogicGraph: s.setLogicGraph,
@@ -66,7 +69,7 @@ const NodeEditorContent: React.FC = () => {
             position: { x: 50, y: 50 },
             data: { label: '✅ 入力完了時', eventType: 'onInputComplete' }
           });
-        } 
+        }
         else if (item.name.startsWith("画像")) {
           // 画像の場合: 画像読み込み時のみ
           initialNodes.push({
@@ -75,7 +78,7 @@ const NodeEditorContent: React.FC = () => {
             position: { x: 50, y: 50 },
             data: { label: '🖼️ 画像読み込み時', eventType: 'onImageLoad' }
           });
-        } 
+        }
         else if (!item.id.startsWith('group')) {
           // その他（ボタン、テキスト等）の場合: クリック時のみ
           initialNodes.push({
@@ -92,18 +95,18 @@ const NodeEditorContent: React.FC = () => {
     }
   }, [activeLogicGraphId, currentGraph, placedItems, setLogicGraph]);
 
-  const { 
-    applyNodesChange: onNodesChange, 
-    applyEdgesChange: onEdgesChange, 
-    addNodeToCurrentGraph: onAddNode, 
-    applyConnect: onConnect 
+  const {
+    applyNodesChange: onNodesChange,
+    applyEdgesChange: onEdgesChange,
+    addNodeToCurrentGraph: onAddNode,
+    applyConnect: onConnect
   } = usePageStore.getState();
-  
+
   const onNodeClick = useSelectionStore(state => state.handleNodeClick);
-  
+
   const nodes = currentGraph?.nodes || [];
   const edges = currentGraph?.edges || [];
-  
+
   const { fitView, project } = useReactFlow();
   const dropRef = useRef<HTMLDivElement>(null);
 
@@ -115,7 +118,7 @@ const NodeEditorContent: React.FC = () => {
         const { nodeType, nodeName } = item;
         const clientOffset = monitor.getClientOffset();
         if (!clientOffset || !dropRef.current) return;
-        
+
         const position = project({
           x: clientOffset.x - (dropRef.current.getBoundingClientRect().left ?? 0),
           y: clientOffset.y - (dropRef.current.getBoundingClientRect().top ?? 0),
@@ -153,7 +156,10 @@ const NodeEditorContent: React.FC = () => {
     animateNode: (props: NodeProps) => <AnimateNode {...props} />,
     delayNode: (props: NodeProps) => <DelayNode {...props} />,
     waitForClickNode: (props: NodeProps) => <WaitForClickNode {...props} />,
-  }), []); 
+    abTestNode: (props: NodeProps) => <ABTestNode {...props} />,
+    submitFormNode: (props: NodeProps) => <SubmitFormNode {...props} />,
+    externalApiNode: (props: NodeProps) => <ExternalApiNode {...props} />,
+  }), []);
 
   const handleNodeClick: NodeClickHandler = (_event, node) => {
     onNodeClick(node.id, node.data?.label);
@@ -165,17 +171,20 @@ const NodeEditorContent: React.FC = () => {
     <div className="node-editor-wrapper">
       <aside className="node-toolbox">
         {/* イベントノードの手動追加機能は削除 */}
-        
+
         <div className="toolbox-header">アクション</div>
         <NodeToolboxItem nodeType="actionNode" nodeName="⚡ 表示/非表示">⚡ 表示/非表示</NodeToolboxItem>
         <NodeToolboxItem nodeType="animateNode" nodeName="⚡ アニメーション">⚡ アニメーション</NodeToolboxItem>
         <NodeToolboxItem nodeType="pageNode" nodeName="⚡ ページ遷移">⚡ ページ遷移</NodeToolboxItem>
         <NodeToolboxItem nodeType="setVariableNode" nodeName="⚡ 変数をセット">⚡ 変数をセット</NodeToolboxItem>
+        <NodeToolboxItem nodeType="submitFormNode" nodeName="📤 フォーム送信">📤 フォーム送信</NodeToolboxItem>
+        <NodeToolboxItem nodeType="externalApiNode" nodeName="🌍 外部API">🌍 外部API</NodeToolboxItem>
         <div style={{ height: 10 }} />
-        
+
         <div className="toolbox-header">ロジック</div>
         <NodeToolboxItem nodeType="delayNode" nodeName="⏱️ 遅延 (Wait)">⏱️ 遅延</NodeToolboxItem>
         <NodeToolboxItem nodeType="ifNode" nodeName="🧠 もし〜なら">🧠 もし〜なら</NodeToolboxItem>
+        <NodeToolboxItem nodeType="abTestNode" nodeName="⚖️ A/B Test">⚖️ A/B Test</NodeToolboxItem>
         <NodeToolboxItem nodeType="waitForClickNode" nodeName="👆 クリック待ち">👆 クリック待ち</NodeToolboxItem>
       </aside>
 

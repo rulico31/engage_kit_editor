@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
-import "./PreviewItem.css"; 
-import { usePreviewStore } from "../stores/usePreviewStore"; 
+import "./PreviewItem.css";
+import { usePreviewStore } from "../stores/usePreviewStore";
 
 interface PreviewItemProps {
   item: PlacedItemType;
@@ -12,13 +12,23 @@ interface PreviewItemProps {
     newState: PreviewState | ((prev: PreviewState) => PreviewState)
   ) => void;
   allItemLogics: Record<string, NodeGraph>;
+  isMobile?: boolean;
 }
 
 const PreviewItem: React.FC<PreviewItemProps> = ({
   item,
   previewState,
+  isMobile = false,
 }) => {
-  const { id, name, width, height } = item;
+  const { id, name } = item;
+  const itemState = previewState[id];
+
+  // モバイル表示時の座標・サイズ
+  const x = isMobile && item.mobileX !== undefined ? item.mobileX : itemState?.x ?? item.x;
+  const y = isMobile && item.mobileY !== undefined ? item.mobileY : itemState?.y ?? item.y;
+  const width = isMobile && item.mobileWidth !== undefined ? item.mobileWidth : item.width;
+  const height = isMobile && item.mobileHeight !== undefined ? item.mobileHeight : item.height;
+
   const onItemEvent = usePreviewStore(state => state.handleItemEvent);
   const onVariableChange = usePreviewStore(state => state.handleVariableChangeFromItem);
   const variables = usePreviewStore(state => state.variables);
@@ -30,15 +40,14 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     if (variableName && variables[variableName] !== undefined) {
       setInputValue(variables[variableName]);
     }
-  }, [variableName]); 
+  }, [variableName]);
 
   const handleClick = () => {
     if (name.includes("ボタン") || name.includes("画像")) {
-        onItemEvent("click", id);
+      onItemEvent("click", id);
     }
   };
 
-  const itemState = previewState[id];
   if (!itemState) return null;
 
   let content: React.ReactNode = null;
@@ -50,9 +59,9 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   if (name.startsWith("画像")) {
     if (item.data.src) {
       content = (
-        <img 
-          src={item.data.src} 
-          alt={item.data.text || "image"} 
+        <img
+          src={item.data.src}
+          alt={item.data.text || "image"}
           className="preview-image-content"
           draggable={false}
           onLoad={() => {
@@ -63,7 +72,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     } else {
       content = <div className="preview-placeholder">No Image</div>;
     }
-  } 
+  }
   else if (isInput) {
     content = (
       <textarea
@@ -79,7 +88,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            e.currentTarget.blur(); 
+            e.currentTarget.blur();
           }
         }}
         onClick={(e) => e.stopPropagation()}
@@ -98,20 +107,20 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
       className={itemClassName}
       style={{
         position: "absolute",
-        left: `${itemState.x}px`,
-        top: `${itemState.y}px`,
+        left: `${x}px`,
+        top: `${y}px`,
         width: `${width}px`,
-        
+
         height: isAutoHeight ? 'auto' : `${height}px`,
         minHeight: isAutoHeight ? `${height}px` : undefined,
-        
-        zIndex: 0, 
+
+        zIndex: 0,
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
         color: item.data.color || '#333333',
         fontSize: item.data.fontSize ? `${item.data.fontSize}px` : '15px', // ★ 追加: フォントサイズ適用
-        
+
         // 枠線の制御
         border: (item.data.showBorder === false) ? 'none' : undefined,
         backgroundColor: (item.data.isTransparent) ? 'transparent' : undefined,

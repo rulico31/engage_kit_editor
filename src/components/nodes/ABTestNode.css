@@ -1,0 +1,66 @@
+.ab-test-node {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 10px;
+    min-width: 180px;
+    color: #fff;
+    font-size: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.ab-test-node-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #a8dadc;
+}
+
+.ab-test-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ab-test-slider-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ab-test-slider-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #aaa;
+}
+
+.ab-test-slider {
+    width: 100%;
+    accent-color: #a8dadc;
+}
+
+.ab-test-handles {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    position: relative;
+    height: 20px;
+}
+
+.ab-test-handle-label {
+    position: absolute;
+    top: 20px;
+    font-size: 10px;
+    color: #888;
+}
+
+.ab-test-handle-label.left {
+    left: 0;
+}
+
+.ab-test-handle-label.right {
+    right: 0;
+}

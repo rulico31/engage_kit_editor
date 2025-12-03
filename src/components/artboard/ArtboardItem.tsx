@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { PlacedItemType, PreviewState, VariableState } from "../../types";
 import "../Artboard.css";
+import { ResizeHandles } from "./ResizeHandles";
 
 interface ArtboardItemProps {
   item: PlacedItemType;
@@ -10,10 +11,13 @@ interface ArtboardItemProps {
   selectedIds: string[];
   activeTabId: string | null;
   isPreviewing: boolean;
+  isMobileView?: boolean;
   previewState: PreviewState | null;
   onItemEvent: (eventName: string, itemId: string) => void;
   variables: VariableState;
   onVariableChange: (variableName: string, value: any) => void;
+  zoomLevel: number;
+  onItemUpdate: (id: string, updates: Partial<PlacedItemType>, addToHistory?: boolean) => void;
 }
 
 export const ArtboardItem: React.FC<ArtboardItemProps> = ({
@@ -24,10 +28,13 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   selectedIds,
   activeTabId,
   isPreviewing,
+  isMobileView = false,
   previewState,
   onItemEvent,
   variables,
   onVariableChange,
+  zoomLevel,
+  onItemUpdate,
 }) => {
   const isSelected = selectedIds.includes(item.id);
   const isActive = item.id === activeTabId;
@@ -36,11 +43,21 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   // 入力系アイテムの自動高さ調整除外設定
   const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン"));
 
+  // モバイル表示時の座標・サイズ (相対配置ロジック)
+  // PC基準 (1000px) から モバイル基準 (375px) への変換
+  // Y座標は維持 (スクロール前提)、X座標と幅は比率でスケーリング
+  const mobileScale = 375 / 1000;
+
+  const x = isMobileView ? item.x * mobileScale : item.x;
+  const y = isMobileView ? item.y : item.y; // Yは維持
+  const width = isMobileView ? item.width * mobileScale : item.width;
+  const height = isMobileView ? item.height : item.height; // 高さも維持 (必要なら調整)
+
   // スタイル計算
   const style: React.CSSProperties = {
-    width: item.width,
-    height: isAutoHeight ? 'auto' : item.height,
-    minHeight: item.height,
+    width: width,
+    height: isAutoHeight ? 'auto' : height,
+    minHeight: height,
     color: item.data?.color || '#333333',
     fontSize: item.data?.fontSize ? `${item.data.fontSize}px` : '15px',
     display: isGroup ? 'block' : 'flex',
@@ -54,8 +71,8 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     style.transition = itemState.transition || 'none';
   } else {
     style.position = 'absolute';
-    style.left = item.x;
-    style.top = item.y;
+    style.left = x;
+    style.top = y;
 
     if (item.data.initialVisibility === false) {
       style.opacity = 0.5;
@@ -182,6 +199,16 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     >
       {content}
       {renderChildren(item.id)}
+
+      {isSelected && !isPreviewing && (
+        <ResizeHandles
+          item={item}
+          zoomLevel={zoomLevel}
+          onResizeStart={() => { }}
+          onResize={(updates) => onItemUpdate(item.id, updates, false)}
+          onResizeEnd={() => onItemUpdate(item.id, {}, true)}
+        />
+      )}
     </div>
   );
 };

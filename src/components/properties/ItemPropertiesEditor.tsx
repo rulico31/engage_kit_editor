@@ -61,35 +61,60 @@ const useItemEditorLogic = (item: PlacedItemType, onItemUpdate: ItemPropertiesEd
     }
 
     setIsUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('project-assets').upload(filePath, file, { cacheControl: '3600', upsert: false });
-      if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage.from('project-assets').getPublicUrl(filePath);
-      
+    // Base64読み込みヘルパー
+    const readAsDataURL = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+
+    try {
+      let srcToUse = '';
+
+      try {
+        // 1. Supabaseへのアップロードを試みる
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage.from('project-assets').upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage.from('project-assets').getPublicUrl(filePath);
+        srcToUse = publicUrl;
+
+      } catch (uploadErr: any) {
+        console.warn("Supabase upload failed, falling back to Base64:", uploadErr);
+        // 2. 失敗した場合はBase64フォールバック
+        srcToUse = await readAsDataURL(file);
+        alert("サーバーへのアップロードに失敗したため、ローカルデータとして保存しました。\n(プロジェクトデータが大きくなる可能性があります)");
+      }
+
       const img = new Image();
       img.onload = () => {
         const MAX_W = 450, MAX_H = 300;
         let w = img.width, h = img.height;
         const ratio = h / w;
-        
-        // リサイズ計算... (省略可だが元のロジック維持)
+
+        // リサイズ計算
         if (w / MAX_W > 1 || h / MAX_H > 1) {
-           if (w / MAX_W > h / MAX_H) { w = MAX_W; h = img.height * (MAX_W / img.width); }
-           else { h = MAX_H; w = img.width * (MAX_H / img.height); }
+          if (w / MAX_W > h / MAX_H) { w = MAX_W; h = img.height * (MAX_W / img.width); }
+          else { h = MAX_H; w = img.width * (MAX_H / img.height); }
         }
 
         onItemUpdate(item.id, {
-          data: { ...item.data, src: publicUrl, originalAspectRatio: ratio, keepAspectRatio: true, isTransparent: false },
+          data: { ...item.data, src: srcToUse, originalAspectRatio: ratio, keepAspectRatio: true, isTransparent: false },
           width: Math.round(w), height: Math.round(h),
         });
         setIsUploading(false);
       };
-      img.src = publicUrl;
+      img.src = srcToUse;
+
     } catch (err: any) {
-      alert("アップロード失敗: " + err.message);
+      alert("画像の読み込みに失敗しました: " + err.message);
       setIsUploading(false);
     } finally {
       e.target.value = "";
@@ -163,14 +188,32 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
       {/* 入力欄設定 */}
       {item.name.startsWith("テキスト入力欄") && (
         <AccordionSection title="入力欄設定">
-           <div className="prop-group">
+          <div className="prop-group">
             <div className="prop-label">変数名</div>
             <input type="text" className="prop-input" value={item.data?.variableName || ""} onChange={(e) => handleDataChange("variableName", e.target.value)} />
           </div>
-           <div className="prop-group">
+          <div className="prop-group">
             <div className="prop-label">プレースホルダー</div>
             <input type="text" className="prop-input" value={item.data?.placeholder || ""} onChange={(e) => handleDataChange("placeholder", e.target.value)} />
           </div>
+          <div className="prop-group">
+            <div className="prop-label">入力タイプ</div>
+            <select
+              className="prop-input"
+              value={item.data?.inputType || "text"}
+              onChange={(e) => handleDataChange("inputType", e.target.value)}
+            >
+              <option value="text">テキスト</option>
+              <option value="email">メールアドレス</option>
+              <option value="number">数値</option>
+              <option value="tel">電話番号</option>
+            </select>
+          </div>
+          <CheckboxProp
+            label="必須項目にする"
+            checked={!!item.data?.required}
+            onChange={(v) => handleDataChange("required", v)}
+          />
         </AccordionSection>
       )}
 
@@ -191,20 +234,20 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
           <CheckboxProp label="初期状態で表示する" checked={item.data?.initialVisibility !== false} onChange={(v) => handleDataChange("initialVisibility", v)} />
           <CheckboxProp label="枠線を表示する" checked={item.data?.showBorder !== false} onChange={(v) => handleDataChange("showBorder", v)} />
           <CheckboxProp label="背景を透過する" checked={!!item.data?.isTransparent} onChange={(v) => handleDataChange("isTransparent", v)} />
-          
+
           {item.name.startsWith("画像") && (
-             <>
-               <CheckboxProp label="アートボードの背景にする" checked={!!item.data?.isArtboardBackground} 
-                 onChange={(v) => {
-                   if(v && !item.data.src) { alert("先に画像をアップロードしてください"); return; }
-                   if(v) onOpenBackgroundModal(item.id, item.data.src!);
-                   handleDataChange("isArtboardBackground", v);
-                 }} 
-               />
-               {item.data?.isArtboardBackground && item.data.src && (
-                  <button className="prop-button" style={{marginTop: 8, backgroundColor: '#555'}} onClick={() => onOpenBackgroundModal(item.id, item.data.src!)}>位置を調整...</button>
-               )}
-             </>
+            <>
+              <CheckboxProp label="アートボードの背景にする" checked={!!item.data?.isArtboardBackground}
+                onChange={(v) => {
+                  if (v && !item.data.src) { alert("先に画像をアップロードしてください"); return; }
+                  if (v) onOpenBackgroundModal(item.id, item.data.src!);
+                  handleDataChange("isArtboardBackground", v);
+                }}
+              />
+              {item.data?.isArtboardBackground && item.data.src && (
+                <button className="prop-button" style={{ marginTop: 8, backgroundColor: '#555' }} onClick={() => onOpenBackgroundModal(item.id, item.data.src!)}>位置を調整...</button>
+              )}
+            </>
           )}
         </AccordionSection>
       )}
@@ -215,7 +258,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
           <NumberInput label="X" value={localRect.x} onChange={(v) => handleRectChange('x', v)} onBlur={() => commitRectChange('x')} />
           <NumberInput label="Y" value={localRect.y} onChange={(v) => handleRectChange('y', v)} onBlur={() => commitRectChange('y')} />
         </div>
-        <div className="prop-row" style={{marginTop: 10}}>
+        <div className="prop-row" style={{ marginTop: 10 }}>
           <NumberInput label="W" value={localRect.w} onChange={(v) => handleRectChange('w', v)} onBlur={() => commitRectChange('w')} />
           <NumberInput label="H" value={localRect.h} onChange={(v) => handleRectChange('h', v)} onBlur={() => commitRectChange('h')} />
         </div>

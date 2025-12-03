@@ -35,14 +35,15 @@ const getDeviceType = (): string => {
 /**
  * リードデータの送信
  * @param variables 現在の全変数（回答データ、スコア等）
+ * @returns 送信成功時はtrue, 失敗時はfalse
  */
-export const submitLeadData = async (variables: Record<string, any>) => {
+export const submitLeadData = async (variables: Record<string, any>): Promise<boolean> => {
   const projectId = useProjectStore.getState().currentProjectId;
-  
+
   // プレビュー中などでプロジェクトIDがない場合はスキップ
   if (!projectId) {
     console.log('[Leads/Dev] Data submission simulation:', variables);
-    return;
+    return true; // Simulate success
   }
 
   const sessionId = getOrCreateSessionId();
@@ -64,7 +65,9 @@ export const submitLeadData = async (variables: Record<string, any>) => {
 
   if (error) {
     console.error('[Leads] Error submitting data:', error);
+    return false;
   } else {
     console.log('[Leads] Data submitted successfully');
+    return true;
   }
 };
