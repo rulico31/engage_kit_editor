@@ -98,10 +98,10 @@ const PageList: React.FC = () => {
 };
 
 // --- ドラッグ可能なツールアイコン ---
-const DraggableTool: React.FC<{ name: string; label: string; icon: string }> = ({ name, label, icon }) => {
+const DraggableTool: React.FC<{ type: string; name: string; label: string; icon: string }> = ({ type, name, label, icon }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.TOOL,
-    item: { name },
+    type: type, // Use specific type as drag source type
+    item: { type, name, label }, // Include type in payload
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
@@ -180,10 +180,10 @@ const LeftPanel: React.FC = () => {
       <div className="left-panel-content" style={{ height: contentHeight, flex: 'none' }}>
         {activeTab === 'tools' ? (
           <div className="tools-grid">
-            <DraggableTool name="テキスト" label="テキスト" icon="T" />
-            <DraggableTool name="ボタン" label="ボタン" icon="🔘" />
-            <DraggableTool name="画像" label="画像" icon="🖼️" />
-            <DraggableTool name="テキスト入力欄" label="テキスト入力欄" icon="📝" />
+            <DraggableTool type={ItemTypes.TEXT} name="テキスト" label="テキスト" icon="T" />
+            <DraggableTool type={ItemTypes.BUTTON} name="ボタン" label="ボタン" icon="🔘" />
+            <DraggableTool type={ItemTypes.IMAGE} name="画像" label="画像" icon="🖼️" />
+            <DraggableTool type={ItemTypes.BOX} name="テキスト入力欄" label="テキスト入力欄" icon="📝" />
           </div>
         ) : (
           <LayerPanel />

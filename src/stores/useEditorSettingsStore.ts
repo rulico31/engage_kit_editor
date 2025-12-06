@@ -2,6 +2,7 @@
 
 import create from 'zustand';
 import type { ViewMode } from '../types';
+import { usePreviewStore } from './usePreviewStore';
 
 interface EditorSettingsStoreState {
   view: "home" | "editor";
@@ -40,14 +41,26 @@ const initialState = {
   isMobileView: false,
 };
 
-export const useEditorSettingsStore = create<EditorSettingsStoreState>((set) => ({
+export const useEditorSettingsStore = create<EditorSettingsStoreState>((set, get) => ({
   ...initialState,
 
   setView: (view) => set({ view }),
   setProjectName: (name) => set({ projectName: name }),
   setViewMode: (mode) => set({ viewMode: mode }),
 
-  togglePreview: () => set(state => ({ isPreviewing: !state.isPreviewing })),
+  togglePreview: () => {
+    const currentState = get().isPreviewing;
+
+    if (!currentState) {
+      // Entering preview mode - initialize preview store
+      usePreviewStore.getState().initPreview();
+    } else {
+      // Exiting preview mode - cleanup preview store
+      usePreviewStore.getState().stopPreview();
+    }
+
+    set({ isPreviewing: !currentState });
+  },
 
   setGridSize: (size) => set({ gridSize: size }),
 

@@ -23,10 +23,18 @@ export type ActiveListeners = Map<string, ResumeListener[]>;
 
 /**
  * ヘルパー: 次のノード群を探してIDの配列を返す (1対多対応)
+ * ★修正: ハンドルIDが null/undefined の場合の互換性を考慮
  */
 const findNextNodes = (srcId: string, handle: string | null, edges: Edge[]): string[] => {
   return edges
-    .filter((e) => e.source === srcId && e.sourceHandle === handle)
+    .filter((e) => {
+      if (e.source !== srcId) return false;
+      // ハンドルが指定されていない場合 (null) は、undefined も許容する
+      if (handle === null) {
+        return e.sourceHandle === null || e.sourceHandle === undefined;
+      }
+      return e.sourceHandle === handle;
+    })
     .map((e) => e.target);
 };
 
@@ -66,12 +74,13 @@ const processQueue = async (
       metadata: { label: node.data.label }
     });
 
-    // (1) アクションノード
+    // (1) アクションノード (表示・非表示)
     if (node.type === "actionNode") {
       const { targetItemId, mode } = node.data;
       if (targetItemId) {
         const currentState = getPreviewState();
         const targetItemState = currentState[targetItemId];
+        // アイテムが存在する場合のみ更新
         if (targetItemState) {
           let newVisibility = targetItemState.isVisible;
           if (mode === "show") newVisibility = true;
@@ -188,10 +197,10 @@ const processQueue = async (
 
       if (targetItemId) {
         const currentState = getPreviewState();
-        const targetItemState = currentState[targetItemId];
         const initialItem = placedItems.find(p => p.id === targetItemId);
 
-        if (targetItemState && initialItem) {
+        // PreviewState にアイテムが存在する場合のみ実行
+        if (currentState[targetItemId] && initialItem) {
 
           let cssProperty = '';
           const durationMs = (Number(durationS) + Number(delayS)) * 1000;
@@ -199,9 +208,13 @@ const processQueue = async (
 
           const playAnimation = (remaining: number) => {
             let fromState: PreviewItemState;
+            const currentItemState = getPreviewState()[targetItemId];
 
+            // ★ 修正: アニメーションタイプに応じて正しい CSS プロパティを指定
+            // PreviewItem.tsx では x, y を left, top にマッピングしているため、
+            // transform ではなく left, top をアニメーション対象にする必要があります。
             if (animationMode === 'relative') {
-              fromState = { ...getPreviewState()[targetItemId], transition: 'none' };
+              fromState = { ...currentItemState, transition: 'none' };
               toState = { ...fromState };
               const numValue = Number(value || 0);
 
@@ -213,22 +226,37 @@ const processQueue = async (
                   toState.opacity = fromState.opacity * numValue;
                 }
               }
-              else if (animType === 'moveX') { cssProperty = 'transform'; toState.x = fromState.x + numValue; }
-              else if (animType === 'moveY') { cssProperty = 'transform'; toState.y = fromState.y + numValue; }
-              else if (animType === 'scale') { cssProperty = 'transform'; toState.scale = fromState.scale * numValue; }
-              else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = fromState.rotation + numValue; }
+              else if (animType === 'moveX') {
+                cssProperty = 'left'; // transform -> left に修正
+                toState.x = fromState.x + numValue;
+              }
+              else if (animType === 'moveY') {
+                cssProperty = 'top'; // transform -> top に修正
+                toState.y = fromState.y + numValue;
+              }
+              else if (animType === 'scale') {
+                cssProperty = 'transform';
+                toState.scale = fromState.scale * numValue;
+              }
+              else if (animType === 'rotate') {
+                cssProperty = 'transform';
+                toState.rotation = fromState.rotation + numValue;
+              }
 
             } else {
+              // 絶対値モード
               fromState = {
-                ...getPreviewState()[targetItemId],
-                x: initialItem.x, y: initialItem.y, opacity: 1, scale: 1, rotation: 0,
+                ...currentItemState,
+                // リセット時は初期値に戻すか、現在の値を基準にするか。
+                // ここでは「絶対指定」なので、初期位置からのアニメーションとするのが自然だが、
+                // 連続アニメーションを考慮し、現在位置からターゲット値へ遷移させる。
                 transition: 'none',
               };
               toState = { ...fromState };
 
               if (animType === 'opacity') { cssProperty = 'opacity'; toState.opacity = Number(value); }
-              else if (animType === 'moveX') { cssProperty = 'transform'; toState.x = Number(value); }
-              else if (animType === 'moveY') { cssProperty = 'transform'; toState.y = Number(value); }
+              else if (animType === 'moveX') { cssProperty = 'left'; toState.x = Number(value); } // transform -> left
+              else if (animType === 'moveY') { cssProperty = 'top'; toState.y = Number(value); } // transform -> top
               else if (animType === 'scale') { cssProperty = 'transform'; toState.scale = Number(value); }
               else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = Number(value); }
             }
@@ -238,11 +266,13 @@ const processQueue = async (
               return;
             }
 
+            // 1. まず transition: none で開始状態をセット (リセット)
             setPreviewState({
               ...getPreviewState(),
               [targetItemId]: fromState,
             });
 
+            // 2. わずかに遅らせて transition を有効にし、目標値をセット
             setTimeout(() => {
               setPreviewState({
                 ...getPreviewState(),
@@ -254,6 +284,7 @@ const processQueue = async (
               });
             }, 10);
 
+            // 3. アニメーション終了後の処理 (ループまたは次のノードへ)
             setTimeout(() => {
               if (loopMode === 'count' && remaining > 1) {
                 const nextRemaining = remaining - 1;
@@ -264,13 +295,14 @@ const processQueue = async (
                   processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
                 }
               }
-            }, durationMs + 20);
+            }, durationMs + 20); // 少し余裕を持たせる
           };
 
           const initialPlays = (loopMode === 'count') ? Number(loopCount) : 1;
           playAnimation(initialPlays);
 
         } else {
+          // ターゲットが見つからない場合はスキップ
           pushNext(node.id, null, allEdges, nextQueue);
         }
       } else {
@@ -366,7 +398,7 @@ const processQueue = async (
       }
     }
 
-    // (12) 外部APIノード (★ 新規追加)
+    // (12) 外部APIノード
     else if (node.type === "externalApiNode") {
       const { url, method = "GET", variableName } = node.data;
 
@@ -467,5 +499,5 @@ export const executeLogicGraph = (
     previewState,
     setPreviewState
   );
-  console.warn("Use usePreviewStore.handleItemEvent instead.");
+  // console.warn("Use usePreviewStore.handleItemEvent instead."); // コメントアウトしてノイズを減らす
 };

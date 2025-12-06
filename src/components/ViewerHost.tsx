@@ -15,6 +15,7 @@ interface ViewerHostProps {
 const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false); // Moved to top
 
   // ストアのアクションを取得
   const loadProject = useProjectStore(state => state.loadProject);
@@ -68,6 +69,17 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     }
   }, [projectId, loadProject, initPreview]);
 
+  // リサイズイベントでモバイル判定 (Moved to top)
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 480);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Conditional returns MUST be after all hooks
   if (error) {
     return (
       <div style={{
@@ -109,18 +121,6 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     overflow: "hidden",
     position: "relative",
   };
-
-  const [isMobile, setIsMobile] = useState(false);
-
-  // リサイズイベントでモバイル判定
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 480);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   return (
     <div style={backgroundStyle}>

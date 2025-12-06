@@ -8,6 +8,7 @@ interface ContextMenuProps {
   onGroup: () => void;
   onUngroup: () => void;
   onDelete: () => void;
+  onAddComment: () => void;
   onClose: () => void;
 }
 
@@ -18,6 +19,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onGroup,
   onUngroup,
   onDelete,
+  onAddComment,
   onClose
 }) => {
   return (
@@ -34,6 +36,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         onClick={(e) => e.stopPropagation()} 
       >
         <div 
+          className="context-menu-item"
+          onClick={onAddComment}
+        >
+          <span>💬 コメントを追加</span>
+        </div>
+        <div className="context-menu-separator" />
+                <div 
           className={`context-menu-item ${selectedCount < 2 ? "disabled" : ""}`}
           onClick={onGroup}
         >

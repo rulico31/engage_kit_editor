@@ -10,6 +10,7 @@ import { useSelectionStore } from "../stores/useSelectionStore";
 import { InspectorTabs } from "./properties/SharedComponents";
 import { NodePropertiesEditor } from "./properties/NodePropertiesEditor";
 import { ItemPropertiesEditor } from "./properties/ItemPropertiesEditor";
+import { PagePropertiesEditor } from "./properties/PagePropertiesEditor";
 
 interface PropertiesPanelProps {
   onOpenBackgroundModal: (itemId: string, src: string) => void;
@@ -21,7 +22,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal
     activeTabId: state.activeTabId,
     activeLogicGraphId: state.activeLogicGraphId,
   }));
-  
+
   const {
     placedItems,
     allItemLogics,
@@ -30,6 +31,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal
     moveItemToBack,
     moveItemForward,
     moveItemBackward,
+    selectedPageId,
   } = usePageStore(s => {
     const page = s.selectedPageId ? s.pages[s.selectedPageId] : undefined;
     return {
@@ -40,19 +42,20 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal
       moveItemToBack: s.moveItemToBack,
       moveItemForward: s.moveItemForward,
       moveItemBackward: s.moveItemBackward,
+      selectedPageId: s.selectedPageId, // Add this
     };
   });
-  
+
   const activeEntry = tabs.find((s) => s.id === activeTabId);
+
   let content = null;
 
-  // --- 表示内容の切り替えロジック ---
   if (activeEntry && activeEntry.type === 'item') {
     const item = placedItems.find((p) => p.id === activeEntry.id);
     if (item) {
       content = (
         <ItemPropertiesEditor
-          key={item.id} // keyを変えることで選択変更時にstateをリセット
+          key={item.id}
           item={item}
           onItemUpdate={updateItem}
           onItemMoveToFront={moveItemToFront}
@@ -62,8 +65,11 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal
           onOpenBackgroundModal={onOpenBackgroundModal}
         />
       );
+    } else {
+      // Item selected but not found in current page
+      content = <div className="properties-panel-content">Item not found (ID: {activeEntry.id})</div>;
     }
-  } 
+  }
   else if (activeEntry && activeEntry.type === 'node') {
     if (!activeLogicGraphId || !allItemLogics) {
       content = <Placeholder>ノードデータ読込中...</Placeholder>;
@@ -80,10 +86,12 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal
         content = <Placeholder>ロジックツリーが見つかりません</Placeholder>;
       }
     }
-  } 
-  
-  if (!content) {
-    content = <Placeholder>アイテムまたはノードを選択してください</Placeholder>;
+  }
+
+  // If no content (nothing selected), show Page Properties
+  // Explicitly check for no activeEntry to avoid overriding "Not Found" messages which result in content!=null
+  if (!activeEntry && !content) {
+    content = <PagePropertiesEditor pageId={selectedPageId || ""} />;
   }
 
   return (
@@ -96,7 +104,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal
   );
 };
 
-const Placeholder: React.FC<{children: React.ReactNode}> = ({ children }) => (
+const Placeholder: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="properties-panel-content">
     <div className="placeholder-text">{children}</div>
   </div>

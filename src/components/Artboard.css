@@ -99,6 +99,11 @@
   background-color: transparent;
 }
 
+/* Preview mode: change cursor to pointer for interactivity */
+.artboard-item.preview {
+  cursor: pointer;
+}
+
 /* --- コンテンツ内部 --- */
 .item-text-content,
 .item-button-content {

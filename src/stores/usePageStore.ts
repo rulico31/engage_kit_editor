@@ -1,6 +1,6 @@
 // src/stores/usePageStore.ts
 
-import create from 'zustand';
+import { create } from 'zustand';
 import {
   applyNodeChanges,
   applyEdgeChanges,
@@ -10,7 +10,7 @@ import {
   type Connection,
   type Node
 } from 'reactflow';
-import type { PlacedItemType, NodeGraph, ProjectData } from '../types';
+import type { PlacedItemType, NodeGraph, ProjectData, CommentType, PageData } from '../types';
 import { useSelectionStore } from './useSelectionStore';
 
 // Undo/Redo履歴の最大数
@@ -22,12 +22,7 @@ interface HistoryState {
 
 interface PageStoreState {
   // 複数ページ管理
-  pages: Record<string, {
-    id: string;
-    name: string;
-    placedItems: PlacedItemType[];
-    allItemLogics: Record<string, NodeGraph>;
-  }>;
+  pages: Record<string, PageData>;
   pageOrder: string[];
   selectedPageId: string | null;
 
@@ -42,12 +37,18 @@ interface PageStoreState {
   addPage: (name?: string) => void;
   deletePage: (pageId: string) => void;
   updatePageName: (pageId: string, name: string) => void;
+  updatePage: (pageId: string, updates: Partial<ProjectData['pages'][string]>) => void;
 
   // アイテム操作
   addItem: (item: PlacedItemType) => void;
   updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, addToHistory?: boolean) => void;
   updateItems: (updates: { id: string, props: Partial<PlacedItemType> }[], addToHistory?: boolean) => void;
   deleteItems: (ids: string[]) => void;
+
+  // コメント管理
+  addComment: (comment: Omit<CommentType, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateComment: (commentId: string, updates: Partial<CommentType>) => void;
+  deleteComment: (commentId: string) => void;
 
   // グループ化・順序
   groupItems: (ids: string[]) => void;
@@ -86,7 +87,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       id: "page-1",
       name: "Page 1",
       placedItems: [],
-      allItemLogics: {}
+      allItemLogics: {},
+      comments: []
     }
   },
   pageOrder: ["page-1"],
@@ -105,7 +107,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     set(state => ({
       pages: {
         ...state.pages,
-        [newId]: { id: newId, name: name || `Page ${state.pageOrder.length + 1}`, placedItems: [], allItemLogics: {} }
+        [newId]: { id: newId, name: name || `Page ${state.pageOrder.length + 1}`, placedItems: [], allItemLogics: {}, comments: [] }
       },
       pageOrder: [...state.pageOrder, newId],
       selectedPageId: newId
@@ -132,6 +134,15 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       pages: {
         ...state.pages,
         [pageId]: { ...state.pages[pageId], name }
+      }
+    }));
+  },
+
+  updatePage: (pageId: string, updates: Partial<ProjectData['pages'][string]>) => {
+    set(state => ({
+      pages: {
+        ...state.pages,
+        [pageId]: { ...state.pages[pageId], ...updates }
       }
     }));
   },
@@ -220,6 +231,61 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
+  // --- コメント管理 ---
+  addComment: (commentData) => {
+    set(state => {
+      const pageId = state.selectedPageId!;
+      const page = state.pages[pageId];
+
+      const newComment: CommentType = {
+        id: `comment-${Date.now()}`,
+        ...commentData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const newComments = [...(page.comments || []), newComment];
+
+      return {
+        pages: { ...state.pages, [pageId]: { ...page, comments: newComments } }
+      };
+    });
+    get().commitHistory();
+  },
+
+  updateComment: (commentId, updates) => {
+    set(state => {
+      const pageId = state.selectedPageId!;
+      const page = state.pages[pageId];
+
+      const newComments = (page.comments || []).map(c => {
+        if (c.id === commentId) {
+          return { ...c, ...updates, updatedAt: new Date().toISOString() };
+        }
+        return c;
+      });
+
+      return {
+        pages: { ...state.pages, [pageId]: { ...page, comments: newComments } }
+      };
+    });
+    get().commitHistory();
+  },
+
+  deleteComment: (commentId) => {
+    set(state => {
+      const pageId = state.selectedPageId!;
+      const page = state.pages[pageId];
+
+      const newComments = (page.comments || []).filter(c => c.id !== commentId);
+
+      return {
+        pages: { ...state.pages, [pageId]: { ...page, comments: newComments } }
+      };
+    });
+    get().commitHistory();
+  },
+
   // --- グループ化 ---
   groupItems: (ids: string[]) => {
     const { pages, selectedPageId } = get();
@@ -237,6 +303,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     const groupId = `group-${Date.now()}`;
     const groupItem: PlacedItemType = {
       id: groupId,
+      type: 'group', // added
       name: "Group",
       x: minX,
       y: minY,

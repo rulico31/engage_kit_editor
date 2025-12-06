@@ -247,7 +247,6 @@ const EditorView: React.FC<EditorViewProps> = ({
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onPublish={onPublish}
-        onEmbed={handleOpenEmbedModal}
       />
 
       <div className="editor-workspace-vertical" ref={workspaceRef}>
@@ -260,52 +259,69 @@ const EditorView: React.FC<EditorViewProps> = ({
             <div
               className="workspace-upper-row"
               style={{
-                height: viewMode === 'split' ? `${splitRatio * 100}%` : '100%',
+                height: viewMode === 'split' && !isPreviewing ? `${splitRatio * 100}%` : '100%',
                 flexShrink: 0
               }}
             >
               {/* Left Panel & Artboard Area */}
-              {viewMode !== "logic" ? (
-                <>
-                  <div className="panel-left" style={{ width: leftWidth }}>
-                    <LeftPanel />
+              {viewMode !== "logic" ? (<>
+                {/* Left Panel - Hidden during preview */}
+                {!isPreviewing && (
+                  <>
+                    <div className="panel-left" style={{ width: leftWidth }}>
+                      <LeftPanel />
+                    </div>
+                    <div
+                      className="resize-separator-vertical"
+                      onMouseDown={handleMouseDown("left")}
+                      title="ドラッグして左パネル幅を変更"
+                    >
+                      <div className="resize-handle-pill-vertical" />
+                    </div>
+                  </>
+                )}
+                <div className="workspace-section design-section" style={{ flex: 1 }}>
+                  <div className="canvas-viewport">
+                    <Artboard />
                   </div>
-                  <div
-                    className="resize-separator-vertical"
-                    onMouseDown={handleMouseDown("left")}
-                    title="ドラッグして左パネル幅を変更"
-                  >
-                    <div className="resize-handle-pill-vertical" />
+                </div>
+              </>
+              ) : (
+                !isPreviewing ? (
+                  <div className="workspace-section logic-section" style={{ flex: 1 }}>
+                    <NodeEditor />
                   </div>
+                ) : (
                   <div className="workspace-section design-section" style={{ flex: 1 }}>
                     <div className="canvas-viewport">
                       <Artboard />
                     </div>
                   </div>
-                </>
-              ) : (
-                <div className="workspace-section logic-section" style={{ flex: 1 }}>
-                  <NodeEditor />
-                </div>
+                )
               )}
 
-              {/* Right Panel (Properties) */}
-              <div
-                className="resize-separator-vertical"
-                onMouseDown={handleMouseDown("right")}
-                title="ドラッグして右パネル幅を変更"
-              >
-                <div className="resize-handle-pill-vertical" />
-              </div>
-              <div className="panel-right" style={{ width: rightWidth }}>
-                <PropertiesPanel
-                  onOpenBackgroundModal={onOpenBackgroundModal}
-                />
-              </div>
+              {/* Right Panel (Properties) - Hidden during preview */}
+              {!isPreviewing && (
+                <>
+                  <div
+                    className="resize-separator-vertical"
+                    onMouseDown={handleMouseDown("right")}
+                    title="ドラッグして右パネル幅を変更"
+                  >
+                    <div className="resize-handle-pill-vertical" />
+                  </div>
+                  <div className="panel-right" style={{ width: rightWidth }}>
+                    <PropertiesPanel
+                      onOpenBackgroundModal={onOpenBackgroundModal}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Split View: Lower Row */}
-            {viewMode === 'split' && (
+            {/* Split View: Lower Row - Hidden during preview */}
+            {viewMode === 'split' && !isPreviewing && (
               <>
                 <div
                   className="resize-separator-horizontal"

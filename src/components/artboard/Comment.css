@@ -1,0 +1,156 @@
+.comment-minimized {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 100;
+    user-select: none;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.comment-minimized:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.comment-minimized.selected {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+}
+
+.comment-icon {
+    color: #4B5563;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.comment-expanded {
+    position: absolute;
+    min-width: 220px;
+    max-width: 320px;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    cursor: move;
+    z-index: 100;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    user-select: none;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    transition: box-shadow 0.2s, transform 0.2s;
+    overflow: hidden;
+}
+
+.comment-expanded:hover {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.comment-expanded.selected {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 8px 8px 4px 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.comment-expanded:hover .comment-header {
+    opacity: 1;
+}
+
+.comment-minimize-btn,
+.comment-delete-btn {
+    background: rgba(0, 0, 0, 0.05);
+    border: none;
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6B7280;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.comment-minimize-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #374151;
+}
+
+.comment-delete-btn:hover {
+    background: #FEE2E2;
+    color: #EF4444;
+}
+
+.comment-body {
+    padding: 0 16px 16px 16px;
+}
+
+.comment-content {
+    min-height: 60px;
+    max-height: 240px;
+    overflow-y: auto;
+    color: #374151;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    cursor: text;
+    padding: 4px;
+    border-radius: 4px;
+    line-height: 1.6;
+    font-size: 14px;
+    user-select: text;
+}
+
+.comment-content:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+/* Scrollbar styling for content */
+.comment-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.comment-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.comment-content::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+}
+
+.comment-textarea {
+    width: 100%;
+    min-height: 60px;
+    max-height: 240px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    line-height: 1.6;
+    color: #374151;
+    background: rgba(255, 255, 255, 0.5);
+    outline: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.comment-textarea:focus {
+    background: white;
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}

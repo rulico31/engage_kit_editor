@@ -1,6 +1,6 @@
 // src/stores/usePreviewStore.ts
 
-import create from 'zustand';
+import { create } from 'zustand';
 import type {
   PreviewState,
   VariableState,

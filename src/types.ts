@@ -7,6 +7,7 @@ export type ViewMode = "design" | "logic" | "split" | "dashboard";
 
 export interface PlacedItemType {
   id: string;
+  type: string; // added
   name: string;
   x: number;
   y: number;
@@ -19,6 +20,14 @@ export interface PlacedItemType {
   mobileY?: number;
   mobileWidth?: number;
   mobileHeight?: number;
+
+  style?: {
+    shadow?: { enabled: boolean; color: string; x: number; y: number; blur: number };
+    glow?: { enabled: boolean; color: string; blur: number; spread: number };
+    textShadow?: { enabled: boolean; color: string; x: number; y: number; blur: number };
+    textGlow?: { enabled: boolean; color: string; blur: number };
+    backgroundColor?: string;
+  };
 
   data: {
     text?: string;
@@ -57,11 +66,26 @@ export interface NodeGraph {
   edges: Edge[];
 }
 
+// コメント/メモの型定義
+export interface CommentType {
+  id: string;
+  content: string;
+  x: number;
+  y: number;
+  isMinimized: boolean;
+  color?: string; // "#FFE082" (黄色), "#B2DFDB" (青緑) など
+  createdAt: string;
+  updatedAt: string;
+  attachedToItemId?: string; // 要素に紐付ける場合（オプション）
+}
+
 export interface PageData {
   id: string;
   name: string;
   placedItems: PlacedItemType[];
   allItemLogics: Record<string, NodeGraph>;
+  comments?: CommentType[]; // コメント配列を追加
+  backgroundColor?: string; // 背景色
 }
 
 export interface ProjectData {

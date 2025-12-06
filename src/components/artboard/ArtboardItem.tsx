@@ -44,44 +44,84 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン"));
 
   // モバイル表示時の座標・サイズ (相対配置ロジック)
-  // PC基準 (1000px) から モバイル基準 (375px) への変換
-  // Y座標は維持 (スクロール前提)、X座標と幅は比率でスケーリング
   const mobileScale = 375 / 1000;
 
   const x = isMobileView ? item.x * mobileScale : item.x;
-  const y = isMobileView ? item.y : item.y; // Yは維持
+  const y = isMobileView ? item.y * mobileScale : item.y;
   const width = isMobileView ? item.width * mobileScale : item.width;
-  const height = isMobileView ? item.height : item.height; // 高さも維持 (必要なら調整)
+  const height = isMobileView ? item.height * mobileScale : item.height;
 
-  // スタイル計算
-  const style: React.CSSProperties = {
+  // --- スタイルの分離 ---
+
+  // 1. コンテナ用スタイル (位置、サイズ、背景、ボックスシャドウ)
+  const containerStyle: React.CSSProperties = {
     width: width,
     height: isAutoHeight ? 'auto' : height,
     minHeight: height,
-    color: item.data?.color || '#333333',
-    fontSize: item.data?.fontSize ? `${item.data.fontSize}px` : '15px',
     display: isGroup ? 'block' : 'flex',
   };
 
+  // 背景色
+  if (item.style?.backgroundColor) {
+    containerStyle.backgroundColor = item.style.backgroundColor;
+  }
+
+  // ボックスシャドウ (Shadow & Glow)
+  const boxShadows: string[] = [];
+  if (item.style?.shadow?.enabled) {
+    const { x, y, blur, color } = item.style.shadow;
+    boxShadows.push(`${x}px ${y}px ${blur}px ${color}`);
+  }
+  if (item.style?.glow?.enabled) {
+    const { blur, spread, color } = item.style.glow;
+    boxShadows.push(`0 0 ${blur}px ${spread}px ${color}`);
+  }
+  if (boxShadows.length > 0) {
+    containerStyle.boxShadow = boxShadows.join(', ');
+  }
+
+  // プレビュー状態の反映 (コンテナ)
   if (isPreviewing && previewState && previewState[item.id]) {
     const itemState = previewState[item.id];
-    style.visibility = itemState.isVisible ? 'visible' : 'hidden';
-    style.opacity = itemState.opacity;
-    style.transform = `translate(${itemState.x}px, ${itemState.y}px) scale(${itemState.scale}) rotate(${itemState.rotation}deg)`;
-    style.transition = itemState.transition || 'none';
+    containerStyle.visibility = itemState.isVisible ? 'visible' : 'hidden';
+    containerStyle.opacity = itemState.opacity;
+    containerStyle.transform = `translate(${itemState.x}px, ${itemState.y}px) scale(${itemState.scale}) rotate(${itemState.rotation}deg)`;
+    containerStyle.transition = itemState.transition || 'none';
   } else {
-    style.position = 'absolute';
-    style.left = x;
-    style.top = y;
+    containerStyle.position = 'absolute';
+    containerStyle.left = x;
+    containerStyle.top = y;
 
     if (item.data.initialVisibility === false) {
-      style.opacity = 0.5;
+      containerStyle.opacity = 0.5;
     }
   }
 
   // 背景設定されている場合は表示しない
   if (item.data?.isArtboardBackground) {
-    style.display = 'none';
+    containerStyle.display = 'none';
+  }
+
+  // 2. テキストコンテンツ用スタイル (色、フォントサイズ、テキストシャドウ)
+  const textStyle: React.CSSProperties = {
+    color: item.data?.color || '#333333',
+    fontSize: `${(item.data?.fontSize || 15) * (isMobileView ? mobileScale : 1)}px`,
+    width: '100%', // 親に合わせる
+    height: '100%',
+  };
+
+  // テキストシャドウ (Shadow & Glow)
+  const textShadows: string[] = [];
+  if (item.style?.textShadow?.enabled) {
+    const { x, y, blur, color } = item.style.textShadow;
+    textShadows.push(`${x}px ${y}px ${blur}px ${color}`);
+  }
+  if (item.style?.textGlow?.enabled) {
+    const { blur, color } = item.style.textGlow;
+    textShadows.push(`0 0 ${blur}px ${color}`);
+  }
+  if (textShadows.length > 0) {
+    textStyle.textShadow = textShadows.join(', ');
   }
 
   // 入力値の同期処理
@@ -136,10 +176,14 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   if (isGroup) {
     content = null;
   } else if (item.name.startsWith("ボタン")) {
-    content = <button className="item-button-content">{item.data.text}</button>;
+    content = (
+      <button className="item-button-content" style={textStyle}>
+        {item.data.text}
+      </button>
+    );
   } else if (item.name.startsWith("画像")) {
-    style.height = item.height;
-    style.minHeight = undefined;
+    containerStyle.height = item.height;
+    containerStyle.minHeight = undefined;
     if (item.data?.src) {
       content = (
         <div className="item-image-content">
@@ -160,6 +204,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         <textarea
           ref={textareaRef}
           className="artboard-item-textarea"
+          style={textStyle} // 入力欄にもスタイル適用
           placeholder={placeholder}
           value={inputValue}
           readOnly={!isPreviewing}
@@ -187,13 +232,18 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       </div>
     );
   } else {
-    content = <div className="item-text-content">{item.data.text}</div>;
+    // 通常のテキスト
+    content = (
+      <div className="item-text-content" style={textStyle}>
+        {item.data.text}
+      </div>
+    );
   }
 
   return (
     <div
       className={itemClassName}
-      style={style}
+      style={containerStyle}
       onClick={handleClick}
       onMouseDown={handleMouseDown}
     >

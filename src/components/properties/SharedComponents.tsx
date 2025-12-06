@@ -36,24 +36,20 @@ export const InspectorTabs: React.FC = () => {
       handleTabClose: s.handleTabClose,
     })
   );
-  
+
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
+  // Ensure active tab is visible
   useEffect(() => {
-    const container = tabsContainerRef.current;
-    if (!container) return;
-    
-    const handleWheel = (e: WheelEvent) => {
-      if (e.deltaY !== 0) {
-        e.preventDefault();
-        container.scrollLeft += e.deltaY;
+    if (activeTabId && tabsContainerRef.current) {
+      // Auto-scroll to active tab if needed
+      const activeTab = tabsContainerRef.current.querySelector('.inspector-tab.is-active');
+      if (activeTab) {
+        activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
-    };
-    
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    return () => container.removeEventListener("wheel", handleWheel);
-  }, []);
-  
+    }
+  }, [activeTabId]);
+
   if (tabs.length === 0) return null;
 
   return (
@@ -63,6 +59,7 @@ export const InspectorTabs: React.FC = () => {
           key={entry.id}
           className={`inspector-tab ${entry.id === activeTabId ? "is-active" : ""}`}
           onClick={() => handleTabSelect(entry.id)}
+          title={entry.label} // Tooltip for full text
         >
           <span className="tab-label">{entry.label}</span>
           <span

@@ -1,4 +1,4 @@
-import create from 'zustand';
+import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import type { ProjectData, SavedProject } from '../types';
 import { usePageStore } from './usePageStore';
@@ -60,12 +60,12 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       // PageStoreの状態も初期化
       usePageStore.getState().loadFromData(newProjectData);
 
-      set({ 
-        currentProjectId: data.id, 
+      set({
+        currentProjectId: data.id,
         projectMeta: data, // ★ 設定
-        isLoading: false 
+        isLoading: false
       });
-      
+
       return data.id;
     } catch (err: any) {
       console.error(err);
@@ -90,10 +90,10 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
         usePageStore.getState().loadFromData(data.data as ProjectData);
       }
 
-      set({ 
-        currentProjectId: data.id, 
+      set({
+        currentProjectId: data.id,
         projectMeta: data, // ★ 設定
-        isLoading: false 
+        isLoading: false
       });
     } catch (err: any) {
       console.error(err);
@@ -109,7 +109,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     try {
       // PageStoreから最新のデータを取得して保存用に整形
       const pageState = usePageStore.getState();
-      
+
       const projectDataToSave: ProjectData = {
         projectName: projectMeta?.name || "無題",
         pages: pageState.pages,

@@ -13,17 +13,18 @@ const ABTestNode = ({ id, data }: NodeProps) => {
 
     return (
         <div className="ab-test-node">
-            <Handle type="target" position={Position.Top} />
+            {/* Input Handle (Left) */}
+            <Handle type="target" position={Position.Left} />
 
             <div className="ab-test-node-header">
                 <span>⚖️ A/B Test</span>
             </div>
 
             <div className="ab-test-content">
-                <div className="ab-test-slider-container">
+                <div className="ab-test-slider-container noDrag">
                     <div className="ab-test-slider-label">
-                        <span>Path A: {probability}%</span>
-                        <span>Path B: {100 - probability}%</span>
+                        <span>A: {probability}%</span>
+                        <span>B: {100 - probability}%</span>
                     </div>
                     <input
                         type="range"
@@ -36,22 +37,26 @@ const ABTestNode = ({ id, data }: NodeProps) => {
                 </div>
             </div>
 
-            <div className="ab-test-handles">
-                <Handle
-                    type="source"
-                    position={Position.Bottom}
-                    id="pathA"
-                    style={{ left: '20%' }}
-                />
-                <span className="ab-test-handle-label left" style={{ left: '10%' }}>Path A</span>
-
-                <Handle
-                    type="source"
-                    position={Position.Bottom}
-                    id="pathB"
-                    style={{ left: '80%' }}
-                />
-                <span className="ab-test-handle-label right" style={{ right: '10%' }}>Path B</span>
+            {/* Output Handles (Right) */}
+            <div className="ab-test-handles-right">
+                <div className="ab-test-handle-row">
+                    <span className="ab-test-socket-label">Path A</span>
+                    <Handle
+                        type="source"
+                        position={Position.Right}
+                        id="pathA"
+                        className="ab-handle-right"
+                    />
+                </div>
+                <div className="ab-test-handle-row">
+                    <span className="ab-test-socket-label">Path B</span>
+                    <Handle
+                        type="source"
+                        position={Position.Right}
+                        id="pathB"
+                        className="ab-handle-right"
+                    />
+                </div>
             </div>
         </div>
     );
