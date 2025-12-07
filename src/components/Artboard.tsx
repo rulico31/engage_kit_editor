@@ -369,20 +369,37 @@ const Artboard: React.FC = () => {
         {renderChildren(undefined)}
 
         {/* コメント表示（プレビュー時は非表示） */}
-        {!isPreviewing && comments.map(comment => (
-          <Comment
-            key={comment.id}
-            comment={comment}
-            onUpdate={(updates) => updateComment(comment.id, updates)}
-            onDelete={() => deleteComment(comment.id)}
-            isSelected={selectedCommentId === comment.id}
-            onClick={() => {
-              setSelectedCommentId(comment.id);
-              handleBackgroundClick();
-            }}
-            onDragStart={(e) => handleCommentDragStart(e, comment.id)}
-          />
-        ))}
+        {!isPreviewing && comments.map(comment => {
+          // コメントの想定サイズ（最小化時と展開時）
+          const commentWidth = comment.isMinimized ? 40 : 200;
+          const commentHeight = comment.isMinimized ? 40 : 150;
+
+          // アートボードの境界内に収まるように位置を調整
+          const clampedX = Math.max(0, Math.min(comment.x, artboardWidth - commentWidth));
+          const clampedY = Math.max(0, Math.min(comment.y, artboardHeight - commentHeight));
+
+          // 位置が調整された場合（クランプされた場合）
+          const clampedComment = {
+            ...comment,
+            x: clampedX,
+            y: clampedY,
+          };
+
+          return (
+            <Comment
+              key={comment.id}
+              comment={clampedComment}
+              onUpdate={(updates) => updateComment(comment.id, updates)}
+              onDelete={() => deleteComment(comment.id)}
+              isSelected={selectedCommentId === comment.id}
+              onClick={() => {
+                setSelectedCommentId(comment.id);
+                handleBackgroundClick();
+              }}
+              onDragStart={(e) => handleCommentDragStart(e, comment.id)}
+            />
+          );
+        })}
       </div>
 
       {contextMenu?.visible && (
@@ -392,10 +409,25 @@ const Artboard: React.FC = () => {
           onUngroup={() => { selectedIds.forEach(id => ungroupItems(id)); setContextMenu(null); }}
           onDelete={() => { deleteItems(selectedIds); setContextMenu(null); }}
           onAddComment={() => {
+            // 画面座標をアートボード内座標に変換
+            const artboardRect = artboardRef.current?.getBoundingClientRect();
+            if (!artboardRect) {
+              setContextMenu(null);
+              return;
+            }
+
+            // クライアント座標からアートボード内座標への変換（ズームレベル考慮）
+            const artboardX = (contextMenu.x - artboardRect.left) / zoomLevel;
+            const artboardY = (contextMenu.y - artboardRect.top) / zoomLevel;
+
+            // グリッドスナップ
+            const snappedX = snapToGrid(artboardX, gridSize);
+            const snappedY = snapToGrid(artboardY, gridSize);
+
             addComment({
               content: '',
-              x: contextMenu.x,
-              y: contextMenu.y,
+              x: snappedX,
+              y: snappedY,
               isMinimized: false,
               // color: '#FFE082', // Removed to use default white
             });
