@@ -4,14 +4,14 @@ import { create } from 'zustand';
 import type {
   PreviewState,
   VariableState,
-  PreviewBackground,
+
 } from '../types';
 import { triggerEvent, type ActiveListeners, type LogicRuntimeContext } from '../logicEngine';
 import { usePageStore } from './usePageStore';
 import { logAnalyticsEvent } from '../lib/analytics';
 import { submitLeadData } from '../lib/leads';
 
-const initialPreviewBackground: PreviewBackground = { src: null, position: undefined };
+
 
 // ランタイムコンテキストの実装
 const runtimeContext: LogicRuntimeContext = {
@@ -29,7 +29,7 @@ const runtimeContext: LogicRuntimeContext = {
 interface PreviewStoreState {
   previewState: PreviewState;
   variables: VariableState;
-  previewBackground: PreviewBackground;
+
   activeListeners: ActiveListeners;
 
   // --- Actions ---
@@ -52,7 +52,6 @@ const variablesRef = { current: {} as VariableState };
 export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   previewState: {},
   variables: {},
-  previewBackground: initialPreviewBackground,
   activeListeners: new Map(),
 
   // --- Actions ---
@@ -62,11 +61,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     const currentPage = pages[selectedPageId!];
     if (!currentPage) return;
 
-    // 1. BG と State を初期化
-    const bgItem = currentPage.placedItems.find(p => p.data.isArtboardBackground);
-    const initialBG = bgItem
-      ? { src: bgItem.data.src ?? null, position: bgItem.data.artboardBackgroundPosition }
-      : initialPreviewBackground;
+
 
     const initialPS: PreviewState = {};
     currentPage.placedItems.forEach(item => {
@@ -83,7 +78,6 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     set({
       previewState: initialPS,
       variables: {},
-      previewBackground: initialBG,
       activeListeners: new Map(),
     });
   },
@@ -94,7 +88,6 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     set({
       previewState: {},
       variables: {},
-      previewBackground: initialPreviewBackground,
       activeListeners: new Map(),
     });
   },
@@ -136,16 +129,8 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
       initialPS[item.id] = { isVisible, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
 
-    const bgItem = targetPageData.placedItems.find(p => p.data.isArtboardBackground);
-    const initialBG = bgItem
-      ? { src: bgItem.data.src ?? null, position: bgItem.data.artboardBackgroundPosition }
-      : initialPreviewBackground;
-
-    previewStateRef.current = initialPS;
-
     set({
       previewState: initialPS,
-      previewBackground: initialBG,
     });
   },
 

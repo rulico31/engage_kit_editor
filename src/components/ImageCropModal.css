@@ -1,0 +1,136 @@
+/* react-image-cropのデフォルトスタイルをインポート */
+@import 'react-image-crop/dist/ReactCrop.css';
+
+.image-crop-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.image-crop-modal-content {
+    background-color: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+    width: 90vw;
+    height: 90vh;
+    color: #e4e4e7;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    animation: scaleIn 0.2s ease-out;
+    display: flex;
+    flex-direction: column;
+}
+
+.image-crop-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #3f3f46;
+    flex-shrink: 0;
+}
+
+.image-crop-modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.image-crop-modal-body {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.image-crop-modal-body .ReactCrop {
+    max-width: 100%;
+    max-height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.image-crop-modal-body .ReactCrop img {
+    max-width: 50%;
+    max-height: 50%;
+    object-fit: contain;
+    display: block;
+}
+
+.image-crop-modal-footer {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    background-color: #27272a;
+    border-top: 1px solid #3f3f46;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    flex-shrink: 0;
+}
+
+.image-crop-modal-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.image-crop-modal-btn.cancel {
+    background-color: transparent;
+    color: #a1a1aa;
+    border-color: #52525b;
+}
+
+.image-crop-modal-btn.cancel:hover {
+    background-color: #3f3f46;
+    color: #fff;
+}
+
+.image-crop-modal-btn.apply {
+    background-color: #2563eb;
+    color: white;
+}
+
+.image-crop-modal-btn.apply:hover:not(:disabled) {
+    background-color: #1d4ed8;
+}
+
+.image-crop-modal-btn.apply:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

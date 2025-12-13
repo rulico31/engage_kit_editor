@@ -12,11 +12,9 @@ import { NodePropertiesEditor } from "./properties/NodePropertiesEditor";
 import { ItemPropertiesEditor } from "./properties/ItemPropertiesEditor";
 import { PagePropertiesEditor } from "./properties/PagePropertiesEditor";
 
-interface PropertiesPanelProps {
-  onOpenBackgroundModal: (itemId: string, src: string) => void;
-}
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal }) => {
+
+const PropertiesPanel: React.FC = () => {
   const { tabs, activeTabId, activeLogicGraphId } = useSelectionStore(state => ({
     tabs: state.tabs,
     activeTabId: state.activeTabId,
@@ -62,7 +60,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ onOpenBackgroundModal
           onItemMoveToBack={moveItemToBack}
           onItemMoveForward={moveItemForward}
           onItemMoveBackward={moveItemBackward}
-          onOpenBackgroundModal={onOpenBackgroundModal}
+
         />
       );
     } else {

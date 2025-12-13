@@ -1,50 +1,147 @@
 .external-api-node {
-    padding: 10px;
+    background: #ffffff;
     border-radius: 8px;
-    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border: 1px solid #3498db;
-    min-width: 180px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    font-family: sans-serif;
+    width: 240px;
+    font-family: 'Inter', system-ui, sans-serif;
+    /* overflow: hidden; Removed */
+    position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 .external-api-node-header {
-    font-weight: bold;
-    margin-bottom: 8px;
-    color: #2980b9;
+    background: #f0f8ff;
+    padding: 10px 15px;
+    border-bottom: 1px solid #dcebf7;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 5px;
+    gap: 8px;
+    color: #2980b9;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
 }
 
 .external-api-node-icon {
-    font-size: 1.2em;
+    font-size: 16px;
 }
 
-.external-api-node-info {
-    font-size: 0.8em;
-    color: #666;
-    text-align: left;
-    margin-bottom: 5px;
-    background: #f0f8ff;
-    padding: 4px;
+.external-api-node-title {
+    font-weight: 600;
+    font-size: 14px;
+    flex: 1;
+}
+
+.external-api-node-method-badge {
+    font-size: 10px;
+    padding: 2px 6px;
     border-radius: 4px;
+    font-weight: 700;
+    text-transform: uppercase;
 }
 
-.external-api-node-labels {
+.external-api-node-method-badge.get {
+    background: #e1f5fe;
+    color: #0288d1;
+    border: 1px solid #b3e5fc;
+}
+
+.external-api-node-method-badge.post {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.external-api-node-body {
+    padding: 12px 15px;
     display: flex;
-    justify-content: space-between;
-    font-size: 0.8em;
-    color: #666;
-    margin-top: 5px;
+    flex-direction: column;
+    min-height: 80px;
+    /* Ensure space for handles */
+    position: relative;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
+
+.external-api-node-info-row {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: #555;
+    gap: 8px;
+}
+
+.external-api-node-info-row .label {
+    font-weight: 600;
+    color: #7f8c8d;
+    min-width: 30px;
+}
+
+.external-api-node-info-row .value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    font-family: monospace;
+    background: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.external-api-node-output-container {
+    position: relative;
+    height: 60px;
+    /* Dedicated height for the outputs */
+    margin-top: 8px;
+    border-top: 1px dashed #eee;
+}
+
+.external-api-node-row {
+    position: absolute;
+    right: -15px;
+    /* Extend to edge to match padding */
+    display: flex;
+    align-items: center;
+    transform: translateY(-50%);
+    padding-right: 15px;
+    width: 100%;
+    justify-content: flex-end;
 }
 
 .external-api-node-label-success {
     color: #2ecc71;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 10px;
 }
 
 .external-api-node-label-error {
     color: #e74c3c;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 10px;
+}
+
+/* Custom Handle Styling */
+.react-flow__handle.external-api-node-handle {
+    width: 10px;
+    height: 10px;
+    background: #3498db;
+    border: 2px solid #fff;
+    right: -6px;
+    /* Attached to edge */
+    position: absolute;
+    top: 50% !important;
+    transform: translateY(-50%);
+}
+
+.react-flow__handle.external-api-node-handle-input {
+    width: 10px;
+    height: 10px;
+    background: #3498db;
+    border: 2px solid #fff;
+    left: -6px;
+    top: 50% !important;
 }

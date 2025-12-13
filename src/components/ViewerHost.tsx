@@ -22,18 +22,20 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const initPreview = usePreviewStore(state => state.initPreview);
 
   // 描画に必要なデータをストアから取得
-  const { placedItems, allItemLogics } = usePageStore(state => {
+  const { placedItems, allItemLogics, backgroundColor, backgroundImage, mobileBackgroundImage } = usePageStore(state => {
     const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
     return {
       placedItems: page?.placedItems || [],
       allItemLogics: page?.allItemLogics || {},
+      backgroundColor: page?.backgroundColor,
+      backgroundImage: page?.backgroundImage,
+      mobileBackgroundImage: page?.mobileBackgroundImage,
     };
   });
 
-  const { previewState, setPreviewState, previewBackground } = usePreviewStore(state => ({
+  const { previewState, setPreviewState } = usePreviewStore(state => ({
     previewState: state.previewState,
     setPreviewState: state.setPreviewState,
-    previewBackground: state.previewBackground,
   }));
 
   // マウント時にプロジェクトをロードし、プレビューを開始する
@@ -110,27 +112,53 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     );
   }
 
+  // 自動スケーリング用の設定
+  const ARTBOARD_WIDTH = 1920; // PCの標準アートボード幅
+  const ARTBOARD_HEIGHT = 1080; // PCの標準アートボード高さ
+  const scale = isMobile ? Math.min(
+    window.innerWidth / ARTBOARD_WIDTH,
+    window.innerHeight / ARTBOARD_HEIGHT
+  ) : 1;
+
   // 背景スタイルの適用
+  const currentBg = isMobile ? mobileBackgroundImage : backgroundImage;
   const backgroundStyle: React.CSSProperties = {
-    backgroundColor: "#ffffff", // デフォルト背景
-    backgroundImage: previewBackground.src ? `url(${previewBackground.src})` : "none",
-    backgroundPosition: previewBackground.position || "50% 50%",
-    backgroundSize: "cover",
+    backgroundColor: backgroundColor || "#ffffff", // デフォルト背景
     width: "100vw",
     height: "100vh",
     overflow: "hidden",
     position: "relative",
   };
 
+  if (currentBg?.src) {
+    backgroundStyle.backgroundImage = `url(${currentBg.src})`;
+    backgroundStyle.backgroundPosition = currentBg.position || '50% 50%';
+    backgroundStyle.backgroundSize = currentBg.size || 'cover';
+    backgroundStyle.backgroundRepeat = 'no-repeat';
+  }
+
+  // コンテナスタイル（スケーリング適用）
+  const containerStyle: React.CSSProperties = {
+    width: `${ARTBOARD_WIDTH}px`,
+    height: `${ARTBOARD_HEIGHT}px`,
+    transform: `scale(${scale})`,
+    transformOrigin: "top left",
+    position: "absolute",
+    top: 0,
+    left: 0,
+  };
+
   return (
     <div style={backgroundStyle}>
-      <PreviewHost
-        placedItems={placedItems}
-        previewState={previewState}
-        setPreviewState={setPreviewState}
-        allItemLogics={allItemLogics}
-        isMobile={isMobile}
-      />
+      <div style={containerStyle}>
+        <PreviewHost
+          placedItems={placedItems}
+          previewState={previewState}
+          setPreviewState={setPreviewState}
+          allItemLogics={allItemLogics}
+          isMobile={isMobile}
+        />
+      </div>
     </div>
   );
 };

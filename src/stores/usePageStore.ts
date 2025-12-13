@@ -16,6 +16,9 @@ import { useSelectionStore } from './useSelectionStore';
 // Undo/Redo履歴の最大数
 const MAX_HISTORY = 20;
 
+// デバウンス用のタイマー（グローバル変数）
+let commitHistoryTimer: number | null = null;
+
 interface HistoryState {
   placedItems: PlacedItemType[];
 }
@@ -41,14 +44,19 @@ interface PageStoreState {
 
   // アイテム操作
   addItem: (item: PlacedItemType) => void;
-  updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, addToHistory?: boolean) => void;
+  updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, options?: { addToHistory?: boolean; immediate?: boolean }) => void;
   updateItems: (updates: { id: string, props: Partial<PlacedItemType> }[], addToHistory?: boolean) => void;
   deleteItems: (ids: string[]) => void;
 
-  // コメント管理
+  // コメント管理（アートボード用）
   addComment: (comment: Omit<CommentType, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateComment: (commentId: string, updates: Partial<CommentType>) => void;
   deleteComment: (commentId: string) => void;
+
+  // コメント管理（ノードエディタ用）
+  addGraphComment: (comment: Omit<CommentType, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateGraphComment: (commentId: string, updates: Partial<CommentType>) => void;
+  deleteGraphComment: (commentId: string) => void;
 
   // グループ化・順序
   groupItems: (ids: string[]) => void;
@@ -72,7 +80,7 @@ interface PageStoreState {
   addNodeToCurrentGraph: (node: Node) => void;
 
   // 履歴操作
-  commitHistory: () => void;
+  commitHistory: (debounce?: boolean) => void;
   undo: () => void;
   redo: () => void;
 
@@ -94,8 +102,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   pageOrder: ["page-1"],
   selectedPageId: "page-1",
 
-  history: [],
-  historyIndex: -1,
+  history: [{ placedItems: [] }],
+  historyIndex: 0,
   canUndo: false,
   canRedo: false,
 
@@ -149,12 +157,14 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
   // --- データロード ---
   loadFromData: (data: ProjectData) => {
+    const firstPageId = data.pageOrder[0];
+    const initialItems = firstPageId ? data.pages[firstPageId].placedItems : [];
     set({
       pages: data.pages,
       pageOrder: data.pageOrder,
-      selectedPageId: data.pageOrder[0] || null,
-      history: [],
-      historyIndex: -1,
+      selectedPageId: firstPageId || null,
+      history: [{ placedItems: JSON.parse(JSON.stringify(initialItems)) }],
+      historyIndex: 0,
       canUndo: false,
       canRedo: false,
     });
@@ -174,7 +184,10 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, addToHistory = false) => {
+  updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, options?: { addToHistory?: boolean; immediate?: boolean }) => {
+    const addToHistory = options?.addToHistory ?? false;
+    const immediate = options?.immediate ?? false;
+
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
@@ -195,7 +208,11 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
       };
     });
-    if (addToHistory) get().commitHistory();
+
+    if (addToHistory) {
+      // immediateがtrueならデバウンスなし、falseならデバウンス付き
+      get().commitHistory(!immediate);
+    }
   },
 
   updateItems: (updatesList: { id: string, props: Partial<PlacedItemType> }[], addToHistory = false) => {
@@ -215,7 +232,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
       };
     });
-    if (addToHistory) get().commitHistory();
+    if (addToHistory) get().commitHistory(true);
   },
 
   deleteItems: (ids: string[]) => {
@@ -284,6 +301,97 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       };
     });
     get().commitHistory();
+  },
+
+  // --- コメント管理（ノードエディタ用） ---
+  addGraphComment: (commentData) => {
+    set(state => {
+      const pageId = state.selectedPageId!;
+      const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
+      if (!activeGraphId) return state;
+
+      const page = state.pages[pageId];
+      const currentGraph = page.allItemLogics[activeGraphId] || { nodes: [], edges: [] };
+
+      const newComment: CommentType = {
+        id: `comment-${Date.now()}`,
+        ...commentData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const newComments = [...(currentGraph.comments || []), newComment];
+
+      return {
+        pages: {
+          ...state.pages,
+          [pageId]: {
+            ...page,
+            allItemLogics: {
+              ...page.allItemLogics,
+              [activeGraphId]: { ...currentGraph, comments: newComments }
+            }
+          }
+        }
+      };
+    });
+  },
+
+  updateGraphComment: (commentId, updates) => {
+    set(state => {
+      const pageId = state.selectedPageId!;
+      const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
+      if (!activeGraphId) return state;
+
+      const page = state.pages[pageId];
+      const currentGraph = page.allItemLogics[activeGraphId] || { nodes: [], edges: [] };
+
+      const newComments = (currentGraph.comments || []).map(c => {
+        if (c.id === commentId) {
+          return { ...c, ...updates, updatedAt: new Date().toISOString() };
+        }
+        return c;
+      });
+
+      return {
+        pages: {
+          ...state.pages,
+          [pageId]: {
+            ...page,
+            allItemLogics: {
+              ...page.allItemLogics,
+              [activeGraphId]: { ...currentGraph, comments: newComments }
+            }
+          }
+        }
+      };
+    });
+  },
+
+  deleteGraphComment: (commentId) => {
+    set(state => {
+      const pageId = state.selectedPageId!;
+      const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
+      if (!activeGraphId) return state;
+
+      const page = state.pages[pageId];
+      const currentGraph = page.allItemLogics[activeGraphId] || { nodes: [], edges: [] };
+
+      const newComments = (currentGraph.comments || []).filter(c => c.id !== commentId);
+
+      return {
+        pages: {
+          ...state.pages,
+          [pageId]: {
+            ...page,
+            allItemLogics: {
+              ...page.allItemLogics,
+              [activeGraphId]: { ...currentGraph, comments: newComments }
+            }
+          }
+        }
+      };
+    });
   },
 
   // --- グループ化 ---
@@ -570,22 +678,44 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- 履歴管理 ---
-  commitHistory: () => {
+  commitHistory: (debounce = false) => {
+    // デバウンス処理
+    if (debounce) {
+      // 既存のタイマーをクリア
+      if (commitHistoryTimer !== null) {
+        clearTimeout(commitHistoryTimer);
+      }
+
+      // 新しいタイマーをセット（500ms後に実行）
+      commitHistoryTimer = window.setTimeout(() => {
+        get().commitHistory(false); // デバウンスなしで実行
+        commitHistoryTimer = null;
+      }, 500);
+      return;
+    }
+
     set(state => {
       const pageId = state.selectedPageId;
       if (!pageId) return state;
 
       const currentItems = state.pages[pageId].placedItems;
+
+      // 現在のインデックスより後の履歴を削除（新しい分岐を作る）
       const newHistory = state.history.slice(0, state.historyIndex + 1);
 
+      // 新しい履歴を追加
       newHistory.push({ placedItems: JSON.parse(JSON.stringify(currentItems)) });
 
+      // 履歴が最大数を超えたら古いものを削除
       if (newHistory.length > MAX_HISTORY) newHistory.shift();
+
+      const newIndex = newHistory.length - 1;
 
       return {
         history: newHistory,
-        historyIndex: newHistory.length - 1,
-        canUndo: true,
+        historyIndex: newIndex,
+        canUndo: newIndex > 0,
+        // 新しい履歴を追加したので、その後にRedoできる履歴はない
         canRedo: false
       };
     });

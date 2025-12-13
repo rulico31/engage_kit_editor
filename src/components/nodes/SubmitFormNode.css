@@ -1,40 +1,91 @@
 .submit-form-node {
-    padding: 10px;
+    background: #ffffff;
     border-radius: 8px;
-    background: #fff;
-    border: 1px solid #ddd;
-    min-width: 150px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    font-family: sans-serif;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e0e0e0;
+    width: 200px;
+    /* Wider for professional look */
+    font-family: 'Inter', system-ui, sans-serif;
+    /* overflow: hidden; Removed */
+    position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 .submit-form-node-header {
-    font-weight: bold;
-    margin-bottom: 8px;
+    background: linear-gradient(to right, #f8f9fa, #ffffff);
+    padding: 10px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    font-weight: 600;
     color: #333;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 5px;
+    gap: 8px;
+    font-size: 14px;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
 }
 
 .submit-form-node-icon {
-    font-size: 1.2em;
+    font-size: 16px;
 }
 
-.submit-form-node-labels {
+.submit-form-node-body {
+    position: relative;
+    height: 80px;
+    /* Fixed height to accommodate handles at specific positions */
+    background: #fff;
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+}
+
+.submit-form-node-row {
+    position: absolute;
+    right: 0;
     display: flex;
-    justify-content: space-between;
-    font-size: 0.8em;
-    color: #666;
-    margin-top: 5px;
+    align-items: center;
+    transform: translateY(-50%);
+    /* Center vertically on the definition point */
+    padding-right: 15px;
+    /* Space for the handle */
+    width: 100%;
+    justify-content: flex-end;
 }
 
 .submit-form-node-label-success {
     color: #2ecc71;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 10px;
 }
 
 .submit-form-node-label-error {
     color: #e74c3c;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 10px;
+}
+
+/* Custom Handle Styling */
+.react-flow__handle.submit-form-node-handle {
+    width: 10px;
+    height: 10px;
+    background: #b0bec5;
+    border: 2px solid #fff;
+    right: -6px;
+    /* Position strictly on the edge */
+    position: absolute;
+    /* Override reactflow absolute */
+    top: 50% !important;
+    /* Center in the row */
+    transform: translateY(-50%);
+}
+
+.react-flow__handle.submit-form-node-handle-input {
+    width: 10px;
+    height: 10px;
+    background: #3498db;
+    border: 2px solid #fff;
+    left: -6px;
+    top: 50% !important;
 }

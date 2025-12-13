@@ -1,6 +1,6 @@
 // src/components/NodeEditor.tsx
 
-import React, { useRef, useEffect, useMemo } from "react";
+import React, { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -12,6 +12,7 @@ import ReactFlow, {
 import { useDrop, type DropTargetMonitor } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import NodeToolboxItem from "./NodeToolboxItem";
+import { ContextMenu } from "./artboard/ContextMenu";
 import "reactflow/dist/style.css";
 import "./NodeEditor.css";
 
@@ -31,6 +32,7 @@ import WaitForClickNode from "./nodes/WaitForClickNode";
 import ABTestNode from "./nodes/ABTestNode";
 import SubmitFormNode from "./nodes/SubmitFormNode";
 import ExternalApiNode from "./nodes/ExternalApiNode";
+import CommentNode from "./nodes/CommentNode";
 
 
 interface NodeToolDragItem { nodeType: string; nodeName: string; }
@@ -110,6 +112,15 @@ const NodeEditorContent: React.FC = () => {
   const { fitView, project } = useReactFlow();
   const dropRef = useRef<HTMLDivElement>(null);
 
+  // コンテキストメニュー
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number } | null>(null);
+
+  // 右クリックメニューハンドラ
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+  }, []);
+
   const [{ isOver }, drop] = useDrop(
     () => ({
       accept: ItemTypes.NODE_TOOL,
@@ -159,6 +170,7 @@ const NodeEditorContent: React.FC = () => {
     abTestNode: (props: NodeProps) => <ABTestNode {...props} />,
     submitFormNode: (props: NodeProps) => <SubmitFormNode {...props} />,
     externalApiNode: (props: NodeProps) => <ExternalApiNode {...props} />,
+    commentNode: (props: NodeProps) => <CommentNode {...props} />,
   }), []);
 
   const handleNodeClick: NodeClickHandler = (_event, node) => {
@@ -188,7 +200,7 @@ const NodeEditorContent: React.FC = () => {
         <NodeToolboxItem nodeType="waitForClickNode" nodeName="👆 クリック待ち">👆 クリック待ち</NodeToolboxItem>
       </aside>
 
-      <div ref={dropRef} className="react-flow-drop-target">
+      <div ref={dropRef} className="react-flow-drop-target" onContextMenu={handleContextMenu}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -206,6 +218,42 @@ const NodeEditorContent: React.FC = () => {
         </ReactFlow>
         {isOver && <div className="react-flow-drop-overlay" />}
       </div>
+
+      {/* 右クリックメニュー */}
+      {contextMenu?.visible && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          selectedCount={0}
+          onGroup={() => { }}
+          onUngroup={() => { }}
+          onDelete={() => { }}
+          onAddComment={() => {
+            if (!dropRef.current) {
+              setContextMenu(null);
+              return;
+            }
+
+            // ReactFlowの座標系に変換
+            const rect = dropRef.current.getBoundingClientRect();
+            const position = project({
+              x: contextMenu.x - rect.left,
+              y: contextMenu.y - rect.top,
+            });
+
+            // コメントノードを追加
+            const newNode: Node = {
+              id: `comment-${Date.now()}`,
+              type: 'commentNode',
+              position,
+              data: { label: 'コメント', content: '', isMinimized: false },
+            };
+            onAddNode(newNode);
+            setContextMenu(null);
+          }}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 };

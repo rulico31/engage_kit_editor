@@ -6,43 +6,54 @@ import type { NodePropertyConfig } from '../../types';
 const ExternalApiNode = ({ data, isConnectable }: NodeProps) => {
     return (
         <div className="external-api-node">
-            <Handle
-                type="target"
-                position={Position.Top}
-                isConnectable={isConnectable}
-            />
-
             <div className="external-api-node-header">
                 <span className="external-api-node-icon">🌍</span>
-                External API
+                <span className="external-api-node-title">External API</span>
+                <span className={`external-api-node-method-badge ${data.method === 'POST' ? 'post' : 'get'}`}>
+                    {data.method || 'GET'}
+                </span>
             </div>
 
-            <div className="external-api-node-info">
-                <div><strong>Method:</strong> {data.method || 'GET'}</div>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <strong>URL:</strong> {data.url || '(Not set)'}
+            <div className="external-api-node-body">
+                <div className="external-api-node-info-row">
+                    <span className="label">URL:</span>
+                    <span className="value" title={data.url}>{data.url || '(Not set)'}</span>
                 </div>
-                <div><strong>To:</strong> {data.variableName || '(No var)'}</div>
-            </div>
+                <div className="external-api-node-info-row">
+                    <span className="label">To:</span>
+                    <span className="value">{data.variableName || '(No var)'}</span>
+                </div>
 
-            <div className="external-api-node-labels">
-                <span className="external-api-node-label-success">Success</span>
-                <span className="external-api-node-label-error">Error</span>
+                {/* Outputs Section */}
+                <div className="external-api-node-output-container">
+                    <div className="external-api-node-row" style={{ top: '30%' }}>
+                        <span className="external-api-node-label-success">Success</span>
+                        <Handle
+                            type="source"
+                            position={Position.Right}
+                            id="success"
+                            isConnectable={isConnectable}
+                            className="external-api-node-handle"
+                        />
+                    </div>
+                    <div className="external-api-node-row" style={{ top: '70%' }}>
+                        <span className="external-api-node-label-error">Error</span>
+                        <Handle
+                            type="source"
+                            position={Position.Right}
+                            id="error"
+                            isConnectable={isConnectable}
+                            className="external-api-node-handle"
+                        />
+                    </div>
+                </div>
             </div>
 
             <Handle
-                type="source"
-                position={Position.Bottom}
-                id="success"
-                style={{ left: '25%' }}
+                type="target"
+                position={Position.Left}
                 isConnectable={isConnectable}
-            />
-            <Handle
-                type="source"
-                position={Position.Bottom}
-                id="error"
-                style={{ left: '75%' }}
-                isConnectable={isConnectable}
+                className="external-api-node-handle-input"
             />
         </div>
     );

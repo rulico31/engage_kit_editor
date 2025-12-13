@@ -5,7 +5,7 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import "./DelayNode.css"; // (★ 新規作成)
 import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
 
-interface DelayNodeProps extends NodeProps {}
+interface DelayNodeProps extends NodeProps { }
 
 const DelayNode: React.FC<DelayNodeProps> = ({
   data,
@@ -21,7 +21,7 @@ const DelayNode: React.FC<DelayNodeProps> = ({
       </div>
 
       {/* (設定はプロパティパネルで行う) */}
-      
+
       {/* (出力ハンドル) */}
       <Handle type="source" position={Position.Right} />
     </div>
@@ -37,7 +37,7 @@ export const delayNodeConfig: NodePropertyConfig = {
     {
       name: "durationS",
       label: "遅延 (秒)",
-      type: "number",
+      type: "text",
       defaultValue: 1.0,
       step: 0.1,
       min: 0,

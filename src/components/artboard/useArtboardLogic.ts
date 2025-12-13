@@ -18,12 +18,11 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     viewMode: state.viewMode,
   }));
 
-  const { deleteItems, updateItems, groupItems, ungroupItems, commitHistory } = usePageStore(state => ({
+  const { deleteItems, updateItems, groupItems, ungroupItems } = usePageStore(state => ({
     deleteItems: state.deleteItems,
     updateItems: state.updateItems,
     groupItems: state.groupItems,
     ungroupItems: state.ungroupItems,
-    commitHistory: state.commitHistory,
   }));
 
   const { selectedIds } = useSelectionStore(state => ({
@@ -125,13 +124,13 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
   }, [updateItems, zoomLevel, gridSize, artboardRef]);
 
   const handleMouseUp = useCallback(() => {
-    if (isDraggingRef.current) commitHistory();
+    // デバウンスタイマーが自動的に履歴を保存するため、ここでは呼ばない
     isDraggingRef.current = false;
     dragStartPos.current = null;
     dragStartItemStates.current = {};
     window.removeEventListener("mousemove", handleMouseMove);
     window.removeEventListener("mouseup", handleMouseUp);
-  }, [commitHistory, handleMouseMove]);
+  }, [handleMouseMove]);
 
   const handleItemDragStart = useCallback((e: React.MouseEvent, itemId: string, handleItemSelect: any) => {
     if (isPreviewing) return;

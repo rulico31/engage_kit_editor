@@ -5,35 +5,39 @@ import './SubmitFormNode.css';
 const SubmitFormNode = ({ isConnectable }: NodeProps) => {
     return (
         <div className="submit-form-node">
-            <Handle
-                type="target"
-                position={Position.Top}
-                isConnectable={isConnectable}
-            />
-
             <div className="submit-form-node-header">
                 <span className="submit-form-node-icon">📤</span>
                 Submit Form
             </div>
 
-            <div className="submit-form-node-labels">
-                <span className="submit-form-node-label-success">Success</span>
-                <span className="submit-form-node-label-error">Error</span>
+            <div className="submit-form-node-body">
+                <div className="submit-form-node-row" style={{ top: '35%' }}>
+                    <span className="submit-form-node-label-success">Success</span>
+                    <Handle
+                        type="source"
+                        position={Position.Right}
+                        id="success"
+                        isConnectable={isConnectable}
+                        className="submit-form-node-handle"
+                    />
+                </div>
+                <div className="submit-form-node-row" style={{ top: '65%' }}>
+                    <span className="submit-form-node-label-error">Error</span>
+                    <Handle
+                        type="source"
+                        position={Position.Right}
+                        id="error"
+                        isConnectable={isConnectable}
+                        className="submit-form-node-handle"
+                    />
+                </div>
             </div>
 
             <Handle
-                type="source"
-                position={Position.Bottom}
-                id="success"
-                style={{ left: '25%' }}
+                type="target"
+                position={Position.Left}
                 isConnectable={isConnectable}
-            />
-            <Handle
-                type="source"
-                position={Position.Bottom}
-                id="error"
-                style={{ left: '75%' }}
-                isConnectable={isConnectable}
+                className="submit-form-node-handle-input"
             />
         </div>
     );

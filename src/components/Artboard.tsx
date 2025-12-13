@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useCallback, useState, useEffect } from "react";
 import { useDrop } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
+import type { PlacedItemType } from "../types";
 
 import "./Artboard.css";
 
@@ -44,15 +45,19 @@ const Artboard: React.FC = () => {
     isMobileView: state.isMobileView,
   }));
 
-  const { previewState, previewBackground, variables, onItemEvent, onVariableChange } = usePreviewStore(state => ({
+  const { previewState, variables, onItemEvent, onVariableChange } = usePreviewStore(state => ({
     previewState: state.previewState,
-    previewBackground: state.previewBackground,
     variables: state.variables,
     onItemEvent: state.handleItemEvent,
     onVariableChange: state.handleVariableChangeFromItem,
   }));
 
   const artboardRef = useRef<HTMLDivElement>(null);
+
+  // updateItem のラッパー（型の互換性のため）
+  const handleItemUpdate = useCallback((id: string, updates: Partial<PlacedItemType>, addToHistory?: boolean) => {
+    updateItem(id, updates, { addToHistory });
+  }, [updateItem]);
 
   // useArtboardLogic hook
   const {
@@ -72,8 +77,11 @@ const Artboard: React.FC = () => {
   // アイテム選択ラッパー
   const onArtboardItemSelect = useCallback((e: React.MouseEvent, id: string, name: string) => {
     const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
-    handleItemSelect(id, name, isMulti);
-  }, [handleItemSelect]);
+    // アイテムを検索してdisplayNameを取得
+    const item = placedItems.find(i => i.id === id);
+    const displayLabel = item?.displayName ? `${name}: ${item.displayName}` : name;
+    handleItemSelect(id, displayLabel, isMulti);
+  }, [handleItemSelect, placedItems]);
 
   // コメントドラッグ処理
   const handleCommentDragStart = useCallback((e: React.MouseEvent, commentId: string) => {
@@ -164,29 +172,10 @@ const Artboard: React.FC = () => {
 
   // 背景スタイル計算
   const backgroundStyle = useMemo(() => {
-    const bgItem = !isPreviewing
-      ? placedItems.find(p => p.data.isArtboardBackground && p.data.src)
-      : undefined;
-
-    const src = isPreviewing ? previewBackground.src : bgItem?.data.src;
-    const pos = isPreviewing ? previewBackground.position : bgItem?.data.artboardBackgroundPosition;
-
-    const bgColor = backgroundColor || '#ffffff';
-
-    const style: React.CSSProperties = {
-      backgroundColor: bgColor,
-      backgroundSize: 'cover',
-      backgroundPosition: '50% 50%',
-      backgroundImage: 'none',
+    return {
+      backgroundColor: backgroundColor || '#ffffff',
     };
-
-    if (src) {
-      style.backgroundImage = `url(${src})`;
-      style.backgroundPosition = pos || '50% 50%';
-    }
-
-    return style;
-  }, [placedItems, isPreviewing, previewBackground, backgroundColor]);
+  }, [backgroundColor]);
 
 
   const showGridOverlay = !isPreviewing && showGrid && gridSize !== null;
@@ -200,13 +189,8 @@ const Artboard: React.FC = () => {
   // 背景クリックハンドラ
   const handleArtboardBackgroundClick = useCallback(() => {
     if (isPreviewing) return;
-    const bgItem = placedItems.find(p => p.data.isArtboardBackground);
-    if (bgItem) {
-      handleItemSelect(bgItem.id, bgItem.name, false);
-    } else {
-      handleBackgroundClick();
-    }
-  }, [isPreviewing, placedItems, handleItemSelect, handleBackgroundClick]);
+    handleBackgroundClick();
+  }, [isPreviewing, handleBackgroundClick]);
 
   // レンダリング用関数
   const renderChildren = useCallback((parentId: string | undefined) => {
@@ -226,10 +210,10 @@ const Artboard: React.FC = () => {
         variables={variables}
         onVariableChange={onVariableChange}
         zoomLevel={zoomLevel}
-        onItemUpdate={updateItem}
+        onItemUpdate={handleItemUpdate}
       />
     ));
-  }, [placedItems, onArtboardItemSelect, handleItemDragStart, selectedIds, activeTabId, isPreviewing, previewState, onItemEvent, variables, onVariableChange, handleItemSelect, zoomLevel, updateItem]);
+  }, [placedItems, onArtboardItemSelect, handleItemDragStart, selectedIds, activeTabId, isPreviewing, previewState, onItemEvent, variables, onVariableChange, handleItemSelect, zoomLevel, handleItemUpdate]);
 
   const MemoizedArtboardItem = useMemo(() => React.memo(ArtboardItem), []);
 
@@ -361,7 +345,7 @@ const Artboard: React.FC = () => {
 
       <div
         ref={artboardRef}
-        className={`artboard ${isOver ? "is-over" : ""} ${backgroundStyle.backgroundImage !== 'none' ? 'has-background-image' : ''}`}
+        className={`artboard ${isOver ? "is-over" : ""}`}
         style={{ transform: `scale(${zoomLevel})`, margin: 0, ...backgroundStyle, width: `${artboardWidth}px`, height: `${artboardHeight}px` }}
         onClick={handleArtboardBackgroundClick}
       >

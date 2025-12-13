@@ -9,7 +9,7 @@ import type {
   PreviewState,
   SelectionEntry,
   VariableState,
-  PreviewBackground,
+
 } from "../types";
 import {
   type Node,
@@ -26,11 +26,11 @@ export interface EditorContextType {
   selectedPageId: string | null;
   onSelectPage: (pageId: string) => void;
   onAddPage: () => void;
-  
+
   isPreviewing: boolean;
   previewState: PreviewState;
   onItemEvent: (eventName: string, itemId: string) => void;
-  
+
   variables: VariableState;
   onVariableChange: (variableName: string, value: any) => void;
 
@@ -43,7 +43,7 @@ export interface EditorContextType {
   selection: SelectionEntry[];
   activeTabId: string | null;
   activeLogicGraphId: string | null;
-  
+
   onItemUpdate: (itemId: string, updatedProps: Partial<PlacedItemType>) => void;
 
   // ★ 追加: 重ね順
@@ -60,17 +60,15 @@ export interface EditorContextType {
   onItemSelect: (id: string) => void;
   onBackgroundClick: () => void;
   onNodeClick: (nodeId: string) => void;
-  
+
   pageInfoList: PageInfo[];
 
   onTabSelect: (id: string) => void;
   onTabClose: (id: string) => void;
-  
+
   nodeGraphTemplates: Record<string, NodeGraph>;
-  
-  onOpenBackgroundModal: (itemId: string, src: string) => void;
-  
-  previewBackground: PreviewBackground;
+
+
 
   // ★ 修正: グリッド/スナップ機能
   gridSize: number | null;

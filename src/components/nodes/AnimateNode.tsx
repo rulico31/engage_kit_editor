@@ -5,7 +5,7 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import "./AnimateNode.css"; // (★ 対応するCSSを次に作成します)
 import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
 
-interface AnimateNodeProps extends NodeProps {}
+interface AnimateNodeProps extends NodeProps { }
 
 const AnimateNode: React.FC<AnimateNodeProps> = ({
   data,
@@ -21,7 +21,7 @@ const AnimateNode: React.FC<AnimateNodeProps> = ({
       </div>
 
       {/* (設定はプロパティパネルで行う) */}
-      
+
       {/* (出力ハンドル) */}
       <Handle type="source" position={Position.Right} />
     </div>
@@ -87,13 +87,13 @@ export const animateNodeConfig: NodePropertyConfig[] = [
       {
         name: "value",
         label: "目標値 / 増減値:", // (ラベルは動的に変更できないため固定)
-        type: "number",
+        type: "text",
         defaultValue: 0,
       },
       {
         name: "durationS",
         label: "時間 (秒):",
-        type: "number",
+        type: "text",
         defaultValue: 0.5,
         step: 0.1,
         min: 0,
@@ -116,7 +116,7 @@ export const animateNodeConfig: NodePropertyConfig[] = [
       {
         name: "loopCount",
         label: "繰り返し回数:",
-        type: "number",
+        type: "text",
         defaultValue: 2,
         step: 1,
         min: 2,
@@ -133,7 +133,7 @@ export const animateNodeConfig: NodePropertyConfig[] = [
       {
         name: "delayS",
         label: "遅延 (秒):",
-        type: "number",
+        type: "text",
         defaultValue: 0,
         step: 0.1,
         min: 0,

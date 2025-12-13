@@ -8,7 +8,8 @@ export type ViewMode = "design" | "logic" | "split" | "dashboard";
 export interface PlacedItemType {
   id: string;
   type: string; // added
-  name: string;
+  name: string; // 要素のタイプ（例: "ボタン", "画像", "テキスト"など）- 固定
+  displayName?: string; // ユーザーが設定するカスタム名（オプション）
   x: number;
   y: number;
   width: number;
@@ -39,9 +40,7 @@ export interface PlacedItemType {
     showBorder?: boolean;
     isTransparent?: boolean;
     initialVisibility?: boolean;
-    isArtboardBackground?: boolean;
-    artboardBackgroundPosition?: string;
-    artboardBackgroundSize?: string;
+
     color?: string;
     fontSize?: number;
     [key: string]: any;
@@ -64,6 +63,7 @@ export type VariableState = Record<string, any>;
 export interface NodeGraph {
   nodes: Node[];
   edges: Edge[];
+  comments?: CommentType[]; // ノードエディタ用コメント
 }
 
 // コメント/メモの型定義
@@ -79,6 +79,8 @@ export interface CommentType {
   attachedToItemId?: string; // 要素に紐付ける場合（オプション）
 }
 
+
+
 export interface PageData {
   id: string;
   name: string;
@@ -86,6 +88,7 @@ export interface PageData {
   allItemLogics: Record<string, NodeGraph>;
   comments?: CommentType[]; // コメント配列を追加
   backgroundColor?: string; // 背景色
+
 }
 
 export interface ProjectData {
@@ -106,10 +109,7 @@ export interface SelectionEntry {
   label: string;
 }
 
-export interface PreviewBackground {
-  src: string | null;
-  position: string | undefined;
-}
+
 
 export type PropertyControlType =
   | 'text'

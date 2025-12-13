@@ -32,6 +32,8 @@ export const PagePropertiesEditor: React.FC<PagePropertiesEditorProps> = ({ page
         updatePage(pageId, { backgroundColor: color });
     };
 
+
+
     return (
         <div className="properties-panel-content" style={{ padding: '16px' }}>
             <div className="prop-group" style={{ marginBottom: 20 }}>

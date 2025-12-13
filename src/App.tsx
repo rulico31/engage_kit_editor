@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import HomeView from "./components/HomeView";
 import EditorView from "./components/EditorView";
 import ViewerHost from "./components/ViewerHost";
-import BackgroundModal from "./components/BackgroundModal";
+
 import PublishModal from "./components/PublishModal";
 import { useProjectStore } from "./stores/useProjectStore";
 import { useSelectionStore } from "./stores/useSelectionStore";
@@ -18,9 +18,7 @@ const App: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<AppRoute>("home");
   const [viewerProjectId, setViewerProjectId] = useState<string | null>(null);
 
-  const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false);
-  const [backgroundTargetItemId, setBackgroundTargetItemId] = useState<string | null>(null);
-  const [backgroundTargetSrc, setBackgroundTargetSrc] = useState<string | null>(null);
+
 
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
@@ -63,6 +61,16 @@ const App: React.FC = () => {
       if (((e.ctrlKey || e.metaKey) && e.key === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')) {
         e.preventDefault();
         redo();
+      }
+      // Save: Ctrl+S
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (currentRoute === 'editor') {
+          saveProject().catch(e => {
+            console.error(e);
+            alert("保存に失敗しました");
+          });
+        }
       }
       // Delete: Delete or Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -112,7 +120,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [currentRoute, saveProject]);
 
   const handleCreateProject = async (name: string) => {
     await createProject(name);
@@ -128,17 +136,7 @@ const App: React.FC = () => {
     setCurrentRoute("home");
   };
 
-  const handleOpenBackgroundModal = (itemId: string, src: string) => {
-    setBackgroundTargetItemId(itemId);
-    setBackgroundTargetSrc(src);
-    setIsBackgroundModalOpen(true);
-  };
 
-  const handleCloseBackgroundModal = () => {
-    setIsBackgroundModalOpen(false);
-    setBackgroundTargetItemId(null);
-    setBackgroundTargetSrc(null);
-  };
 
   const handlePublish = async () => {
     // 保存してからモーダルを開く (ID確定のため)
@@ -166,16 +164,10 @@ const App: React.FC = () => {
             projectName={projectMeta?.name || ""}
             onGoHome={handleGoHome}
             onPublish={handlePublish}
-            onOpenBackgroundModal={handleOpenBackgroundModal}
+
           />
 
-          {isBackgroundModalOpen && backgroundTargetItemId && backgroundTargetSrc && (
-            <BackgroundModal
-              itemId={backgroundTargetItemId}
-              imageSrc={backgroundTargetSrc}
-              onClose={handleCloseBackgroundModal}
-            />
-          )}
+
 
           {isPublishModalOpen && (
             <PublishModal

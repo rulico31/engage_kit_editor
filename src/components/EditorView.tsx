@@ -12,14 +12,12 @@ import "./GridPopover.css";
 import EmbedModal from "./EmbedModal";
 
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
-import { usePageStore } from "../stores/usePageStore";
-import { useSelectionStore } from "../stores/useSelectionStore";
 import { useProjectStore } from "../stores/useProjectStore";
 
 interface EditorViewProps {
   projectName: string;
   onGoHome: () => void;
-  onOpenBackgroundModal: (itemId: string, src: string) => void;
+
   onPublish: () => void;
 }
 
@@ -69,7 +67,7 @@ const GridPopover: React.FC = () => {
 const EditorView: React.FC<EditorViewProps> = ({
   projectName,
   onGoHome,
-  onOpenBackgroundModal,
+
   onPublish,
 }) => {
   const {
@@ -189,51 +187,6 @@ const EditorView: React.FC<EditorViewProps> = ({
     };
   }, [isGridPopoverOpen]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (useEditorSettingsStore.getState().isPreviewing) return;
-
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === 'z') {
-          e.preventDefault();
-          if (e.shiftKey) {
-            if (usePageStore.getState().canRedo) usePageStore.getState().redo();
-          } else {
-            if (usePageStore.getState().canUndo) usePageStore.getState().undo();
-          }
-        } else if (e.key === 'y') {
-          e.preventDefault();
-          if (usePageStore.getState().canRedo) usePageStore.getState().redo();
-        }
-
-        else if (e.key === 'g') {
-          e.preventDefault();
-          const currentSelectedIds = useSelectionStore.getState().selectedIds;
-
-          if (e.shiftKey) {
-            if (currentSelectedIds.length > 0) {
-              currentSelectedIds.forEach(id => {
-                usePageStore.getState().ungroupItems(id);
-              });
-            }
-          } else {
-            if (currentSelectedIds.length >= 2) {
-              usePageStore.getState().groupItems(currentSelectedIds);
-            }
-          }
-        }
-        else if (e.key === 's') {
-          e.preventDefault();
-          handleSave();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
-
 
   return (
     <div className="editor-container">
@@ -312,7 +265,7 @@ const EditorView: React.FC<EditorViewProps> = ({
                   </div>
                   <div className="panel-right" style={{ width: rightWidth }}>
                     <PropertiesPanel
-                      onOpenBackgroundModal={onOpenBackgroundModal}
+
                     />
                   </div>
                 </>
