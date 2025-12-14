@@ -56,20 +56,41 @@ export const PagePropertiesEditor: React.FC<PagePropertiesEditorProps> = ({ page
             <AccordionSection title="外観 (Appearance)" defaultOpen={true}>
                 <div className="prop-group">
                     <div className="prop-label">背景色 (Background Color)</div>
+
+                    {/* 透明チェックボックス */}
+                    <label className="prop-checkbox-row" style={{ marginBottom: '8px' }}>
+                        <input
+                            type="checkbox"
+                            checked={page.backgroundColor === 'transparent'}
+                            onChange={(e) => {
+                                if (e.target.checked) {
+                                    handleBgColorChange('transparent');
+                                } else {
+                                    handleBgColorChange('#ffffff');
+                                }
+                            }}
+                        />
+                        <span>透明 (Transparent)</span>
+                    </label>
+
+                    {/* 色選択（透明でない場合のみ有効） */}
                     <div className="prop-color-picker-wrapper">
                         <input
                             type="color"
                             className="prop-color-picker"
-                            value={page.backgroundColor || "#ffffff"}
+                            value={page.backgroundColor === 'transparent' ? '#ffffff' : (page.backgroundColor || "#ffffff")}
                             onChange={(e) => handleBgColorChange(e.target.value)}
+                            disabled={page.backgroundColor === 'transparent'}
+                            style={{ opacity: page.backgroundColor === 'transparent' ? 0.5 : 1 }}
                         />
                         <input
                             type="text"
                             className="prop-input"
                             style={{ flexGrow: 1 }}
-                            value={page.backgroundColor || ""}
+                            value={page.backgroundColor === 'transparent' ? 'transparent' : (page.backgroundColor || "")}
                             placeholder="#ffffff"
                             onChange={(e) => handleBgColorChange(e.target.value)}
+                            disabled={page.backgroundColor === 'transparent'}
                         />
                     </div>
                 </div>

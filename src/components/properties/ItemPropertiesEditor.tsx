@@ -1,3 +1,5 @@
+// src/components/properties/ItemPropertiesEditor.tsx
+
 import React, { useState, useEffect } from "react";
 import type { PlacedItemType } from "../../types";
 import { AccordionSection } from "./SharedComponents";
@@ -5,6 +7,8 @@ import { supabase } from "../../lib/supabaseClient";
 import { useSelectionStore } from "../../stores/useSelectionStore";
 import { usePageStore } from "../../stores/usePageStore";
 import ImageCropModal from "../ImageCropModal";
+// 型定義のために必要ならインポート
+import type { Crop } from 'react-image-crop';
 
 interface ItemPropertiesEditorProps {
   item: PlacedItemType;
@@ -13,7 +17,6 @@ interface ItemPropertiesEditorProps {
   onItemMoveToBack: (id: string) => void;
   onItemMoveForward: (id: string) => void;
   onItemMoveBackward: (id: string) => void;
-
 }
 
 // カスタムフック：ローカル状態と画像アップロードロジックの分離
@@ -102,10 +105,11 @@ const useItemEditorLogic = (item: PlacedItemType, onItemUpdate: ItemPropertiesEd
           data: {
             ...item.data,
             src: srcToUse,
-            originalSrc: srcToUse,  // 元画像も保存
+            originalSrc: srcToUse,  // 元画像も同時に保存
             originalAspectRatio: ratio,
             keepAspectRatio: true,
-            isTransparent: false
+            isTransparent: false,
+            cropState: null, // 新しい画像になったらクロップ状態はリセット
           },
           width: Math.round(w), height: Math.round(h),
         });
@@ -146,7 +150,6 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
 
   const handleNameChange = (newDisplayName: string) => {
     onItemUpdate(item.id, { displayName: newDisplayName });
-    // タブのラベルも更新（タイプ: カスタム名 の形式）
     const displayLabel = newDisplayName ? `${item.name}: ${newDisplayName}` : item.name;
     updateTabLabel(item.id, displayLabel);
   };
@@ -155,7 +158,6 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
     commitHistory(false);
   };
 
-  // onChange: スタイル更新のみ（履歴には保存しない）
   const handleStyleChange = (category: 'shadow' | 'glow' | 'textShadow' | 'textGlow' | 'backgroundColor', key: string, value: any) => {
     const currentStyle = item.style || {};
     let newStyle = { ...currentStyle };
@@ -168,22 +170,102 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
     onItemUpdate(item.id, { style: newStyle });
   };
 
-  // onBlur: 履歴に保存
   const handleStyleBlur = () => {
     commitHistory(false);
   };
 
   // トリミング完了ハンドラ
-  const handleCropComplete = (croppedImageUrl: string) => {
-    onItemUpdate(item.id, {
-      data: {
-        ...item.data,
-        src: croppedImageUrl,
-        // originalSrc は変更しない
-      },
-    });
-    setIsCropModalOpen(false);
-    commitHistory(false);
+  // ★変更: Match機能と同じ精密計算ロジックを使用してリサイズを行う
+  const handleCropComplete = async (croppedImageUrl: string, cropState: { crop: Crop, zoom: number }) => {
+    try {
+      // 1. 画像をロードして naturalWidth/naturalHeight を取得
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('画像のロードに失敗しました'));
+        img.src = croppedImageUrl;
+      });
+
+      // 2. アスペクト比を計算
+      const aspectRatio = img.naturalHeight / img.naturalWidth;
+
+      // 3. Match機能と同じロジックで高さを計算 (padding/border考慮)
+      // Artboard.css に基づき、枠線は常に4px(透明含む)、パディングは24px/20px
+      const BORDER_W = 4; // CSSで固定されているため
+      const PADDING_X = 24;
+      const PADDING_Y = 20;
+
+      const imageDisplayWidth = item.width - BORDER_W - PADDING_X;
+
+      let newHeight = item.height;
+      if (imageDisplayWidth > 0) {
+        const requiredImageHeight = imageDisplayWidth * aspectRatio;
+        newHeight = Math.round(requiredImageHeight + BORDER_W + PADDING_Y);
+      }
+
+      // 4. 一括更新（data、width、height）
+      onItemUpdate(item.id, {
+        data: {
+          ...item.data,
+          src: croppedImageUrl,
+          cropState: cropState, // ★状態を保存
+          originalAspectRatio: aspectRatio, // ★新しいアスペクト比を保存
+        },
+        width: item.width, // 幅は維持
+        height: newHeight, // 高さを再計算
+      });
+
+      setIsCropModalOpen(false);
+      commitHistory(false);
+    } catch (error) {
+      console.error('トリミング処理中にエラーが発生しました:', error);
+      alert('画像のトリミング処理に失敗しました。');
+    }
+  };
+
+  // 画像サイズをアスペクト比に合わせるハンドラ（枠線とパディングを考慮）
+  const handleMatchSize = async () => {
+    if (!item.data?.src) {
+      alert('画像が設定されていません。');
+      return;
+    }
+
+    try {
+      const img = new Image();
+      const imageSrc = item.data.src;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('画像のロードに失敗しました'));
+        img.src = imageSrc;
+      });
+
+      // 定数の定義 (Artboard.cssに準拠)
+      // showBorderがfalseでもCSSクラス'.no-border'は'border-color: transparent'のみで
+      // 'border-width'は維持されるため、BORDER_Wは常に4とする。
+      const BORDER_W = 4;
+      const PADDING_X = 24; // (12px + 12px)
+      const PADDING_Y = 20; // (10px + 10px)
+
+      const imageDisplayWidth = item.width - BORDER_W - PADDING_X;
+
+      if (imageDisplayWidth <= 0) {
+        alert('要素の幅が小さすぎて画像を表示できません。');
+        return;
+      }
+
+      const aspectRatio = img.naturalHeight / img.naturalWidth;
+      const requiredImageHeight = imageDisplayWidth * aspectRatio;
+      const newHeight = Math.round(requiredImageHeight + BORDER_W + PADDING_Y);
+
+      onItemUpdate(item.id, {
+        height: newHeight,
+      });
+
+      commitHistory(false);
+    } catch (error) {
+      console.error('画像サイズの調整中にエラーが発生しました:', error);
+      alert('画像サイズの調整に失敗しました。');
+    }
   };
 
   return (
@@ -235,9 +317,6 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
               </div>
             </AccordionSection>
 
-
-
-
             {/* テキスト/ボタンの内容 */}
             {(item.name.startsWith("テキスト") || item.name.startsWith("ボタン")) && (
               <AccordionSection title="テキスト内容" defaultOpen={true}>
@@ -265,7 +344,26 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                 {item.data?.src && (
                   <div className="prop-group">
                     <img src={item.data.src} alt="Preview" className="prop-image-preview" />
-                    <button className="prop-button" onClick={() => setIsCropModalOpen(true)}>画像をトリミング</button>
+
+                    {/* トリミング・Matchボタン */}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        className="prop-button"
+                        onClick={() => setIsCropModalOpen(true)}
+                        style={{ flex: 1, minWidth: '140px' }}
+                      >
+                        ✂️ 画像をトリミング
+                      </button>
+                      <button
+                        className="prop-button"
+                        onClick={handleMatchSize}
+                        style={{ flex: 1, minWidth: '140px' }}
+                        title="画像のアスペクト比に合わせて要素サイズを調整"
+                      >
+                        📐 Match
+                      </button>
+                    </div>
+
                     <button className="prop-button-danger" onClick={() => handleDataChange("src", null)}>画像を削除</button>
                   </div>
                 )}
@@ -305,6 +403,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
         {/* --- Design Tab --- */}
         {activeTab === 'design' && (
           <>
+            {/* ... Design Tab Content ... */}
             <AccordionSection title="塗り・背景" defaultOpen={true}>
               <div className="prop-group">
                 <label className="prop-label">背景色 (Background)</label>
@@ -328,8 +427,6 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                 </div>
               </div>
               <CheckboxProp label="背景を透過しない(不透明)" checked={!item.data?.isTransparent} onChange={(v) => handleDataChange("isTransparent", !v)} />
-
-
             </AccordionSection>
 
             {/* Typography */}
@@ -366,7 +463,6 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                   />
                 </div>
 
-                {/* Text Shadow */}
                 <div style={{ marginTop: 15, borderTop: '1px solid #333', paddingTop: 10 }}>
                   <CheckboxProp label="文字の影 (Text Shadow)" checked={!!item.style?.textShadow?.enabled} onChange={(v) => handleStyleChange('textShadow', 'enabled', v)} />
                   {item.style?.textShadow?.enabled && (
@@ -434,6 +530,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
         {/* --- Settings Tab --- */}
         {activeTab === 'settings' && (
           <>
+            {/* ... Settings Tab Content ... */}
             <AccordionSection title="位置とサイズ (Layout)" defaultOpen={true}>
               <div className="prop-row">
                 <NumberInput label="X" value={localRect.x} onChange={(v) => handleRectChange('x', v)} onBlur={() => commitRectChange('x')} />
@@ -479,10 +576,12 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
       </div>
 
       {/* 画像トリミングモーダル */}
-      {item.name.startsWith("画像") && (
+      {item.name.startsWith("画像") && (item.data?.src || item.data?.originalSrc) && (
         <ImageCropModal
           isOpen={isCropModalOpen}
           imageSrc={item.data?.originalSrc || item.data?.src || ''}
+          initialCrop={item.data?.cropState?.crop}
+          initialZoom={item.data?.cropState?.zoom}
           onComplete={handleCropComplete}
           onCancel={() => setIsCropModalOpen(false)}
         />
@@ -492,7 +591,6 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
 };
 
 // --- Helper Components ---
-
 const CheckboxProp = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: (v: boolean) => void }) => (
   <label className="prop-checkbox-row">
     <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />

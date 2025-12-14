@@ -1,3 +1,5 @@
+/* src/components/ImageCropModal.css */
+
 /* react-image-cropのデフォルトスタイルをインポート */
 @import 'react-image-crop/dist/ReactCrop.css';
 
@@ -7,25 +9,34 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(0, 0, 0, 0.85);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 2000;
     animation: fadeIn 0.2s ease-out;
+    padding: 20px;
 }
 
 .image-crop-modal-content {
     background-color: #27272a;
     border: 1px solid #3f3f46;
     border-radius: 8px;
-    width: 90vw;
-    height: 90vh;
+
+    /* 中身に合わせて伸縮 */
+    width: auto;
+    height: auto;
+    max-width: 95vw;
+    max-height: 95vh;
+
     color: #e4e4e7;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
     animation: scaleIn 0.2s ease-out;
     display: flex;
     flex-direction: column;
+
+    /* ★重要: サイズ変化を滑らかにするトランジションを追加 */
+    transition: width 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .image-crop-modal-header {
@@ -42,40 +53,158 @@
 }
 
 .image-crop-modal-body {
-    flex: 1;
-    padding: 20px;
+    padding: 40px;
+    background-color: #111;
+
+    overflow: auto;
+
     display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: hidden;
-    min-height: 0;
+    /* justify-content: center;  <-- 削除 */
+
+    min-width: 300px;
+    min-height: 200px;
 }
 
-.image-crop-modal-body .ReactCrop {
-    max-width: 100%;
-    max-height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+/* スクロールバーのデザイン */
+.image-crop-modal-body::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
 }
 
-.image-crop-modal-body .ReactCrop img {
-    max-width: 50%;
-    max-height: 50%;
-    object-fit: contain;
+.image-crop-modal-body::-webkit-scrollbar-track {
+    background: #111;
+}
+
+.image-crop-modal-body::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 5px;
+    border: 2px solid #111;
+}
+
+.image-crop-modal-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.image-crop-content-wrapper {
+    /* margin: auto により、余白がある時は中央、溢れた時は左上基準 */
+    margin: auto;
+    width: fit-content;
+    height: fit-content;
     display: block;
+}
+
+.ReactCrop {
+    /* コンテナのトランジション */
+    transition: width 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.ReactCrop img {
+    display: block;
+    max-height: 70vh;
+    max-width: 85vw;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+
+    /* ★重要: 画像サイズのトランジション */
+    transition: width 0.2s cubic-bezier(0.25, 0.8, 0.25, 1), height 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .image-crop-modal-footer {
     padding: 16px 20px;
     display: flex;
-    justify-content: flex-end;
-    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
     background-color: #27272a;
     border-top: 1px solid #3f3f46;
     border-bottom-left-radius: 8px;
     border-bottom-right-radius: 8px;
     flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.zoom-label {
+    font-size: 13px;
+    color: #a1a1aa;
+}
+
+.zoom-slider {
+    width: 120px;
+    height: 4px;
+    border-radius: 2px;
+    background: #3f3f46;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.zoom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #2563eb;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.zoom-slider::-webkit-slider-thumb:hover {
+    background: #3b82f6;
+}
+
+.zoom-value {
+    font-size: 13px;
+    color: #e4e4e7;
+    min-width: 45px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.mode-controls {
+    display: flex;
+    gap: 8px;
+    background-color: #3f3f46;
+    padding: 2px;
+    border-radius: 6px;
+}
+
+.mode-btn {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background-color: transparent;
+    color: #a1a1aa;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mode-btn:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.mode-btn.active {
+    background-color: #52525b;
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-left: auto;
 }
 
 .image-crop-modal-btn {
@@ -111,6 +240,7 @@
 .image-crop-modal-btn.apply:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    background-color: #3f3f46;
 }
 
 @keyframes fadeIn {
@@ -132,5 +262,25 @@
     to {
         transform: scale(1);
         opacity: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .image-crop-modal-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .zoom-controls,
+    .mode-controls,
+    .action-buttons {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .action-buttons {
+        margin-left: 0;
+        margin-top: 4px;
     }
 }
