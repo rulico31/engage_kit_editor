@@ -77,7 +77,7 @@ interface PageStoreState {
   autoStackItems: () => void;
 
   // ノード操作
-  updateNodeData: (nodeId: string, data: any) => void;
+  updateNodeData: (nodeId: string, data: any, options?: { addToHistory?: boolean; historyDebounce?: boolean }) => void;
   setLogicGraph: (itemId: string, graph: NodeGraph) => void;
 
   // React Flow グラフ操作用アクション
@@ -568,8 +568,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  // --- ノード操作 (基本) ---
-  updateNodeData: (nodeId: string, data: any) => {
+  // --- Node Operations (Basic) ---
+  updateNodeData: (nodeId: string, data: any, options?: { addToHistory?: boolean; historyDebounce?: boolean }) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
@@ -589,6 +589,10 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       });
       return { pages: { ...state.pages, [pageId]: { ...page, allItemLogics: newLogics } } };
     });
+
+    if (options?.addToHistory) {
+      get().commitHistory(options.historyDebounce);
+    }
   },
 
   setLogicGraph: (itemId: string, graph: NodeGraph) => {
@@ -727,16 +731,21 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
   // --- 履歴管理 ---
   commitHistory: (debounce = false) => {
+    console.log('[COMMIT_HISTORY] called with debounce:', debounce);
+
     if (debounce) {
       if (commitHistoryTimer !== null) {
         clearTimeout(commitHistoryTimer);
       }
       commitHistoryTimer = window.setTimeout(() => {
+        console.log('[COMMIT_HISTORY] debounce timer fired');
         get().commitHistory(false);
         commitHistoryTimer = null;
       }, 500);
       return;
     }
+
+    console.log('[COMMIT_HISTORY] saving history NOW');
 
     set(state => {
       const pageId = state.selectedPageId;
@@ -774,10 +783,17 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   undo: () => {
+    const currentState = get();
+    console.log('[UNDO] historyIndex:', currentState.historyIndex, 'history.length:', currentState.history.length);
+
     set(state => {
-      if (state.historyIndex <= 0) return state;
+      if (state.historyIndex <= 0) {
+        console.log('[UNDO] Cannot undo - at beginning of history');
+        return state;
+      }
       const newIndex = state.historyIndex - 1;
       const historyState = state.history[newIndex];
+      console.log('[UNDO] Applying undo, new index:', newIndex);
 
       return {
         historyIndex: newIndex,
@@ -791,10 +807,17 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   redo: () => {
+    const currentState = get();
+    console.log('[REDO] historyIndex:', currentState.historyIndex, 'history.length:', currentState.history.length, 'canRedo:', currentState.canRedo);
+
     set(state => {
-      if (state.historyIndex >= state.history.length - 1) return state;
+      if (state.historyIndex >= state.history.length - 1) {
+        console.log('[REDO] Cannot redo - at end of history');
+        return state;
+      }
       const newIndex = state.historyIndex + 1;
       const historyState = state.history[newIndex];
+      console.log('[REDO] Applying redo, new index:', newIndex);
 
       return {
         historyIndex: newIndex,

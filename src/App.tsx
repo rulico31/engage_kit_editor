@@ -44,24 +44,46 @@ const App: React.FC = () => {
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if input/textarea is focused
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      const { undo, redo, deleteItems, updateItem } = usePageStore.getState();
-      const { selectedIds } = useSelectionStore.getState();
+      // Input/Textarea handling for Undo/Redo
+      const activeElement = document.activeElement as HTMLElement;
+      const isInput = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
 
       // Undo: Ctrl+Z
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        if (isInput) {
+          // Force blur to save current state
+          activeElement.blur();
+          e.preventDefault();
+          // Wait for blur to commit history, then undo
+          setTimeout(() => {
+            usePageStore.getState().undo();
+          }, 50);
+          return;
+        }
+
+        // Normal undo if not input
         e.preventDefault();
-        undo();
+        usePageStore.getState().undo();
+        return;
       }
-      // Redo: Ctrl+Y or Ctrl+Shift+Z
+
+      // Redo: Ctrl+Y or Ctrl+Shift+Z (also works when input is focused)
       if (((e.ctrlKey || e.metaKey) && e.key === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')) {
+        if (isInput) {
+          activeElement.blur();
+        }
         e.preventDefault();
-        redo();
+        usePageStore.getState().redo();
+        return;
       }
+
+      // Ignore other keys if input is focused (standard behavior)
+      if (isInput) {
+        return;
+      }
+
+      const { deleteItems, updateItem } = usePageStore.getState();
+      const { selectedIds } = useSelectionStore.getState();
       // Save: Ctrl+S
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();

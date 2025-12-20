@@ -85,7 +85,7 @@ export const abTestNodeConfig: any = {
         {
             name: "ratioA",
             label: "Path A の比率 (%):",
-            type: "text",
+            type: "number",
             defaultValue: "50",
             description: "0〜100の数値を入力してください"
         },

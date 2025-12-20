@@ -1,4 +1,5 @@
 import React from "react";
+
 import type { Node } from "reactflow";
 import type { PropertyConfig, PropertySelectOption } from "../../types";
 import { AccordionSection } from "./SharedComponents";
@@ -67,13 +68,32 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
       newValue = (e.target as HTMLInputElement).checked;
     }
 
+    console.log('[handleChange] name:', name, 'type:', type, 'newValue:', newValue);
+
     // WaitForClickNodeの旧形式targetItemId対応（一応保持）
     if (node.type === "waitForClickNode" && name === "targetItemId") {
       const selectedItem = placedItems.find(p => p.id === newValue);
       const newLabel = selectedItem ? `待ち: ${selectedItem.data.text || selectedItem.name} ` : "ターゲット未設定";
-      updateNodeData(node.id, { [name]: newValue, label: newLabel });
+
+      // selectタイプの場合は即座に履歴保存、それ以外はデバウンス
+      const shouldSaveImmediately = type === 'select';
+      updateNodeData(node.id, { [name]: newValue, label: newLabel }, { addToHistory: true, historyDebounce: !shouldSaveImmediately });
     } else {
-      updateNodeData(node.id, { [name]: newValue });
+      // select, checkbox, numberの場合は即座に履歴保存
+      // textの場合のみデバウンスで履歴保存
+      const shouldSaveImmediately = type === 'select' || type === 'checkbox' || type === 'number';
+      updateNodeData(node.id, { [name]: newValue }, { addToHistory: true, historyDebounce: !shouldSaveImmediately });
+    }
+  };
+
+  const handleBlur = () => {
+    // フォーカスが外れたタイミングで履歴に保存
+    updateNodeData(node.id, {}, { addToHistory: true });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
     }
   };
 
@@ -83,7 +103,7 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
     const newIds = checked
       ? [...currentIds, itemId]
       : currentIds.filter(id => id !== itemId);
-    updateNodeData(node.id, { [name]: newIds });
+    updateNodeData(node.id, { [name]: newIds }, { addToHistory: true, historyDebounce: false });
   };
 
   // オプション生成ロジック
@@ -176,6 +196,23 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
     );
   }
 
+  if (type === 'textarea') {
+    return (
+      <div className="prop-group">
+        <label className="prop-label">{label}</label>
+        <textarea
+          className="prop-textarea"
+          name={name}
+          value={value ?? ''}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          rows={4}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="prop-group">
       <label className="prop-label">{label}</label>
@@ -185,7 +222,8 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
         name={name}
         value={value ?? ''}
         onChange={handleChange}
-        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         onFocus={(e) => e.target.select()}
         step={step}
         min={min}
@@ -230,18 +268,26 @@ export const NodePropertiesEditor: React.FC<{ node: Node }> = ({ node }) => {
                 max="100"
                 value={ratioA}
                 onChange={(e) => {
+                  // ドラッグ中は履歴保存しない（UIのみ更新）
                   updateNodeData(node.id, { ratioA: Number(e.target.value) });
                 }}
-                className="prop-input" // クラスは維持しつつ
+                onMouseUp={() => {
+                  // スライダーを離したときに履歴保存
+                  updateNodeData(node.id, {}, { addToHistory: true });
+                }}
+                onTouchEnd={() => {
+                  // タッチデバイス対応
+                  updateNodeData(node.id, {}, { addToHistory: true });
+                }}
+                className="prop-input"
                 style={{
                   flex: 1,
-                  padding: 0,       // パディングを強制的にゼロにする
-                  border: 'none',   // ボーダーを消す
-                  height: '6px',    // 高さをスリムに
-                  // CSSグラデーションで「進捗バー」を表現（左:濃いティール、右:薄いティール）
+                  padding: 0,
+                  border: 'none',
+                  height: '6px',
                   background: `linear-gradient(to right, #0d9488 0%, #0d9488 ${ratioA}%, #99f6e4 ${ratioA}%, #99f6e4 100%)`,
                   borderRadius: '3px',
-                  appearance: 'none', // ブラウザ標準スタイルをリセット
+                  appearance: 'none',
                   outline: 'none',
                 }}
               />

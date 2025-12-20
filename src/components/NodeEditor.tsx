@@ -130,6 +130,7 @@ const NodeEditorContent: React.FC = () => {
     (params: Connection) => {
       const nextEdges = addEdge(params, currentGraph.edges);
       updateGraph(currentGraph.nodes, nextEdges);
+      usePageStore.getState().commitHistory();
     },
     [currentGraph.nodes, currentGraph.edges, updateGraph]
   );
@@ -221,6 +222,9 @@ const NodeEditorContent: React.FC = () => {
       const nextNodes = [...currentGraph.nodes, newNode];
       updateGraph(nextNodes, currentGraph.edges);
 
+      // 履歴に保存
+      usePageStore.getState().commitHistory();
+
       // 新しく追加したノードを選択状態にする
       selectItem(newNode.id, 'node', nodeTypeLabels[nodeType] || '新しいノード');
       console.log('[NodeEditor] Node added via react-dnd');
@@ -296,6 +300,7 @@ const NodeEditorContent: React.FC = () => {
     // ノードを追加
     const nextNodes = [...currentGraph.nodes, newNode];
     updateGraph(nextNodes, currentGraph.edges);
+    usePageStore.getState().commitHistory();
 
     // メニューを閉じる
     setContextMenu(null);
