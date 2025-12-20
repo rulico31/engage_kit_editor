@@ -5,7 +5,9 @@ import { useDrag } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import "./LeftPanel.css";
 import { usePageStore } from "../stores/usePageStore";
+import { useSelectionStore } from "../stores/useSelectionStore";
 import { PageNameModal } from "./PageNameModal";
+import { Edit2 } from "lucide-react";
 
 // --- レイヤーパネルのインポート (内部コンポーネント) ---
 const LayerPanel: React.FC = () => {
@@ -38,17 +40,29 @@ const LayerPanel: React.FC = () => {
 
 // --- ページリスト (左下) ---
 const PageList: React.FC = () => {
-  const { pages, pageOrder, selectedPageId, addPage, setSelectedPageId, deletePage } = usePageStore(state => ({
+  const { pages, pageOrder, selectedPageId, addPage, setSelectedPageId, deletePage, updatePageName } = usePageStore(state => ({
     pages: state.pages,
     pageOrder: state.pageOrder,
     selectedPageId: state.selectedPageId,
     addPage: state.addPage,
     setSelectedPageId: state.setSelectedPageId,
     deletePage: state.deletePage,
+    updatePageName: state.updatePageName,
   }));
 
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [initialPageName, setInitialPageName] = React.useState("");
+
+  // リネーム用ステート
+  const [renamingPageId, setRenamingPageId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState("");
+  const editInputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (renamingPageId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [renamingPageId]);
 
   const handleOpenModal = () => {
     setInitialPageName(`Page ${pageOrder.length + 1}`);
@@ -57,7 +71,31 @@ const PageList: React.FC = () => {
 
   const handleAddPage = (name: string) => {
     addPage(name);
+    // 新しいページ作成時は選択状態を解除してページプロパティを表示する（タブ履歴は残す）
+    useSelectionStore.getState().handleBackgroundClick();
     setIsModalOpen(false);
+  };
+
+  const handleRenameStart = (e: React.MouseEvent, pageId: string, currentName: string) => {
+    e.stopPropagation();
+    setRenamingPageId(pageId);
+    setEditName(currentName);
+  };
+
+  const handleRenameSave = () => {
+    if (renamingPageId && editName.trim()) {
+      updatePageName(renamingPageId, editName.trim());
+    }
+    setRenamingPageId(null);
+    setEditName("");
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleRenameSave();
+    } else if (e.key === 'Escape') {
+      setRenamingPageId(null);
+    }
   };
 
   return (
@@ -65,20 +103,46 @@ const PageList: React.FC = () => {
       <div className="page-list-scroll">
         {pageOrder.map((pageId) => {
           const page = pages[pageId];
+          const isRenaming = renamingPageId === pageId;
+
           return (
             <div
               key={pageId}
               className={`page-list-item ${selectedPageId === pageId ? "selected" : ""}`}
-              onClick={() => setSelectedPageId(pageId)}
+              onClick={() => !isRenaming && setSelectedPageId(pageId)}
             >
-              <span className="page-name">{page.name}</span>
-              {pageOrder.length > 1 && (
-                <button
-                  className="page-delete-btn"
-                  onClick={(e) => { e.stopPropagation(); deletePage(pageId); }}
-                >
-                  ×
-                </button>
+              {isRenaming ? (
+                <input
+                  ref={editInputRef}
+                  className="page-name-input"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onBlur={handleRenameSave}
+                  onKeyDown={handleRenameKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <>
+                  <span className="page-name" title={page.name}>{page.name}</span>
+                  <div className="page-actions">
+                    <button
+                      className="page-rename-btn"
+                      onClick={(e) => handleRenameStart(e, pageId, page.name)}
+                      title="名前を変更"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                    {pageOrder.length > 1 && (
+                      <button
+                        className="page-delete-btn"
+                        onClick={(e) => { e.stopPropagation(); deletePage(pageId); }}
+                        title="削除"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           );

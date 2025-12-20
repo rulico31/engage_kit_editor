@@ -5,7 +5,6 @@ import type {
   PreviewState,
   NodeGraph,
   VariableState,
-  PreviewItemState,
   PlacedItemType
 } from "./types";
 import type { AnalyticsEventType } from "./lib/analytics";
@@ -29,9 +28,10 @@ const findNextNodes = (srcId: string, handle: string | null, edges: Edge[]): str
   return edges
     .filter((e) => {
       if (e.source !== srcId) return false;
-      // ハンドルが指定されていない場合 (null) は、undefined も許容する
+      // ★修正: handle が null (指定なし) の場合、どのsourceHandleから出ているエッジも許容する
+      // これにより、sourceHandle="source" などのエッジも正しく検出されるようになる
       if (handle === null) {
-        return e.sourceHandle === null || e.sourceHandle === undefined;
+        return true;
       }
       return e.sourceHandle === handle;
     })
@@ -77,9 +77,24 @@ const processQueue = async (
     // (1) アクションノード (表示・非表示)
     if (node.type === "actionNode") {
       const { targetItemId, mode } = node.data;
+
+      console.log('🎬 アクションノード実行', {
+        nodeId: node.id,
+        targetItemId,
+        mode,
+        currentPreviewState: getPreviewState()
+      });
+
       if (targetItemId) {
         const currentState = getPreviewState();
         const targetItemState = currentState[targetItemId];
+
+        console.log('🎯 ターゲットアイテム状態', {
+          targetItemId,
+          targetItemState,
+          exists: !!targetItemState
+        });
+
         // アイテムが存在する場合のみ更新
         if (targetItemState) {
           let newVisibility = targetItemState.isVisible;
@@ -87,11 +102,25 @@ const processQueue = async (
           else if (mode === "hide") newVisibility = false;
           else if (mode === "toggle") newVisibility = !targetItemState.isVisible;
 
+          console.log('✨ 表示状態を更新', {
+            targetItemId,
+            oldVisibility: targetItemState.isVisible,
+            newVisibility,
+            mode
+          });
+
           setPreviewState({
             ...currentState,
             [targetItemId]: { ...targetItemState, isVisible: newVisibility },
           });
+        } else {
+          console.warn('⚠️ ターゲットアイテムが見つかりません', {
+            targetItemId,
+            availableItems: Object.keys(currentState).filter(k => k !== 'currentPageId' && k !== 'isFinished')
+          });
         }
+      } else {
+        console.warn('⚠️ targetItemIdが設定されていません', { nodeId: node.id, nodeData: node.data });
       }
       pushNext(node.id, null, allEdges, nextQueue);
     }
@@ -107,6 +136,17 @@ const processQueue = async (
         comparison = '==',
         comparisonValue
       } = node.data;
+
+      console.log('🔀 Ifノード実行', {
+        nodeId: node.id,
+        conditionSource,
+        conditionTargetId,
+        conditionType,
+        variableName,
+        comparisonType,
+        comparison,
+        comparisonValue
+      });
 
       let conditionResult = false;
 
@@ -149,6 +189,12 @@ const processQueue = async (
         }
       }
 
+      console.log('✅ If条件結果', {
+        nodeId: node.id,
+        conditionResult,
+        nextPath: conditionResult ? 'true' : 'false'
+      });
+
       context.logEvent('logic_branch', {
         nodeId: node.id,
         nodeType: node.type,
@@ -165,23 +211,51 @@ const processQueue = async (
     // (3) ページ遷移ノード
     else if (node.type === "pageNode") {
       const { targetPageId } = node.data;
-      if (targetPageId) requestPageChange(targetPageId);
+      console.log('📄 ページ遷移ノード実行', {
+        nodeId: node.id,
+        targetPageId
+      });
+      if (targetPageId) {
+        requestPageChange(targetPageId);
+        console.log('✅ ページ遷移実行', { targetPageId });
+      } else {
+        console.warn('⚠️ targetPageIdが設定されていません');
+      }
     }
 
     // (4) 変数セットノード
     else if (node.type === "setVariableNode") {
       const { variableName, operation = 'set', value } = node.data;
+      console.log('📊 変数セットノード実行', {
+        nodeId: node.id,
+        variableName,
+        operation,
+        value
+      });
       if (variableName) {
         const currentVars = getVariables();
         let newValue = value;
         if (operation === 'add') newValue = Number(currentVars[variableName] || 0) + Number(value || 0);
         setVariables({ ...currentVars, [variableName]: newValue });
+        console.log('✅ 変数更新完了', {
+          variableName,
+          oldValue: currentVars[variableName],
+          newValue
+        });
+      } else {
+        console.warn('⚠️ variableNameが設定されていません');
       }
       pushNext(node.id, null, allEdges, nextQueue);
     }
 
     // (5) アニメーションノード
     else if (node.type === "animateNode") {
+      console.log('🎬 アニメーションノード実行', {
+        nodeId: node.id,
+        nodeData: node.data,
+        targetItemId: node.data.targetItemId
+      });
+
       const {
         targetItemId,
         animType,
@@ -204,15 +278,12 @@ const processQueue = async (
 
           let cssProperty = '';
           const durationMs = (Number(durationS) + Number(delayS)) * 1000;
-          let toState: Partial<PreviewItemState>;
+          let toState: Partial<any>;
 
           const playAnimation = (remaining: number) => {
-            let fromState: PreviewItemState;
+            let fromState: any;
             const currentItemState = getPreviewState()[targetItemId];
 
-            // ★ 修正: アニメーションタイプに応じて正しい CSS プロパティを指定
-            // PreviewItem.tsx では x, y を left, top にマッピングしているため、
-            // transform ではなく left, top をアニメーション対象にする必要があります。
             if (animationMode === 'relative') {
               fromState = { ...currentItemState, transition: 'none' };
               toState = { ...fromState };
@@ -227,11 +298,11 @@ const processQueue = async (
                 }
               }
               else if (animType === 'moveX') {
-                cssProperty = 'left'; // transform -> left に修正
+                cssProperty = 'left';
                 toState.x = fromState.x + numValue;
               }
               else if (animType === 'moveY') {
-                cssProperty = 'top'; // transform -> top に修正
+                cssProperty = 'top';
                 toState.y = fromState.y + numValue;
               }
               else if (animType === 'scale') {
@@ -247,16 +318,13 @@ const processQueue = async (
               // 絶対値モード
               fromState = {
                 ...currentItemState,
-                // リセット時は初期値に戻すか、現在の値を基準にするか。
-                // ここでは「絶対指定」なので、初期位置からのアニメーションとするのが自然だが、
-                // 連続アニメーションを考慮し、現在位置からターゲット値へ遷移させる。
                 transition: 'none',
               };
               toState = { ...fromState };
 
               if (animType === 'opacity') { cssProperty = 'opacity'; toState.opacity = Number(value); }
-              else if (animType === 'moveX') { cssProperty = 'left'; toState.x = Number(value); } // transform -> left
-              else if (animType === 'moveY') { cssProperty = 'top'; toState.y = Number(value); } // transform -> top
+              else if (animType === 'moveX') { cssProperty = 'left'; toState.x = Number(value); }
+              else if (animType === 'moveY') { cssProperty = 'top'; toState.y = Number(value); }
               else if (animType === 'scale') { cssProperty = 'transform'; toState.scale = Number(value); }
               else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = Number(value); }
             }
@@ -313,7 +381,12 @@ const processQueue = async (
     // (6) 遅延ノード
     else if (node.type === "delayNode") {
       const { durationS = 1.0 } = node.data;
+      console.log('⏱️ 遅延ノード実行', {
+        nodeId: node.id,
+        durationS
+      });
       setTimeout(() => {
+        console.log('✅ 遅延完了', { nodeId: node.id, durationS });
         const nextNodeIds = findNextNodes(node.id, null, allEdges);
         if (nextNodeIds.length > 0) {
           processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
@@ -323,12 +396,20 @@ const processQueue = async (
 
     // (7) イベントノード
     else if (node.type === "eventNode") {
+      console.log('🎯 イベントノード通過', {
+        nodeId: node.id,
+        eventType: node.data.eventType
+      });
       pushNext(node.id, null, allEdges, nextQueue);
     }
 
     // (8) クリック待ちノード
     else if (node.type === "waitForClickNode") {
       const { targetItemId } = node.data;
+      console.log('⏸️ クリック待ちノード実行', {
+        nodeId: node.id,
+        targetItemId
+      });
 
       if (targetItemId) {
         const nextNodeIds = findNextNodes(node.id, null, allEdges);
@@ -352,10 +433,20 @@ const processQueue = async (
 
     // (10) A/Bテストノード
     else if (node.type === "abTestNode") {
-      const { probability = 50 } = node.data;
+      // ★ 修正: エディタ側の保存プロパティ名は ratioA です
+      const { ratioA = 50 } = node.data;
+      const probability = Number(ratioA); // ratioA を probability として扱う
+
       const randomValue = Math.random() * 100;
       const isPathA = randomValue < probability;
       const resultPath = isPathA ? "pathA" : "pathB";
+
+      console.log('🎲 A/Bテストノード実行', {
+        nodeId: node.id,
+        probability,
+        randomValue,
+        resultPath
+      });
 
       context.logEvent('logic_branch', {
         nodeId: node.id,
@@ -380,6 +471,10 @@ const processQueue = async (
     // (11) フォーム送信ノード
     else if (node.type === "submitFormNode") {
       const currentVars = getVariables();
+      console.log('📤 フォーム送信ノード実行', {
+        nodeId: node.id,
+        variables: currentVars
+      });
 
       try {
         const success = await context.submitLead(currentVars);
@@ -401,6 +496,12 @@ const processQueue = async (
     // (12) 外部APIノード
     else if (node.type === "externalApiNode") {
       const { url, method = "GET", variableName } = node.data;
+      console.log('🌐 外部APIノード実行', {
+        nodeId: node.id,
+        url,
+        method,
+        variableName
+      });
 
       if (!url) {
         pushNext(node.id, "error", allEdges, nextQueue);
@@ -445,6 +546,7 @@ const processQueue = async (
 export const triggerEvent = (
   eventName: string,
   targetItemId: string,
+  logicOwnerId: string, // ★追加: ロジックの所有者ID
   currentPageGraph: NodeGraph,
   placedItems: PlacedItemType[],
   getPreviewState: () => PreviewState,
@@ -457,6 +559,14 @@ export const triggerEvent = (
 ) => {
   const { nodes, edges } = currentPageGraph;
 
+  console.log('🔔 イベント発火', {
+    eventName,
+    targetItemId,
+    logicOwnerId,
+    totalNodes: nodes.length,
+    totalEdges: edges.length
+  });
+
   // 1. 「待機中」のフローを再開させる
   if (eventName === "click" && activeListeners.has(targetItemId)) {
     const listeners = activeListeners.get(targetItemId);
@@ -467,14 +577,34 @@ export const triggerEvent = (
   }
 
   // 2. イベント開始ノードを探す
-  const startingNodes = nodes.filter(
-    (n) => n.type === "eventNode" && n.data.eventType === eventName
-  );
+  const startingNodes = nodes.filter((n) => {
+    if (n.type !== "eventNode" || n.data.eventType !== eventName) return false;
+
+    // A. 複数ターゲット指定 (targetItemIds) がある場合
+    if (Array.isArray(n.data.targetItemIds) && n.data.targetItemIds.length > 0) {
+      return n.data.targetItemIds.includes(targetItemId);
+    }
+
+    // B. 単一ターゲット指定 (targetItemId / targetName) がある場合 (Legacy)
+    if (n.data.targetItemId) {
+      return n.data.targetItemId === targetItemId;
+    }
+
+    // C. ターゲット指定なし (Implicit Self)
+    // 所有者とターゲットが一致する場合のみ発火 (自分自身のクリックイベントなど)
+    return logicOwnerId === targetItemId;
+  });
+
+  console.log('🎯 見つかったイベントノード', {
+    count: startingNodes.length,
+    nodes: startingNodes.map(n => ({ id: n.id, label: n.data.label }))
+  });
 
   if (startingNodes.length > 0) {
     const initialQueue: string[] = [];
 
     startingNodes.forEach(startNode => {
+      // イベントノードからの出力を探す（ハンドル指定なし）
       const nextIds = findNextNodes(startNode.id, null, edges);
       initialQueue.push(...nextIds);
     });
@@ -499,5 +629,4 @@ export const executeLogicGraph = (
     previewState,
     setPreviewState
   );
-  // console.warn("Use usePreviewStore.handleItemEvent instead."); // コメントアウトしてノイズを減らす
 };

@@ -1,8 +1,8 @@
 // src/components/nodes/SubmitDataNode.ts
 
-import type { NodePropertyConfig } from "../../types";
+import type { PropertyConfig } from "../../types";
 
-export const submitDataNodeConfig: NodePropertyConfig = {
+export const submitDataNodeConfig: any = {
   title: "データ送信設定",
   properties: [
     {

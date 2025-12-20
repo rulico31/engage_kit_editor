@@ -6,6 +6,7 @@ import ConfirmModal from "./ConfirmModal";
 interface HomeViewProps {
   onCreateProject: (name: string, initialData?: any) => void;
   onOpenProject: (projectId: string) => void;
+  onLoadFromJSON?: () => void;
 }
 
 interface Project {
@@ -17,7 +18,7 @@ interface Project {
   page_count?: number;
 }
 
-const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) => {
+const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onLoadFromJSON }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -148,9 +149,16 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
         {/* ヘッダー */}
         <div className="home-header">
           <div className="brand-logo">EngageKit</div>
-          <button className="create-project-btn" onClick={() => setIsCreateModalOpen(true)}>
-            + 新規プロジェクト
-          </button>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            {onLoadFromJSON && (
+              <button className="load-json-btn" onClick={onLoadFromJSON}>
+                📂 JSONから読み込み
+              </button>
+            )}
+            <button className="create-project-btn" onClick={() => setIsCreateModalOpen(true)}>
+              + 新規プロジェクト
+            </button>
+          </div>
         </div>
 
         {/* プロジェクトリスト */}

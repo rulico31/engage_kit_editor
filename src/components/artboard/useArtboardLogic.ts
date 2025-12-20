@@ -18,11 +18,9 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     viewMode: state.viewMode,
   }));
 
-  const { deleteItems, updateItems, groupItems, ungroupItems } = usePageStore(state => ({
+  const { deleteItems, updateItems } = usePageStore(state => ({
     deleteItems: state.deleteItems,
     updateItems: state.updateItems,
-    groupItems: state.groupItems,
-    ungroupItems: state.ungroupItems,
   }));
 
   const { selectedIds } = useSelectionStore(state => ({
@@ -101,13 +99,10 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     const dy = mouseYInArtboard - dragStartPos.current.y;
 
     // モバイルビューの場合は、移動量をPC座標系に逆変換する
-    // Mobile Scale = 375 / 1000 = 0.375
-    // Delta PC = Delta Mobile / 0.375
     const isMobileView = useEditorSettingsStore.getState().isMobileView;
     const mobileScale = 375 / 1000;
 
     const finalDx = isMobileView ? dx / mobileScale : dx;
-    // Y座標はスケーリングしていないのでそのまま (dy)
 
     const updates = Object.entries(dragStartItemStates.current).map(([id, startState]) => ({
       id,
@@ -151,25 +146,13 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
       else targets = new Set([itemId]);
     }
 
+    // ドラッグ可能なアイテムのみを対象とする
     const validTargets = new Set<string>();
     targets.forEach(id => {
       const targetItem = placedItems.find(p => p.id === id);
-      if (!targetItem) return;
-
-      const startGroupId = targetItem.groupId;
-      let parent = startGroupId ? placedItems.find(p => p.id === startGroupId) || null : null;
-      let parentIsTarget = false;
-
-      while (parent) {
-        if (targets.has(parent.id)) {
-          parentIsTarget = true;
-          break;
-        }
-        const nextGroupId = parent.groupId;
-        parent = nextGroupId ? placedItems.find(p => p.id === nextGroupId) || null : null;
+      if (targetItem) {
+        validTargets.add(id);
       }
-
-      if (!parentIsTarget) validTargets.add(id);
     });
 
     isDraggingRef.current = true;
@@ -198,8 +181,6 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     contextMenu,
     setContextMenu,
     handleItemDragStart,
-    groupItems,
-    ungroupItems,
     deleteItems,
     selectedIds
   };

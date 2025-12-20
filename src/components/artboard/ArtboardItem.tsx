@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import type { PlacedItemType, PreviewState, VariableState } from "../../types";
 import "../Artboard.css";
 import { ResizeHandles } from "./ResizeHandles";
+import { useSelectionStore } from "../../stores/useSelectionStore";
 
 interface ArtboardItemProps {
   item: PlacedItemType;
@@ -36,9 +37,17 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   zoomLevel,
   onItemUpdate,
 }) => {
-  const isSelected = selectedIds.includes(item.id);
+  // activeLogicGraphIdを取得（ロジック編集中のアイテムIDを保持）
+  const activeLogicGraphId = useSelectionStore((s) => s.activeLogicGraphId);
+
+  // selectedIdsに含まれているか、またはactiveLogicGraphIdと一致するかで選択状態を判定
+  const isSelected = selectedIds.includes(item.id) || item.id === activeLogicGraphId;
   const isActive = item.id === activeTabId;
   const isGroup = item.id.startsWith("group");
+
+  // ハイライト状態を取得
+  const highlightedItemIds = useSelectionStore((s) => s.highlightedItemIds);
+  const isHighlighted = highlightedItemIds.includes(item.id);
 
   // 入力系アイテムの自動高さ調整除外設定
   const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン"));
@@ -61,8 +70,10 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     display: isGroup ? 'block' : 'flex',
   };
 
-  // 背景色
-  if (item.style?.backgroundColor) {
+  // 背景色（isTransparentがtrueの場合は強制的にtransparent）
+  if (item.data?.isTransparent === true) {
+    containerStyle.backgroundColor = 'transparent';
+  } else if (item.style?.backgroundColor) {
     containerStyle.backgroundColor = item.style.backgroundColor;
   }
 
@@ -172,6 +183,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   if (item.data?.showBorder === false) itemClassName += " no-border";
   if (item.data?.isTransparent === true) itemClassName += " is-transparent";
   if (item.name.startsWith("テキスト入力欄")) itemClassName += " is-input";
+  if (isHighlighted && !isPreviewing) itemClassName += " highlighted";
 
   if (isGroup) {
     content = null;
@@ -198,13 +210,22 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       );
     }
   } else if (item.name.startsWith("テキスト入力欄")) {
-    const placeholder = item.data?.placeholder || "テキストを入力...";
+    let placeholder = item.data?.placeholder || "テキストを入力...";
+    // 必須入力の場合、プレースホルダーにアスタリスクを追加
+    if (item.data?.required) {
+      placeholder = `* ${placeholder}`;
+    }
+
     content = (
       <div className="item-input-content">
         <textarea
           ref={textareaRef}
           className="artboard-item-textarea"
-          style={textStyle} // 入力欄にもスタイル適用
+          style={{
+            ...textStyle,
+            // @ts-ignore - CSS変数の設定
+            '--placeholder-color': item.data?.color || '#999999',
+          }}
           placeholder={placeholder}
           value={inputValue}
           readOnly={!isPreviewing}

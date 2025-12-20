@@ -1,63 +1,156 @@
 /* src/components/nodes/IfNode.css */
 
 .if-node {
-  background: #3a8a4a;
-  border: 1px solid #1b5e2a;
-  border-radius: 5px;
-  padding: 10px 15px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  width: 180px;
-}
-
-.if-node-label {
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  text-align: center;
-  font-weight: bold;
-}
-
-.if-node-condition {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e11d48;
+  /* ローズ色のボーダー */
+  width: 200px;
+  font-family: 'Inter', system-ui, sans-serif;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 15px;
+}
+
+.if-node-header {
+  background: #e11d48;
+  /* 濃いローズ色のヘッダー */
+  padding: 10px 15px;
+  border-bottom: 1px solid #be123c;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  /* 白文字 */
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+}
+
+.if-node-icon {
+  width: 16px;
+  height: 16px;
+  transform: rotate(90deg);
+  /* アイコンを横向きにして分岐っぽく */
+}
+
+.if-node-title {
+  font-weight: 700;
+  font-size: 14px;
+  flex: 1;
+  letter-spacing: 0.5px;
+}
+
+.if-node-body {
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 60px;
+  border-bottom-left-radius: 7px;
+  border-bottom-right-radius: 7px;
+  gap: 6px;
+}
+
+/* 条件式の表示エリア */
+.if-node-logic-display {
+  padding: 0 15px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.logic-text {
+  background-color: #fff1f2;
+  /* 薄いピンク背景 */
+  color: #9f1239;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
   font-size: 12px;
-  text-align: left;
-}
-.if-node-condition label {
-  margin-top: 6px;
+  font-weight: 600;
+  border: 1px dashed #fecdd3;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.if-node-select {
+.if-node-divider {
+  height: 1px;
+  background-color: #ffe4e6;
+  margin: 4px 0;
   width: 100%;
-  padding: 4px 6px;
-  border-radius: 3px;
-  border: 1px solid #1b5e2a;
-  background-color: #f0f0f0;
-  color: #333;
-  font-size: 13px;
-  box-sizing: border-box;
 }
 
-/* (出力グループ) */
-.if-node-output-group {
-  text-align: right;
-  padding-right: 15px;
-  margin-top: 5px;
-  font-size: 13px;
+.if-node-branch-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* 右寄せ */
+  padding: 2px 15px;
+  position: relative;
+  height: 24px;
 }
 
-/* (ハンドルスタイル) */
-.if-node .react-flow__handle-left {
-  left: -8px;
-  background: #efefef;
-  border: 2px solid #3a8a4a;
+/* True Branch Styling */
+.if-node-branch-row.true-branch .branch-label {
+  color: #16a34a;
+  /* Green */
 }
-.if-node .react-flow__handle-right {
-  right: -8px;
-  background: #efefef;
-  border: 2px solid #3a8a4a;
+
+.if-node-branch-row.true-branch .branch-icon {
+  color: #16a34a;
+}
+
+/* False Branch Styling */
+.if-node-branch-row.false-branch .branch-label {
+  color: #e11d48;
+  /* Red/Pink */
+}
+
+.if-node-branch-row.false-branch .branch-icon {
+  color: #e11d48;
+}
+
+.branch-label {
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: 6px;
+  text-transform: uppercase;
+}
+
+.branch-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* ハンドルのカスタマイズ */
+.react-flow__handle.if-node-handle {
+  width: 10px;
+  height: 10px;
+  background: #e11d48;
+  /* ローズ色 */
+  border: 2px solid #fff;
+  position: absolute;
+  top: 50% !important;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 1px #be123c;
+  z-index: 10;
+}
+
+.if-node-handle.branch-handle {
+  right: -6px;
+}
+
+/* 個別のハンドル色 */
+.if-node-branch-row.true-branch .branch-handle {
+  background: #16a34a;
+  /* Trueは緑 */
+  box-shadow: 0 0 0 1px #15803d;
+}
+
+.if-node-branch-row.false-branch .branch-handle {
+  background: #e11d48;
+  /* Falseは赤/ピンク */
+  box-shadow: 0 0 0 1px #be123c;
 }

@@ -1,157 +1,299 @@
 /* src/components/PublishModal.css */
 
+/* モーダルの背景（オーバーレイ） */
 .publish-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.6);
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  /* 暗めの背景 */
   display: flex;
-  align-items: center;
   justify-content: center;
-  z-index: 2000; /* 最前面 */
-  backdrop-filter: blur(3px);
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(2px);
+  /* 少しぼかしを入れると高級感が出ます */
 }
 
-.publish-modal-box {
-  background-color: #1e1e1e;
-  border: 1px solid #444;
-  border-radius: 8px;
+/* モーダル本体 */
+/* TSXの className="publish-modal-content" に合わせてスタイルを適用 */
+.publish-modal-content {
+  background-color: #252526;
   width: 500px;
-  max-width: 90%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  /* 少し幅を広げる */
+  max-width: 90vw;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  border: 1px solid #454545;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* 角丸からはみ出ないように */
+  color: #ccc;
+  padding: 0;
+  /* ヘッダーとボディでpaddingを分けるためリセット */
 }
 
+/* ヘッダーエリア */
 .publish-modal-header {
-  background-color: #252526;
   padding: 16px 20px;
-  border-bottom: 1px solid #333;
+  background-color: #2d2d2d;
+  border-bottom: 1px solid #3e3e3e;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.publish-modal-title {
-  font-size: 1.1em;
-  font-weight: bold;
-  color: #eee;
+.publish-modal-header h2 {
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #e0e0e0;
 }
 
-.publish-close-button {
+/* 右上の×ボタン */
+.close-button {
   background: transparent;
   border: none;
   color: #888;
+  font-size: 20px;
   cursor: pointer;
-  font-size: 1.2em;
-  line-height: 1;
-  padding: 4px;
+  padding: 4px 8px;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.publish-close-button:hover {
-  background-color: #333;
+
+.close-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
-.publish-modal-content {
+/* コンテンツボディ */
+.publish-modal-body {
+  padding: 24px;
+  text-align: left;
+  /* 基本は左揃え */
+}
+
+/* 1. 説明文の背景エリア */
+.publish-confirm {
+  background-color: #1e1e1e;
+  /* 濃い背景で見出しを目立たせる */
   padding: 20px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  margin-bottom: 24px;
 }
 
-/* タブ切り替え */
-.publish-tabs {
+.publish-confirm p {
+  margin-top: 0;
+  margin-bottom: 12px;
+  line-height: 1.5;
+  color: #d4d4d4;
+}
+
+.publish-info ul {
+  padding-left: 20px;
+  margin: 0;
+  color: #a0a0a0;
+  font-size: 13px;
+}
+
+.publish-info li {
+  margin-bottom: 4px;
+}
+
+/* 2. アクションボタンエリア */
+.action-buttons {
   display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #333;
+  justify-content: flex-end;
+  /* 右寄せ */
+  gap: 12px;
+  margin-top: 24px;
 }
 
-.publish-tab {
+/* キャンセルボタン */
+.cancel-btn {
+  background-color: transparent;
+  border: 1px solid #555;
+  color: #ccc;
   padding: 8px 16px;
-  background: transparent;
-  border: none;
-  color: #888;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
+  font-size: 13px;
   transition: all 0.2s;
 }
 
-.publish-tab:hover {
-  color: #ccc;
+.cancel-btn:hover {
+  border-color: #888;
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
-.publish-tab.active {
-  color: #007acc;
-  border-bottom-color: #007acc;
-}
-
-/* コードエリア */
-.code-preview-area {
-  background-color: #111;
-  border: 1px solid #333;
-  border-radius: 4px;
-  padding: 12px;
-  margin-bottom: 16px;
-  position: relative;
-}
-
-.code-preview-text {
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 0.9em;
-  color: #d4d4d4;
-  word-break: break-all;
-  white-space: pre-wrap;
-  line-height: 1.5;
-  margin: 0;
-  max-height: 150px;
-  overflow-y: auto;
-}
-
-.copy-button-wrapper {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.copy-button {
-  background-color: #007acc;
+/* 公開するボタン */
+.publish-btn {
+  background-color: #2a8a4a;
   color: white;
   border: none;
-  padding: 8px 16px;
+  padding: 8px 24px;
   border-radius: 4px;
-  font-weight: bold;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
-.copy-button:hover {
-  background-color: #008be6;
+.publish-btn:hover {
+  background-color: #35a35b;
 }
 
-.copy-button:active {
-  transform: translateY(1px);
-}
-
-.copy-button.copied {
-  background-color: #2a8a4a;
-}
-
-.publish-warning {
-  background-color: #3a3a2a;
-  color: #f0d060;
+/* エラー表示 */
+.error-message {
+  background-color: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #ff8a80;
   padding: 12px;
   border-radius: 4px;
-  font-size: 0.9em;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+/* 進捗バー */
+.publishing-progress {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background-color: #333;
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 16px 0 8px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: #007acc;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #888;
+}
+
+/* 完了画面 */
+.publish-success h3 {
+  margin-top: 0;
+  color: #fff;
+  text-align: center;
+}
+
+.publish-success p {
+  text-align: center;
+  color: #aaa;
+  font-size: 13px;
   margin-bottom: 20px;
-  border: 1px solid #665522;
+}
+
+.success-icon {
+  font-size: 48px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+/* 4. 埋め込みコードのボックス */
+.embed-code-container {
+  margin-bottom: 20px;
+  background-color: #1e1e1e;
+  /* 背景より少し濃い黒 */
+  padding: 16px;
+  border-radius: 8px;
+  /* 角丸 */
+  border: 1px solid #333;
+}
+
+.embed-code-container textarea {
+  width: 100%;
+  height: 280px;
+  /* 全文が表示される十分な高さ */
+  background-color: transparent;
+  /* コンテナの背景色を使う */
+  color: #9cdcfe;
+  border: none;
+  /* 枠線を消してシームレスに */
+  padding: 0;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.embed-code-container textarea:focus {
+  outline: none;
+  /* border-colorは削除（枠線なし） */
+}
+
+.copy-btn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px;
+  background-color: #333;
+  /* ボタンは少し明るくして区別 */
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  background-color: #444;
+  border-color: #555;
+}
+
+.preview-link {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.preview-link a {
+  color: #007acc;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.preview-link a:hover {
+  text-decoration: underline;
+}
+
+.publish-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.close-btn {
+  background-color: transparent;
+  border: 1px solid #555;
+  color: #ccc;
+  padding: 8px 32px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  border-color: #888;
+  color: #fff;
 }

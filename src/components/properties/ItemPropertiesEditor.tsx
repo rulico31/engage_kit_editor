@@ -3,12 +3,22 @@
 import React, { useState, useEffect } from "react";
 import type { PlacedItemType } from "../../types";
 import { AccordionSection } from "./SharedComponents";
-import { supabase } from "../../lib/supabaseClient";
 import { useSelectionStore } from "../../stores/useSelectionStore";
 import { usePageStore } from "../../stores/usePageStore";
 import ImageCropModal from "../ImageCropModal";
 // 型定義のために必要ならインポート
 import type { Crop } from 'react-image-crop';
+
+// ★追加: このファイル内でも window.electronAPI を認識できるように型を拡張
+declare global {
+  interface Window {
+    electronAPI?: {
+      saveProjectFile: (data: string) => Promise<boolean>;
+      openProjectFile: () => Promise<string | null>;
+      selectImageFile: () => Promise<string | null>;
+    };
+  }
+}
 
 interface ItemPropertiesEditorProps {
   item: PlacedItemType;
@@ -49,22 +59,97 @@ const useItemEditorLogic = (item: PlacedItemType, onItemUpdate: ItemPropertiesEd
     if (item.data?.keepAspectRatio && (key === 'w' || key === 'h')) {
       const w = key === 'w' ? val : Math.round(val / ratioToUse);
       const h = key === 'h' ? val : Math.round(val * ratioToUse);
-      onItemUpdate(item.id, { width: w, height: h });
+      onItemUpdate(item.id, { width: w, height: h }, { addToHistory: true, immediate: true });
       setLocalRect(prev => ({ ...prev, w, h }));
     } else {
       const propMap = { x: 'x', y: 'y', w: 'width', h: 'height' };
-      onItemUpdate(item.id, { [propMap[key]]: val });
+      onItemUpdate(item.id, { [propMap[key]]: val }, { addToHistory: true, immediate: true });
     }
   };
 
-  // 画像アップロード
+  // ★共通処理: 画像URLをアイテムに適用するロジック
+  const applyImageToItem = (srcToUse: string, originalSrcToUse: string) => {
+    console.log('🎨 applyImageToItem開始:', {
+      srcLength: srcToUse.length,
+      originalSrcLength: originalSrcToUse.length
+    });
+
+    const img = new Image();
+    img.onload = () => {
+      console.log('✅ 画像ロード成功:', {
+        width: img.width,
+        height: img.height
+      });
+
+      const MAX_W = 450, MAX_H = 300;
+      let w = img.width, h = img.height;
+      const ratio = h / w;
+
+      console.log('📐 元のサイズ:', { w, h, ratio });
+
+      if (w / MAX_W > 1 || h / MAX_H > 1) {
+        if (w / MAX_W > h / MAX_H) { w = MAX_W; h = img.height * (MAX_W / img.width); }
+        else { h = MAX_H; w = img.width * (MAX_H / img.height); }
+      }
+
+      console.log('📐 調整後のサイズ:', { w, h });
+
+      onItemUpdate(item.id, {
+        data: {
+          ...item.data,
+          src: srcToUse,
+          originalSrc: originalSrcToUse,
+          originalAspectRatio: ratio,
+          keepAspectRatio: true,
+          isTransparent: false,
+          cropState: null, // 新しい画像になったらクロップ状態はリセット
+        },
+        width: Math.round(w), height: Math.round(h),
+      });
+
+      console.log('✅ アイテム更新完了');
+      setIsUploading(false);
+    };
+    img.onerror = (event) => {
+      console.error('❌ 画像ロードエラー:', event);
+      console.error('❌ img.src:', img.src.substring(0, 100) + '...');
+      console.error('❌ srcToUse (first 100 chars):', srcToUse.substring(0, 100));
+      alert("画像の読み込みに失敗しました");
+      setIsUploading(false);
+    };
+    img.src = srcToUse;
+    console.log('🔄 画像ロード開始...');
+  };
+
+  // Web用: 画像アップロード
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('📸 画像アップロード開始');
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+    console.log('📸 選択されたファイル:', file);
+
+    if (!file) {
+      console.warn('⚠️ ファイルが選択されていません');
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      console.error('❌ 画像ファイルではありません:', file.type);
       alert("5MB以下の画像ファイルを選択してください");
       return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      console.error('❌ ファイルサイズが大きすぎます:', file.size);
+      alert("5MB以下の画像ファイルを選択してください");
+      return;
+    }
+
+    console.log('✅ ファイル検証成功:', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      sizeKB: Math.round(file.size / 1024) + 'KB'
+    });
 
     setIsUploading(true);
 
@@ -78,45 +163,19 @@ const useItemEditorLogic = (item: PlacedItemType, onItemUpdate: ItemPropertiesEd
     };
 
     try {
-      let srcToUse = '';
-      try {
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage.from('project-assets').upload(filePath, file, { cacheControl: '3600', upsert: false });
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('project-assets').getPublicUrl(filePath);
-        srcToUse = publicUrl;
-      } catch (uploadErr: any) {
-        console.warn("Supabase upload failed, falling back to local:", uploadErr);
-        srcToUse = await readAsDataURL(file);
-        alert("サーバーへのアップロードに失敗したため、ローカルデータとして保存しました。");
-      }
+      console.log('🔄 Base64エンコード開始...');
+      // ★修正: Supabaseアップロードを無効化し、常にBase64として保存
+      const srcToUse = await readAsDataURL(file);
+      console.log('✅ Base64エンコード完了:', {
+        dataUrlLength: srcToUse.length,
+        preview: srcToUse.substring(0, 50) + '...'
+      });
 
-      const img = new Image();
-      img.onload = () => {
-        const MAX_W = 450, MAX_H = 300;
-        let w = img.width, h = img.height;
-        const ratio = h / w;
-        if (w / MAX_W > 1 || h / MAX_H > 1) {
-          if (w / MAX_W > h / MAX_H) { w = MAX_W; h = img.height * (MAX_W / img.width); }
-          else { h = MAX_H; w = img.width * (MAX_H / img.height); }
-        }
-        onItemUpdate(item.id, {
-          data: {
-            ...item.data,
-            src: srcToUse,
-            originalSrc: srcToUse,  // 元画像も同時に保存
-            originalAspectRatio: ratio,
-            keepAspectRatio: true,
-            isTransparent: false,
-            cropState: null, // 新しい画像になったらクロップ状態はリセット
-          },
-          width: Math.round(w), height: Math.round(h),
-        });
-        setIsUploading(false);
-      };
-      img.src = srcToUse;
+      console.log('🖼️ applyImageToItem呼び出し中...');
+      applyImageToItem(srcToUse, srcToUse);
+      console.log('✅ 画像アップロード完了');
     } catch (err: any) {
+      console.error('❌ 画像アップロードエラー:', err);
       alert("画像の読み込みに失敗しました: " + err.message);
       setIsUploading(false);
     } finally {
@@ -145,7 +204,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
 
   // onBlur: 履歴に保存
   const handleDataBlur = () => {
-    commitHistory(false);
+    onItemUpdate(item.id, {}, { addToHistory: true, immediate: true });
   };
 
   const handleNameChange = (newDisplayName: string) => {
@@ -171,7 +230,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
   };
 
   const handleStyleBlur = () => {
-    commitHistory(false);
+    onItemUpdate(item.id, {}, { addToHistory: true, immediate: true });
   };
 
   // トリミング完了ハンドラ
@@ -326,6 +385,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                     className="prop-textarea"
                     value={item.data?.text || ""}
                     onChange={(e) => handleDataChange("text", e.target.value)}
+                    onBlur={handleDataBlur}
                     rows={4}
                   />
                 </div>
@@ -336,7 +396,11 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
             {item.name.startsWith("画像") && (
               <AccordionSection title="画像素材" defaultOpen={true}>
                 <div className="prop-group">
-                  <label className="prop-button" style={{ opacity: isUploading ? 0.6 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}>
+                  {/* 通常のfile input（すべての環境で使用） */}
+                  <label
+                    className="prop-button"
+                    style={{ opacity: isUploading ? 0.6 : 1, cursor: isUploading ? 'not-allowed' : 'pointer' }}
+                  >
                     {isUploading ? "アップロード中..." : "画像を選択 / アップロード"}
                     <input type="file" style={{ display: "none" }} accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
                   </label>
@@ -394,6 +458,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                   label="必須入力にする"
                   checked={!!item.data?.required}
                   onChange={(v) => handleDataChange("required", v)}
+                  onBlur={handleDataBlur}
                 />
               </AccordionSection>
             )}
@@ -426,11 +491,11 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                   />
                 </div>
               </div>
-              <CheckboxProp label="背景を透過しない(不透明)" checked={!item.data?.isTransparent} onChange={(v) => handleDataChange("isTransparent", !v)} />
+              <CheckboxProp label="背景を透過しない(不透明)" checked={!item.data?.isTransparent} onChange={(v) => handleDataChange("isTransparent", !v)} onBlur={handleDataBlur} />
             </AccordionSection>
 
             {/* Typography */}
-            {(item.name.startsWith("テキスト") || item.name.startsWith("ボタン")) && (
+            {(item.name.startsWith("テキスト") || item.name.startsWith("ボタン") || item.name.startsWith("テキスト入力欄")) && (
               <AccordionSection title="文字スタイル" defaultOpen={true}>
                 <div className="prop-group">
                   <label className="prop-label">文字色</label>
@@ -454,36 +519,34 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                 </div>
                 <div className="prop-group">
                   <label className="prop-label">フォントサイズ (px)</label>
-                  <input
-                    type="text"
-                    className="prop-input"
+                  <FontSizeInput
                     value={item.data?.fontSize ?? 15}
-                    onChange={(e) => handleDataChange("fontSize", e.target.value === "" ? undefined : parseInt(e.target.value))}
+                    onChange={(value) => handleDataChange("fontSize", value)}
                     onBlur={handleDataBlur}
                   />
                 </div>
 
                 <div style={{ marginTop: 15, borderTop: '1px solid #333', paddingTop: 10 }}>
-                  <CheckboxProp label="文字の影 (Text Shadow)" checked={!!item.style?.textShadow?.enabled} onChange={(v) => handleStyleChange('textShadow', 'enabled', v)} />
+                  <CheckboxProp label="文字の影 (Text Shadow)" checked={!!item.style?.textShadow?.enabled} onChange={(v) => handleStyleChange('textShadow', 'enabled', v)} onBlur={handleStyleBlur} />
                   {item.style?.textShadow?.enabled && (
                     <div style={{ paddingLeft: 10, marginBottom: 10 }}>
                       <div className="prop-row">
-                        <NumberInput label="X" value={item.style.textShadow.x || 0} onChange={(v) => handleStyleChange('textShadow', 'x', v)} onBlur={() => { }} />
-                        <NumberInput label="Y" value={item.style.textShadow.y || 0} onChange={(v) => handleStyleChange('textShadow', 'y', v)} onBlur={() => { }} />
+                        <NumberInput label="X" value={item.style.textShadow.x || 0} onChange={(v) => handleStyleChange('textShadow', 'x', v)} onBlur={handleStyleBlur} />
+                        <NumberInput label="Y" value={item.style.textShadow.y || 0} onChange={(v) => handleStyleChange('textShadow', 'y', v)} onBlur={handleStyleBlur} />
                       </div>
                       <div className="prop-row" style={{ marginTop: 5 }}>
-                        <NumberInput label="Blur" value={item.style.textShadow.blur || 0} onChange={(v) => handleStyleChange('textShadow', 'blur', v)} onBlur={() => { }} />
-                        <ColorInput label="Color" value={item.style.textShadow.color || "#000000"} onChange={(v) => handleStyleChange('textShadow', 'color', v)} />
+                        <NumberInput label="Blur" value={item.style.textShadow.blur || 0} onChange={(v) => handleStyleChange('textShadow', 'blur', v)} onBlur={handleStyleBlur} />
+                        <ColorInput label="Color" value={item.style.textShadow.color || "#000000"} onChange={(v) => handleStyleChange('textShadow', 'color', v)} onBlur={handleStyleBlur} />
                       </div>
                     </div>
                   )}
 
-                  <CheckboxProp label="文字の光彩 (Text Glow)" checked={!!item.style?.textGlow?.enabled} onChange={(v) => handleStyleChange('textGlow', 'enabled', v)} />
+                  <CheckboxProp label="文字の光彩 (Text Glow)" checked={!!item.style?.textGlow?.enabled} onChange={(v) => handleStyleChange('textGlow', 'enabled', v)} onBlur={handleStyleBlur} />
                   {item.style?.textGlow?.enabled && (
                     <div style={{ paddingLeft: 10 }}>
                       <div className="prop-row">
-                        <NumberInput label="Blur" value={item.style.textGlow.blur || 0} onChange={(v) => handleStyleChange('textGlow', 'blur', v)} onBlur={() => { }} />
-                        <ColorInput label="Color" value={item.style.textGlow.color || "#ffffff"} onChange={(v) => handleStyleChange('textGlow', 'color', v)} />
+                        <NumberInput label="Blur" value={item.style.textGlow.blur || 0} onChange={(v) => handleStyleChange('textGlow', 'blur', v)} onBlur={handleStyleBlur} />
+                        <ColorInput label="Color" value={item.style.textGlow.color || "#ffffff"} onChange={(v) => handleStyleChange('textGlow', 'color', v)} onBlur={handleStyleBlur} />
                       </div>
                     </div>
                   )}
@@ -493,33 +556,33 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
 
             {/* Effects */}
             <AccordionSection title="エフェクト (Effects)" defaultOpen={false}>
-              <CheckboxProp label="枠線を表示 (Border)" checked={item.data?.showBorder !== false} onChange={(v) => handleDataChange("showBorder", v)} />
+              <CheckboxProp label="枠線を表示 (Border)" checked={item.data?.showBorder !== false} onChange={(v) => handleDataChange("showBorder", v)} onBlur={handleDataBlur} />
 
               <div className="prop-separator" />
 
-              <CheckboxProp label="ドロップシャドウ (Box Shadow)" checked={!!item.style?.shadow?.enabled} onChange={(v) => handleStyleChange('shadow', 'enabled', v)} />
+              <CheckboxProp label="ドロップシャドウ (Box Shadow)" checked={!!item.style?.shadow?.enabled} onChange={(v) => handleStyleChange('shadow', 'enabled', v)} onBlur={handleStyleBlur} />
               {item.style?.shadow?.enabled && (
                 <div style={{ paddingLeft: 10, marginBottom: 12 }}>
                   <div className="prop-row">
-                    <NumberInput label="X" value={item.style.shadow.x || 0} onChange={(v) => handleStyleChange('shadow', 'x', v)} onBlur={() => { }} />
-                    <NumberInput label="Y" value={item.style.shadow.y || 0} onChange={(v) => handleStyleChange('shadow', 'y', v)} onBlur={() => { }} />
+                    <NumberInput label="X" value={item.style.shadow.x || 0} onChange={(v) => handleStyleChange('shadow', 'x', v)} onBlur={handleStyleBlur} />
+                    <NumberInput label="Y" value={item.style.shadow.y || 0} onChange={(v) => handleStyleChange('shadow', 'y', v)} onBlur={handleStyleBlur} />
                   </div>
                   <div className="prop-row" style={{ marginTop: 5 }}>
-                    <NumberInput label="Blur" value={item.style.shadow.blur || 0} onChange={(v) => handleStyleChange('shadow', 'blur', v)} onBlur={() => { }} />
-                    <ColorInput label="Color" value={item.style.shadow.color || "#000000"} onChange={(v) => handleStyleChange('shadow', 'color', v)} />
+                    <NumberInput label="Blur" value={item.style.shadow.blur || 0} onChange={(v) => handleStyleChange('shadow', 'blur', v)} onBlur={handleStyleBlur} />
+                    <ColorInput label="Color" value={item.style.shadow.color || "#000000"} onChange={(v) => handleStyleChange('shadow', 'color', v)} onBlur={handleStyleBlur} />
                   </div>
                 </div>
               )}
 
-              <CheckboxProp label="光彩 (Box Glow)" checked={!!item.style?.glow?.enabled} onChange={(v) => handleStyleChange('glow', 'enabled', v)} />
+              <CheckboxProp label="光彩 (Box Glow)" checked={!!item.style?.glow?.enabled} onChange={(v) => handleStyleChange('glow', 'enabled', v)} onBlur={handleStyleBlur} />
               {item.style?.glow?.enabled && (
                 <div style={{ paddingLeft: 10 }}>
                   <div className="prop-row">
-                    <NumberInput label="Blur" value={item.style.glow.blur || 0} onChange={(v) => handleStyleChange('glow', 'blur', v)} onBlur={() => { }} />
-                    <NumberInput label="Spread" value={item.style.glow.spread || 0} onChange={(v) => handleStyleChange('glow', 'spread', v)} onBlur={() => { }} />
+                    <NumberInput label="Blur" value={item.style.glow.blur || 0} onChange={(v) => handleStyleChange('glow', 'blur', v)} onBlur={handleStyleBlur} />
+                    <NumberInput label="Spread" value={item.style.glow.spread || 0} onChange={(v) => handleStyleChange('glow', 'spread', v)} onBlur={handleStyleBlur} />
                   </div>
                   <div style={{ marginTop: 5 }}>
-                    <ColorInput label="Color" value={item.style.glow.color || "#ffffff"} onChange={(v) => handleStyleChange('glow', 'color', v)} />
+                    <ColorInput label="Color" value={item.style.glow.color || "#ffffff"} onChange={(v) => handleStyleChange('glow', 'color', v)} onBlur={handleStyleBlur} />
                   </div>
                 </div>
               )}
@@ -542,7 +605,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
               </div>
               {item.name.startsWith("画像") && (
                 <div style={{ marginTop: 8 }}>
-                  <CheckboxProp label="縦横比を維持する" checked={!!item.data?.keepAspectRatio} onChange={(v) => handleDataChange("keepAspectRatio", v)} />
+                  <CheckboxProp label="縦横比を維持する" checked={!!item.data?.keepAspectRatio} onChange={(v) => handleDataChange("keepAspectRatio", v)} onBlur={handleDataBlur} />
                 </div>
               )}
             </AccordionSection>
@@ -558,7 +621,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
 
               <div className="prop-separator" />
 
-              <CheckboxProp label="初期状態で表示する" checked={item.data?.initialVisibility !== false} onChange={(v) => handleDataChange("initialVisibility", v)} />
+              <CheckboxProp label="初期状態で表示する" checked={item.data?.initialVisibility !== false} onChange={(v) => handleDataChange("initialVisibility", v)} onBlur={handleDataBlur} />
             </AccordionSection>
 
             {item.name.startsWith("テキスト入力欄") && (
@@ -591,9 +654,21 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
 };
 
 // --- Helper Components ---
-const CheckboxProp = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: (v: boolean) => void }) => (
+const CheckboxProp = ({ label, checked, onChange, onBlur }: {
+  label: string,
+  checked: boolean,
+  onChange: (v: boolean) => void,
+  onBlur?: () => void
+}) => (
   <label className="prop-checkbox-row">
-    <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => {
+        onChange(e.target.checked);
+        onBlur?.();
+      }}
+    />
     <span>{label}</span>
   </label>
 );
@@ -613,6 +688,12 @@ const NumberInput = ({ label, value, onChange, onBlur }: { label: string, value:
     else if (val === '' || val === '-') onChange(0);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
+  };
+
   return (
     <div className="prop-group-half">
       <div className="prop-label-inline">{label}</div>
@@ -622,17 +703,83 @@ const NumberInput = ({ label, value, onChange, onBlur }: { label: string, value:
         value={localValue}
         onChange={handleChange}
         onBlur={onBlur}
+        onKeyDown={handleKeyDown}
       />
     </div>
   );
 };
 
-const ColorInput = ({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) => (
+const ColorInput = ({ label, value, onChange, onBlur }: {
+  label: string,
+  value: string,
+  onChange: (v: string) => void,
+  onBlur?: () => void
+}) => (
   <div className="prop-group-half">
     <div className="prop-label-inline">{label}</div>
     <div className="prop-color-picker-wrapper">
-      <input type="color" className="prop-color-picker-small" value={value} onChange={(e) => onChange(e.target.value)} style={{ width: 24, height: 24, padding: 0, border: 'none' }} />
-      <input type="text" className="prop-input" style={{ fontSize: 11, padding: '4px' }} value={value} onChange={(e) => onChange(e.target.value)} />
+      <input
+        type="color"
+        className="prop-color-picker-small"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        style={{ width: 24, height: 24, padding: 0, border: 'none' }}
+      />
+      <input
+        type="text"
+        className="prop-input"
+        style={{ fontSize: 11, padding: '4px' }}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+      />
     </div>
   </div>
 );
+
+// FontSizeInput: ローカル状態で編集中の値を保持
+const FontSizeInput = ({ value, onChange, onBlur }: { value: number, onChange: (v: number | undefined) => void, onBlur: () => void }) => {
+  const [localValue, setLocalValue] = useState(String(value));
+
+  useEffect(() => {
+    setLocalValue(String(value));
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 編集中はローカル状態のみを更新（ストアには反映しない）
+    setLocalValue(e.target.value);
+  };
+
+  const handleBlur = () => {
+    // フォーカスが外れたときに値を確定してストアに反映
+    const num = parseInt(localValue);
+    if (isNaN(num) || num < 1) {
+      // 無効な値の場合はデフォルト値に戻す
+      const defaultValue = value || 15;
+      setLocalValue(String(defaultValue));
+      onChange(defaultValue);
+    } else {
+      // 有効な値の場合はストアに反映
+      onChange(num);
+    }
+    onBlur();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      className="prop-input"
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+    />
+  );
+};

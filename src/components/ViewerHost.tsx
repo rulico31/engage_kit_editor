@@ -1,35 +1,69 @@
 // src/components/ViewerHost.tsx
 
 import React, { useEffect, useState } from "react";
-import { useProjectStore } from "../stores/useProjectStore";
+import { supabase } from "../lib/supabaseClient";
 import { usePreviewStore } from "../stores/usePreviewStore";
 import { usePageStore } from "../stores/usePageStore";
+import { useProjectStore } from "../stores/useProjectStore";
 import PreviewHost from "./PreviewHost";
-import "./Artboard.css"; // デザイン用のCSSを流用
-import { logAnalyticsEvent } from "../lib/analytics"; // ★ 追加: 分析ログ用
+import type { ProjectData } from "../types";
+import "./Artboard.css";
+import { logAnalyticsEvent } from "../lib/analytics";
 
 interface ViewerHostProps {
   projectId: string;
 }
 
+// ★ Phase 4: Watermark Component
+const PoweredByBadge: React.FC = () => (
+  <a
+    href="https://engagekit.io" // LPへのリンク（仮）
+    target="_blank"
+    rel="noopener noreferrer"
+    style={{
+      position: 'fixed',
+      bottom: '12px',
+      right: '12px',
+      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+      backdropFilter: 'blur(4px)',
+      padding: '6px 10px',
+      borderRadius: '6px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      textDecoration: 'none',
+      zIndex: 9999,
+      fontSize: '11px',
+      color: '#444',
+      fontFamily: 'sans-serif',
+      transition: 'opacity 0.2s',
+      border: '1px solid rgba(0,0,0,0.05)'
+    }}
+    onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+  >
+    <span style={{ fontWeight: 500 }}>Powered by</span>
+    <span style={{ fontWeight: 700, color: '#3b82f6' }}>EngageKit</span>
+  </a>
+);
+
 const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false); // Moved to top
+  const [isMobile, setIsMobile] = useState(false);
+  const [showWatermark] = useState(true);
 
-  // ストアのアクションを取得
-  const loadProject = useProjectStore(state => state.loadProject);
   const initPreview = usePreviewStore(state => state.initPreview);
+  const loadFromData = usePageStore(state => state.loadFromData);
 
-  // 描画に必要なデータをストアから取得
-  const { placedItems, allItemLogics, backgroundColor, backgroundImage, mobileBackgroundImage } = usePageStore(state => {
+  const { placedItems, allItemLogics, backgroundColor, backgroundImage } = usePageStore(state => {
     const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
     return {
       placedItems: page?.placedItems || [],
       allItemLogics: page?.allItemLogics || {},
       backgroundColor: page?.backgroundColor,
       backgroundImage: page?.backgroundImage,
-      mobileBackgroundImage: page?.mobileBackgroundImage,
     };
   });
 
@@ -38,40 +72,52 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     setPreviewState: state.setPreviewState,
   }));
 
-  // マウント時にプロジェクトをロードし、プレビューを開始する
   useEffect(() => {
     const fetchAndInit = async () => {
       try {
-        // 1. データベースからプロジェクトをロード
-        // (注: loadProjectは内部でEditorSettingsStoreを更新しますが、Viewerモードでは無視します)
-        await loadProject(projectId);
+        useProjectStore.setState({ currentProjectId: projectId });
 
-        // 2. ロード完了後、プレビュー状態を初期化
-        // (少し待ってデータがストアに反映されてから実行)
+        // 1. データベースからデータを取得
+        // ★修正: 'content' カラムは廃止されたため 'data' を取得するように変更
+        const { data, error } = await supabase
+          .from("projects")
+          .select("published_content, is_published, data")
+          .eq("id", projectId)
+          .single();
+
+        if (error) throw error;
+        if (!data) throw new Error("プロジェクトが見つかりません");
+
+        // 公開データがあればそれを優先、なければ下書き(data)を表示
+        const projectData = (data.is_published && data.published_content)
+          ? (data.published_content as ProjectData)
+          : (data.data as ProjectData); // content -> data に変更
+
+        if (!projectData) {
+          throw new Error("表示できるコンテンツがありません");
+        }
+
+        loadFromData(projectData);
+
         setTimeout(() => {
           initPreview();
           setIsLoaded(true);
-
-          // ★ 追加: PVとUUの計測開始
-          // プロジェクトロードと初期化が完了した時点でカウントします
           logAnalyticsEvent('page_view', {
             metadata: { referrer: document.referrer }
           });
+        }, 50);
 
-        }, 100);
-
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
-        setError("コンテンツの読み込みに失敗しました。");
+        setError(err.message || "コンテンツの読み込みに失敗しました。");
       }
     };
 
     if (projectId) {
       fetchAndInit();
     }
-  }, [projectId, loadProject, initPreview]);
+  }, [projectId, loadFromData, initPreview]);
 
-  // リサイズイベントでモバイル判定 (Moved to top)
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 480);
@@ -81,7 +127,6 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Conditional returns MUST be after all hooks
   if (error) {
     return (
       <div style={{
@@ -90,9 +135,12 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         alignItems: "center",
         height: "100vh",
         color: "#ff6b6b",
-        backgroundColor: "#111"
+        backgroundColor: "#111",
+        flexDirection: "column",
+        gap: "1rem"
       }}>
-        {error}
+        <p>{error}</p>
+        <p style={{ fontSize: "0.8rem", color: "#666" }}>Project ID: {projectId}</p>
       </div>
     );
   }
@@ -112,45 +160,25 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     );
   }
 
-  // 自動スケーリング用の設定
-  const ARTBOARD_WIDTH = 1920; // PCの標準アートボード幅
-  const ARTBOARD_HEIGHT = 1080; // PCの標準アートボード高さ
-  const scale = isMobile ? Math.min(
-    window.innerWidth / ARTBOARD_WIDTH,
-    window.innerHeight / ARTBOARD_HEIGHT
-  ) : 1;
-
-  // 背景スタイルの適用
-  const currentBg = isMobile ? mobileBackgroundImage : backgroundImage;
   const backgroundStyle: React.CSSProperties = {
-    backgroundColor: backgroundColor || "#ffffff", // デフォルト背景
+    backgroundColor: backgroundColor || "#ffffff",
     width: "100vw",
     height: "100vh",
     overflow: "hidden",
     position: "relative",
-  };
-
-  if (currentBg?.src) {
-    backgroundStyle.backgroundImage = `url(${currentBg.src})`;
-    backgroundStyle.backgroundPosition = currentBg.position || '50% 50%';
-    backgroundStyle.backgroundSize = currentBg.size || 'cover';
-    backgroundStyle.backgroundRepeat = 'no-repeat';
-  }
-
-  // コンテナスタイル（スケーリング適用）
-  const containerStyle: React.CSSProperties = {
-    width: `${ARTBOARD_WIDTH}px`,
-    height: `${ARTBOARD_HEIGHT}px`,
-    transform: `scale(${scale})`,
-    transformOrigin: "top left",
-    position: "absolute",
-    top: 0,
-    left: 0,
+    backgroundImage: backgroundImage?.src ? `url(${backgroundImage.src})` : undefined,
+    backgroundSize: backgroundImage?.displayMode === 'tile' ? 'auto' : (backgroundImage?.displayMode || 'cover'),
+    backgroundPosition: backgroundImage?.position || 'center center',
+    backgroundRepeat: backgroundImage?.displayMode === 'tile' ? 'repeat' : 'no-repeat',
   };
 
   return (
     <div style={backgroundStyle}>
-      <div style={containerStyle}>
+      <div style={{
+        width: "100%",
+        height: "100%",
+        position: "relative"
+      }}>
         <PreviewHost
           placedItems={placedItems}
           previewState={previewState}
@@ -158,6 +186,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
           allItemLogics={allItemLogics}
           isMobile={isMobile}
         />
+
+        {showWatermark && <PoweredByBadge />}
       </div>
     </div>
   );

@@ -1,91 +1,122 @@
+/* src/components/nodes/SubmitFormNode.css */
+
 .submit-form-node {
     background: #ffffff;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e0e0e0;
+    border: 1px solid #475569;
+    /* スレート色のボーダー */
     width: 200px;
-    /* Wider for professional look */
     font-family: 'Inter', system-ui, sans-serif;
-    /* overflow: hidden; Removed */
     position: relative;
     display: flex;
     flex-direction: column;
 }
 
 .submit-form-node-header {
-    background: linear-gradient(to right, #f8f9fa, #ffffff);
+    background: #475569;
+    /* 濃いスレート色のヘッダー */
     padding: 10px 15px;
-    border-bottom: 1px solid #f0f0f0;
-    font-weight: 600;
-    color: #333;
+    border-bottom: 1px solid #334155;
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
+    color: #ffffff;
+    /* 白文字 */
     border-top-left-radius: 7px;
     border-top-right-radius: 7px;
 }
 
 .submit-form-node-icon {
-    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.submit-form-node-title {
+    font-weight: 700;
+    font-size: 13px;
+    flex: 1;
+    letter-spacing: 0.5px;
 }
 
 .submit-form-node-body {
-    position: relative;
-    height: 80px;
-    /* Fixed height to accommodate handles at specific positions */
-    background: #fff;
+    padding: 12px 0;
+    /* 上下のパディングのみ */
+    display: flex;
+    flex-direction: column;
+    min-height: 60px;
     border-bottom-left-radius: 7px;
     border-bottom-right-radius: 7px;
+    gap: 8px;
 }
 
-.submit-form-node-row {
-    position: absolute;
-    right: 0;
+.submit-form-node-status-row {
     display: flex;
     align-items: center;
-    transform: translateY(-50%);
-    /* Center vertically on the definition point */
-    padding-right: 15px;
-    /* Space for the handle */
-    width: 100%;
     justify-content: flex-end;
+    /* 右寄せ */
+    padding: 4px 15px;
+    position: relative;
+    height: 24px;
 }
 
-.submit-form-node-label-success {
-    color: #2ecc71;
+/* Success Route Styling */
+.submit-form-node-status-row.success .status-label {
+    color: #16a34a;
+    /* Green */
+}
+
+.submit-form-node-status-row.success .status-icon {
+    color: #16a34a;
+}
+
+/* Error Route Styling */
+.submit-form-node-status-row.error .status-label {
+    color: #dc2626;
+    /* Red */
+}
+
+.submit-form-node-status-row.error .status-icon {
+    color: #dc2626;
+}
+
+.status-label {
     font-size: 12px;
-    font-weight: 500;
-    margin-right: 10px;
+    font-weight: 600;
+    margin-right: 6px;
+    text-transform: uppercase;
 }
 
-.submit-form-node-label-error {
-    color: #e74c3c;
-    font-size: 12px;
-    font-weight: 500;
-    margin-right: 10px;
+.status-icon {
+    width: 14px;
+    height: 14px;
 }
 
-/* Custom Handle Styling */
+/* ハンドルのカスタマイズ */
 .react-flow__handle.submit-form-node-handle {
     width: 10px;
     height: 10px;
-    background: #b0bec5;
+    background: #475569;
+    /* スレート色 */
     border: 2px solid #fff;
-    right: -6px;
-    /* Position strictly on the edge */
     position: absolute;
-    /* Override reactflow absolute */
     top: 50% !important;
-    /* Center in the row */
     transform: translateY(-50%);
+    box-shadow: 0 0 0 1px #334155;
+    z-index: 10;
 }
 
-.react-flow__handle.submit-form-node-handle-input {
-    width: 10px;
-    height: 10px;
-    background: #3498db;
-    border: 2px solid #fff;
-    left: -6px;
-    top: 50% !important;
+.submit-form-node-handle.status-handle {
+    right: -6px;
+}
+
+/* 個別のハンドル色 */
+.submit-form-node-status-row.success .status-handle {
+    background: #16a34a;
+    box-shadow: 0 0 0 1px #15803d;
+}
+
+.submit-form-node-status-row.error .status-handle {
+    background: #dc2626;
+    box-shadow: 0 0 0 1px #b91c1c;
 }

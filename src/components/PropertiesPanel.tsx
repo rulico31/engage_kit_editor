@@ -5,6 +5,7 @@ import "./NodePropertiesEditor.css";
 // ストア
 import { usePageStore } from "../stores/usePageStore";
 import { useSelectionStore } from "../stores/useSelectionStore";
+import type { SelectionEntry } from "../types"; // 型定義をインポート
 
 // 分割したコンポーネントのインポート
 import { InspectorTabs } from "./properties/SharedComponents";
@@ -12,11 +13,9 @@ import { NodePropertiesEditor } from "./properties/NodePropertiesEditor";
 import { ItemPropertiesEditor } from "./properties/ItemPropertiesEditor";
 import { PagePropertiesEditor } from "./properties/PagePropertiesEditor";
 
-
-
 const PropertiesPanel: React.FC = () => {
   const { tabs, activeTabId, activeLogicGraphId } = useSelectionStore(state => ({
-    tabs: state.tabs,
+    tabs: state.tabs || [], // 安全のためデフォルト値を設定
     activeTabId: state.activeTabId,
     activeLogicGraphId: state.activeLogicGraphId,
   }));
@@ -40,11 +39,12 @@ const PropertiesPanel: React.FC = () => {
       moveItemToBack: s.moveItemToBack,
       moveItemForward: s.moveItemForward,
       moveItemBackward: s.moveItemBackward,
-      selectedPageId: s.selectedPageId, // Add this
+      selectedPageId: s.selectedPageId,
     };
   });
 
-  const activeEntry = tabs.find((s) => s.id === activeTabId);
+  // 's' に型注釈を追加して any エラーを解消
+  const activeEntry = tabs.find((s: SelectionEntry) => s.id === activeTabId);
 
   let content = null;
 
@@ -60,7 +60,6 @@ const PropertiesPanel: React.FC = () => {
           onItemMoveToBack={moveItemToBack}
           onItemMoveForward={moveItemForward}
           onItemMoveBackward={moveItemBackward}
-
         />
       );
     } else {
@@ -87,7 +86,6 @@ const PropertiesPanel: React.FC = () => {
   }
 
   // If no content (nothing selected), show Page Properties
-  // Explicitly check for no activeEntry to avoid overriding "Not Found" messages which result in content!=null
   if (!activeEntry && !content) {
     content = <PagePropertiesEditor pageId={selectedPageId || ""} />;
   }

@@ -19,8 +19,16 @@ const MAX_HISTORY = 20;
 // デバウンス用のタイマー（グローバル変数）
 let commitHistoryTimer: number | null = null;
 
+// ★修正: 履歴にはアイテム、コメント、ロジックグラフ、全ページ情報を含める
 interface HistoryState {
+  // 現在選択中のページの状態（下位互換性のため残す）
   placedItems: PlacedItemType[];
+  comments: CommentType[];
+  allItemLogics: Record<string, NodeGraph>;
+  // 全ページの状態
+  pages: Record<string, PageData>;
+  pageOrder: string[];
+  selectedPageId: string | null;
 }
 
 interface PageStoreState {
@@ -40,7 +48,7 @@ interface PageStoreState {
   addPage: (name?: string) => void;
   deletePage: (pageId: string) => void;
   updatePageName: (pageId: string, name: string) => void;
-  updatePage: (pageId: string, updates: Partial<ProjectData['pages'][string]>) => void;
+  updatePage: (pageId: string, updates: Partial<PageData>) => void; // 型を簡略化
 
   // アイテム操作
   addItem: (item: PlacedItemType) => void;
@@ -59,8 +67,7 @@ interface PageStoreState {
   deleteGraphComment: (commentId: string) => void;
 
   // グループ化・順序
-  groupItems: (ids: string[]) => void;
-  ungroupItems: (id: string) => void;
+
   moveItemToFront: (id: string) => void;
   moveItemToBack: (id: string) => void;
   moveItemForward: (id: string) => void;
@@ -86,6 +93,7 @@ interface PageStoreState {
 
   // データロード
   loadFromData: (data: ProjectData) => void;
+  resetState: () => void; // 追加: 完全リセット用
 }
 
 export const usePageStore = create<PageStoreState>((set, get) => ({
@@ -102,7 +110,22 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   pageOrder: ["page-1"],
   selectedPageId: "page-1",
 
-  history: [{ placedItems: [] }],
+  history: [{
+    placedItems: [],
+    comments: [],
+    allItemLogics: {},
+    pages: {
+      "page-1": {
+        id: "page-1",
+        name: "Page 1",
+        placedItems: [],
+        allItemLogics: {},
+        comments: []
+      }
+    },
+    pageOrder: ["page-1"],
+    selectedPageId: "page-1"
+  }],
   historyIndex: 0,
   canUndo: false,
   canRedo: false,
@@ -120,6 +143,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       pageOrder: [...state.pageOrder, newId],
       selectedPageId: newId
     }));
+    get().commitHistory();
   },
 
   deletePage: (pageId: string) => {
@@ -135,6 +159,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       pageOrder: newOrder,
       selectedPageId: newOrder[0]
     });
+    get().commitHistory();
   },
 
   updatePageName: (pageId: string, name: string) => {
@@ -144,9 +169,10 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         [pageId]: { ...state.pages[pageId], name }
       }
     }));
+    get().commitHistory();
   },
 
-  updatePage: (pageId: string, updates: Partial<ProjectData['pages'][string]>) => {
+  updatePage: (pageId: string, updates: Partial<PageData>) => {
     set(state => ({
       pages: {
         ...state.pages,
@@ -158,12 +184,57 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   // --- データロード ---
   loadFromData: (data: ProjectData) => {
     const firstPageId = data.pageOrder[0];
-    const initialItems = firstPageId ? data.pages[firstPageId].placedItems : [];
+    const initialPage = firstPageId ? data.pages[firstPageId] : null;
+    const initialItems = initialPage ? initialPage.placedItems : [];
+    const initialComments = initialPage ? (initialPage.comments || []) : [];
+
     set({
       pages: data.pages,
       pageOrder: data.pageOrder,
       selectedPageId: firstPageId || null,
-      history: [{ placedItems: JSON.parse(JSON.stringify(initialItems)) }],
+      history: [{
+        placedItems: JSON.parse(JSON.stringify(initialItems)),
+        comments: JSON.parse(JSON.stringify(initialComments)),
+        allItemLogics: JSON.parse(JSON.stringify(initialPage?.allItemLogics || {})),
+        pages: JSON.parse(JSON.stringify(data.pages)),
+        pageOrder: [...data.pageOrder],
+        selectedPageId: firstPageId
+      }],
+      historyIndex: 0,
+      canUndo: false,
+      canRedo: false,
+    });
+  },
+
+  resetState: () => {
+    set({
+      pages: {
+        "page-1": {
+          id: "page-1",
+          name: "Page 1",
+          placedItems: [],
+          allItemLogics: {},
+          comments: []
+        }
+      },
+      pageOrder: ["page-1"],
+      selectedPageId: "page-1",
+      history: [{
+        placedItems: [],
+        comments: [],
+        allItemLogics: {},
+        pages: {
+          "page-1": {
+            id: "page-1",
+            name: "Page 1",
+            placedItems: [],
+            allItemLogics: {},
+            comments: []
+          }
+        },
+        pageOrder: ["page-1"],
+        selectedPageId: "page-1"
+      }],
       historyIndex: 0,
       canUndo: false,
       canRedo: false,
@@ -177,8 +248,34 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const page = state.pages[pageId];
       const newItems = [...page.placedItems, item];
 
+      // 新しいアイテムのロジックグラフに初期イベントノードを追加（グループ以外）
+      const newLogics = { ...page.allItemLogics };
+
+      if (item.type !== 'group') {
+        // 初期イベントノードを作成
+        const initialEventNode = {
+          id: `eventNode_${item.id}_init`,
+          type: 'eventNode',
+          position: { x: 100, y: 100 },
+          data: { label: 'イベント', eventType: 'click' }
+        };
+
+        // このアイテムのロジックグラフを初期化
+        newLogics[item.id] = {
+          nodes: [initialEventNode],
+          edges: []
+        };
+      }
+
       return {
-        pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
+        pages: {
+          ...state.pages,
+          [pageId]: {
+            ...page,
+            placedItems: newItems,
+            allItemLogics: newLogics
+          }
+        }
       };
     });
     get().commitHistory();
@@ -210,7 +307,6 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
 
     if (addToHistory) {
-      // immediateがtrueならデバウンスなし、falseならデバウンス付き
       get().commitHistory(!immediate);
     }
   },
@@ -257,8 +353,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const newComment: CommentType = {
         id: `comment-${Date.now()}`,
         ...commentData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
       };
 
       const newComments = [...(page.comments || []), newComment];
@@ -277,7 +372,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
       const newComments = (page.comments || []).map(c => {
         if (c.id === commentId) {
-          return { ...c, ...updates, updatedAt: new Date().toISOString() };
+          return { ...c, ...updates };
         }
         return c;
       });
@@ -316,8 +411,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const newComment: CommentType = {
         id: `comment-${Date.now()}`,
         ...commentData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: Date.now(),
       };
 
       const newComments = [...(currentGraph.comments || []), newComment];
@@ -335,6 +429,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         }
       };
     });
+    get().commitHistory();
   },
 
   updateGraphComment: (commentId, updates) => {
@@ -348,7 +443,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
       const newComments = (currentGraph.comments || []).map(c => {
         if (c.id === commentId) {
-          return { ...c, ...updates, updatedAt: new Date().toISOString() };
+          return { ...c, ...updates };
         }
         return c;
       });
@@ -366,6 +461,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         }
       };
     });
+    get().commitHistory();
   },
 
   deleteGraphComment: (commentId) => {
@@ -392,71 +488,10 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         }
       };
     });
-  },
-
-  // --- グループ化 ---
-  groupItems: (ids: string[]) => {
-    const { pages, selectedPageId } = get();
-    const page = pages[selectedPageId!];
-    const items = page.placedItems;
-
-    const targets = items.filter(i => ids.includes(i.id));
-    if (targets.length < 2) return;
-
-    const minX = Math.min(...targets.map(t => t.x));
-    const minY = Math.min(...targets.map(t => t.y));
-    const maxX = Math.max(...targets.map(t => t.x + t.width));
-    const maxY = Math.max(...targets.map(t => t.y + t.height));
-
-    const groupId = `group-${Date.now()}`;
-    const groupItem: PlacedItemType = {
-      id: groupId,
-      type: 'group', // added
-      name: "Group",
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-      data: { text: "", src: null, showBorder: false, isTransparent: true, initialVisibility: true }
-    };
-
-    const newItems = items.map(item => {
-      if (ids.includes(item.id)) {
-        return { ...item, groupId: groupId };
-      }
-      return item;
-    });
-
-    set(state => ({
-      pages: { ...state.pages, [selectedPageId!]: { ...page, placedItems: [...newItems, groupItem] } }
-    }));
     get().commitHistory();
   },
 
-  ungroupItems: (targetId: string) => {
-    set(state => {
-      const pageId = state.selectedPageId!;
-      const page = state.pages[pageId];
 
-      let groupId = targetId;
-      const targetItem = page.placedItems.find(i => i.id === targetId);
-      if (targetItem?.groupId) groupId = targetItem.groupId;
-
-      if (!targetId.startsWith("group") && !targetItem?.groupId) return state;
-
-      const newItems = page.placedItems.map(item => {
-        if (item.groupId === groupId) {
-          return { ...item, groupId: undefined };
-        }
-        return item;
-      }).filter(item => item.id !== groupId);
-
-      return {
-        pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
-      };
-    });
-    get().commitHistory();
-  },
 
   // --- 重なり順 ---
   moveItemToFront: (id: string) => {
@@ -469,6 +504,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       items.push(item);
       return { pages: { ...state.pages, [pageId]: { ...state.pages[pageId], placedItems: items } } };
     });
+    get().commitHistory();
   },
   moveItemToBack: (id: string) => {
     set(state => {
@@ -480,6 +516,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       items.unshift(item);
       return { pages: { ...state.pages, [pageId]: { ...state.pages[pageId], placedItems: items } } };
     });
+    get().commitHistory();
   },
   moveItemForward: (id: string) => {
     set(state => {
@@ -490,6 +527,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       [items[idx], items[idx + 1]] = [items[idx + 1], items[idx]];
       return { pages: { ...state.pages, [pageId]: { ...state.pages[pageId], placedItems: items } } };
     });
+    get().commitHistory();
   },
   moveItemBackward: (id: string) => {
     set(state => {
@@ -500,6 +538,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       [items[idx - 1], items[idx]] = [items[idx], items[idx - 1]];
       return { pages: { ...state.pages, [pageId]: { ...state.pages[pageId], placedItems: items } } };
     });
+    get().commitHistory();
   },
 
   // --- 自動レイアウト ---
@@ -509,7 +548,6 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const page = state.pages[pageId];
       const items = [...page.placedItems];
 
-      // Y座標でソート
       items.sort((a, b) => a.y - b.y);
 
       let currentY = 20;
@@ -517,12 +555,9 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         const newItem = { ...item };
         newItem.mobileX = 20;
         newItem.mobileY = currentY;
-        newItem.mobileWidth = 335; // モバイル幅 (375 - 40)
-
-        // 高さは維持するか、必要なら調整
+        newItem.mobileWidth = 335;
         newItem.mobileHeight = item.height;
-
-        currentY += newItem.mobileHeight + 20; // マージン
+        currentY += newItem.mobileHeight + 20;
         return newItem;
       });
 
@@ -598,6 +633,11 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         }
       };
     });
+
+    // ノードの移動は頻繁に発生するのでデバウンス
+    // 削除は即座に履歴保存
+    const hasRemoval = changes.some(c => c.type === 'remove');
+    get().commitHistory(!hasRemoval);
   },
 
   applyEdgesChange: (changes: EdgeChange[]) => {
@@ -623,6 +663,12 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         }
       };
     });
+
+    // エッジの削除時は即座に履歴保存
+    const hasRemoval = changes.some(c => c.type === 'remove');
+    if (hasRemoval) {
+      get().commitHistory();
+    }
   },
 
   applyConnect: (connection: Connection) => {
@@ -648,6 +694,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         }
       };
     });
+    get().commitHistory();
   },
 
   addNodeToCurrentGraph: (node: Node) => {
@@ -675,20 +722,17 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         }
       };
     });
+    get().commitHistory();
   },
 
   // --- 履歴管理 ---
   commitHistory: (debounce = false) => {
-    // デバウンス処理
     if (debounce) {
-      // 既存のタイマーをクリア
       if (commitHistoryTimer !== null) {
         clearTimeout(commitHistoryTimer);
       }
-
-      // 新しいタイマーをセット（500ms後に実行）
       commitHistoryTimer = window.setTimeout(() => {
-        get().commitHistory(false); // デバウンスなしで実行
+        get().commitHistory(false);
         commitHistoryTimer = null;
       }, 500);
       return;
@@ -698,15 +742,24 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const pageId = state.selectedPageId;
       if (!pageId) return state;
 
-      const currentItems = state.pages[pageId].placedItems;
+      const currentPage = state.pages[pageId];
+      const currentItems = currentPage.placedItems;
+      const currentComments = currentPage.comments || [];
+      const currentLogics = currentPage.allItemLogics || {};
 
       // 現在のインデックスより後の履歴を削除（新しい分岐を作る）
       const newHistory = state.history.slice(0, state.historyIndex + 1);
 
-      // 新しい履歴を追加
-      newHistory.push({ placedItems: JSON.parse(JSON.stringify(currentItems)) });
+      // ★修正: コメント、ロジックグラフ、全ページ情報も履歴に含める
+      newHistory.push({
+        placedItems: JSON.parse(JSON.stringify(currentItems)),
+        comments: JSON.parse(JSON.stringify(currentComments)),
+        allItemLogics: JSON.parse(JSON.stringify(currentLogics)),
+        pages: JSON.parse(JSON.stringify(state.pages)),
+        pageOrder: [...state.pageOrder],
+        selectedPageId: state.selectedPageId
+      });
 
-      // 履歴が最大数を超えたら古いものを削除
       if (newHistory.length > MAX_HISTORY) newHistory.shift();
 
       const newIndex = newHistory.length - 1;
@@ -715,7 +768,6 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         history: newHistory,
         historyIndex: newIndex,
         canUndo: newIndex > 0,
-        // 新しい履歴を追加したので、その後にRedoできる履歴はない
         canRedo: false
       };
     });
@@ -725,14 +777,13 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     set(state => {
       if (state.historyIndex <= 0) return state;
       const newIndex = state.historyIndex - 1;
-      const pageId = state.selectedPageId!;
+      const historyState = state.history[newIndex];
 
       return {
         historyIndex: newIndex,
-        pages: {
-          ...state.pages,
-          [pageId]: { ...state.pages[pageId], placedItems: state.history[newIndex].placedItems }
-        },
+        pages: historyState.pages,
+        pageOrder: historyState.pageOrder,
+        selectedPageId: historyState.selectedPageId,
         canUndo: newIndex > 0,
         canRedo: true
       };
@@ -743,14 +794,13 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     set(state => {
       if (state.historyIndex >= state.history.length - 1) return state;
       const newIndex = state.historyIndex + 1;
-      const pageId = state.selectedPageId!;
+      const historyState = state.history[newIndex];
 
       return {
         historyIndex: newIndex,
-        pages: {
-          ...state.pages,
-          [pageId]: { ...state.pages[pageId], placedItems: state.history[newIndex].placedItems }
-        },
+        pages: historyState.pages,
+        pageOrder: historyState.pageOrder,
+        selectedPageId: historyState.selectedPageId,
         canUndo: true,
         canRedo: newIndex < state.history.length - 1
       };

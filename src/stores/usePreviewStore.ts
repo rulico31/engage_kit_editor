@@ -50,7 +50,7 @@ const previewStateRef = { current: {} as PreviewState };
 const variablesRef = { current: {} as VariableState };
 
 export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
-  previewState: {},
+  previewState: { currentPageId: '', isFinished: false },
   variables: {},
   activeListeners: new Map(),
 
@@ -63,7 +63,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
 
 
-    const initialPS: PreviewState = {};
+    const initialPS: PreviewState = { currentPageId: selectedPageId || '', isFinished: false };
     currentPage.placedItems.forEach(item => {
       // 初期表示設定を反映 (未設定の場合は true)
       const isVisible = item.data.initialVisibility !== false;
@@ -83,10 +83,10 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   },
 
   stopPreview: () => {
-    previewStateRef.current = {};
+    previewStateRef.current = { currentPageId: '', isFinished: false };
     variablesRef.current = {};
     set({
-      previewState: {},
+      previewState: { currentPageId: '', isFinished: false },
       variables: {},
       activeListeners: new Map(),
     });
@@ -123,7 +123,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     usePageStore.getState().setSelectedPageId(targetPageId);
 
     // 2. (内部ストア) プレビュー状態をリセット
-    const initialPS: PreviewState = {};
+    const initialPS: PreviewState = { currentPageId: targetPageId, isFinished: false };
     targetPageData.placedItems.forEach(item => {
       const isVisible = item.data.initialVisibility !== false;
       initialPS[item.id] = { isVisible, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
@@ -147,18 +147,15 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
     const { placedItems, allItemLogics } = currentPage;
 
-    // ★ イベントバブリングの実装
-    // クリックされたアイテムから開始し、親グループ(groupId)を辿って順にロジックを実行する
-    let currentId: string | undefined = originItemId;
-
-    while (currentId) {
-      const targetGraph = allItemLogics[currentId];
-
-      // 該当アイテム(またはグループ)にロジックが設定されていれば実行
+    // ★ 全ロジックグラフをスキャンするように変更
+    // (特定のアイテムだけでなく、他のアイテムのロジック内に定義されたイベントハンドラも発火させるため)
+    Object.entries(allItemLogics).forEach(([logicOwnerId, targetGraph]) => {
+      // グラフが存在し、ノードが含まれている場合のみ実行
       if (targetGraph && targetGraph.nodes.length > 0) {
         triggerEvent(
           eventName,
-          currentId, // ロジックの所有者IDとして実行
+          originItemId,
+          logicOwnerId, // ★第三引数として logicOwnerId を渡す (logicEngine側も修正が必要)
           targetGraph,
           placedItems,
           () => previewStateRef.current,
@@ -170,10 +167,6 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
           runtimeContext
         );
       }
-
-      // 親グループを探してループ継続
-      const currentItem = placedItems.find(p => p.id === currentId);
-      currentId = currentItem?.groupId;
-    }
+    });
   },
 }));

@@ -1,31 +1,126 @@
 /* src/components/nodes/SetVariableNode.css */
 
 .set-variable-node {
-  background: #c26a1d; /* (オレンジ系) */
-  border: 1px solid #a0500c;
-  border-radius: 5px;
-  padding: 10px 15px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  min-width: 170px;
-  text-align: center;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f59e0b;
+  /* オレンジ色のボーダー */
+  width: 200px;
+  font-family: 'Inter', system-ui, sans-serif;
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.set-variable-node-header {
+  background: #f59e0b;
+  /* 濃いオレンジ色のヘッダー */
+  padding: 10px 15px;
+  border-bottom: 1px solid #d97706;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  /* 白文字 */
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+}
+
+.set-variable-node-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.set-variable-node-title {
+  font-weight: 700;
+  font-size: 14px;
+  flex: 1;
+}
+
+.set-variable-node-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #ffffff;
+  color: #f59e0b;
+  /* バッジの文字色はオレンジ */
+}
+
+.set-variable-node-body {
+  padding: 12px 15px;
+  display: flex;
+  flex-direction: column;
+  min-height: 40px;
+  border-bottom-left-radius: 7px;
+  border-bottom-right-radius: 7px;
+}
+
+.set-variable-node-info-row {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: #555;
+  gap: 8px;
+}
+
+.set-variable-node-info-row .label {
+  font-weight: 600;
+  color: #999;
+  min-width: 30px;
+}
+
+.set-variable-node-info-row .value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  font-family: monospace;
+  font-weight: 500;
+  color: #333;
+}
+
+/* コード風の表示エリア */
+.set-variable-node-code-block {
+  background-color: #fef3c7;
+  /* 薄いオレンジ背景 */
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  color: #b45309;
+  border: 1px dashed #fcd34d;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.code-variable {
+  font-weight: bold;
+}
+
+/* ハンドルのカスタマイズ */
+.react-flow__handle.set-variable-node-handle {
+  width: 10px;
+  height: 10px;
+  background: #f59e0b;
+  /* オレンジ色 */
+  border: 2px solid #fff;
+  position: absolute;
+  top: 50% !important;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 1px #d97706;
   z-index: 10;
 }
 
-/* (ハンドルスタイル) */
-.set-variable-node .react-flow__handle {
-  background: #efefef;
-  border: 2px solid #c26a1d;
-}
-.set-variable-node .react-flow__handle-left {
-  left: -8px;
-}
-.set-variable-node .react-flow__handle-right {
-  right: -8px;
+.react-flow__handle.set-variable-node-handle-left {
+  left: -6px;
 }
 
-.set-variable-node-label {
-  font-weight: bold;
+.react-flow__handle.set-variable-node-handle-right {
+  right: -6px;
 }

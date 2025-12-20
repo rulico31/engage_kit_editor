@@ -1,0 +1,198 @@
+/* src/components/nodes/CommentNode.css */
+
+/* 共通変数（アートボード側と統一） */
+:root {
+    --comment-bg: #fffbeb;
+    /* 薄いクリーム色 */
+    --comment-border: #fcd34d;
+    /* アンバーイエロー */
+    --comment-text: #78350f;
+    /* 濃い茶色 */
+    --comment-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+/* 隠しハンドル */
+.hidden-handle {
+    visibility: hidden;
+    width: 1px;
+    height: 1px;
+}
+
+/* --- 最小化モード (Pill Shape - ノードエディタ用) --- */
+.comment-node-minimized {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--comment-bg);
+    border: 1px solid var(--comment-border);
+    border-radius: 20px;
+    padding: 6px 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 80px;
+    max-width: 160px;
+}
+
+.comment-node-minimized:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: #f59e0b;
+}
+
+.minimized-icon {
+    color: #d97706;
+    display: flex;
+    align-items: center;
+}
+
+.minimized-text {
+    font-size: 12px;
+    color: var(--comment-text);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- 展開モード (Card Shape) --- */
+.comment-node-expanded {
+    background-color: var(--comment-bg);
+    border: 1px solid var(--comment-border);
+    border-radius: 8px;
+
+    /* ★修正: 幅を固定してガタつきとボタンズレを防ぐ */
+    width: 240px;
+
+    box-shadow: var(--comment-shadow);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+
+    /* アニメーション */
+    transition: box-shadow 0.2s ease;
+}
+
+.comment-node-expanded:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* アクションボタン（位置固定・逃げないように） */
+.comment-actions {
+    position: absolute;
+    top: -10px;
+    right: -8px;
+    display: flex;
+    gap: 4px;
+    /* 常に表示、またはホバーで見やすくする */
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+
+/* 親要素ホバー時、または編集中(editingクラス付与時)は表示 */
+.comment-node-expanded:hover .comment-actions,
+.comment-node-expanded.editing .comment-actions,
+.comment-actions:hover {
+    opacity: 1;
+}
+
+.action-btn {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    color: #6b7280;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn:hover {
+    transform: scale(1.1);
+}
+
+.action-btn.minimize:hover {
+    color: #d97706;
+    border-color: #fcd34d;
+}
+
+.action-btn.delete:hover {
+    color: #ef4444;
+    border-color: #fca5a5;
+    background-color: #fef2f2;
+}
+
+/* コンテンツエリア */
+.comment-content-area {
+    padding: 12px;
+    flex: 1;
+}
+
+/* 閲覧・編集共通のテキストスタイル（レイアウトシフト防止） */
+.comment-textarea,
+.comment-display {
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--comment-text);
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 60px;
+    padding: 4px;
+    border-radius: 4px;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* 編集モード */
+.comment-textarea {
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px dashed rgba(0, 0, 0, 0.1);
+    resize: vertical;
+    outline: none;
+    display: block;
+}
+
+.comment-textarea:focus {
+    background: #ffffff;
+    border-style: solid;
+    border-color: #fcd34d;
+}
+
+.comment-textarea::placeholder {
+    color: rgba(120, 53, 15, 0.4);
+}
+
+/* 閲覧モード */
+.comment-display {
+    background: transparent;
+    border: 1px solid transparent;
+    /* 枠線分のスペースを確保 */
+    cursor: text;
+    /* クリックできることを示唆 */
+}
+
+.comment-display:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.comment-display.empty {
+    color: rgba(120, 53, 15, 0.4);
+    font-style: italic;
+}
+
+/* フッター（アイコン） */
+.comment-footer {
+    padding: 0 12px 8px;
+    display: flex;
+    justify-content: flex-end;
+    opacity: 0.3;
+}
+
+.footer-icon {
+    color: var(--comment-text);
+}

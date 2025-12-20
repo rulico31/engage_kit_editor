@@ -7,6 +7,7 @@ import PropertiesPanel from "./PropertiesPanel";
 import NodeEditor from "./NodeEditor";
 import LeftPanel from "./LeftPanel";
 import DashboardView from "./DashboardView";
+import { GridControls } from "./GridControls";
 import "./EditorView.css";
 import "./GridPopover.css";
 import EmbedModal from "./EmbedModal";
@@ -52,7 +53,7 @@ const GridPopover: React.FC = () => {
             <button
               key={size === null ? 'null' : size}
               className={`grid-snap-button ${gridSize === size ? 'active' : ''}`}
-              onClick={() => setGridSize(size)}
+              onClick={() => setGridSize(size ?? 0)}
               title={size === null ? "スナップ OFF" : size === 1 ? "ピクセル (1px) スナップ" : `${size}px グリッド`}
             >
               {size === null ? 'OFF' : size}
@@ -87,18 +88,15 @@ const EditorView: React.FC<EditorViewProps> = ({
 
   const handleSave = async () => {
     try {
-      await saveProject();
-      alert("プロジェクトを保存しました (Supabase)");
+      const success = await saveProject();
+      if (success) {
+        alert("プロジェクトを保存しました");
+      }
+      // キャンセルの場合(success === false)は何も表示しない
     } catch (e) {
       console.error(e);
       alert("保存に失敗しました");
     }
-  };
-
-  const handleOpenEmbedModal = async () => {
-    // 保存してからモーダルを開く (ID確定のため)
-    await handleSave();
-    setIsEmbedModalOpen(true);
   };
 
   const handleEnterFullscreen = () => {
@@ -233,7 +231,8 @@ const EditorView: React.FC<EditorViewProps> = ({
                     </div>
                   </>
                 )}
-                <div className="workspace-section design-section" style={{ flex: 1 }}>
+                <div className="workspace-section design-section" style={{ flex: 1, position: 'relative' }}>
+                  {!isPreviewing && <GridControls />}
                   <div className="canvas-viewport">
                     <Artboard />
                   </div>
@@ -245,7 +244,8 @@ const EditorView: React.FC<EditorViewProps> = ({
                     <NodeEditor />
                   </div>
                 ) : (
-                  <div className="workspace-section design-section" style={{ flex: 1 }}>
+                  <div className="workspace-section design-section" style={{ flex: 1, position: 'relative' }}>
+                    {!isPreviewing && <GridControls />}
                     <div className="canvas-viewport">
                       <Artboard />
                     </div>

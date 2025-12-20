@@ -3,10 +3,10 @@ import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import "./GridPopover.css";
 
 interface GridPopoverProps {
-    onClose: () => void;
+    onClose?: () => void;
 }
 
-export const GridPopover: React.FC<GridPopoverProps> = ({ onClose }) => {
+export const GridPopover: React.FC<GridPopoverProps> = () => {
     const { gridSize, showGrid, setGridSize, setShowGrid } = useEditorSettingsStore(
         (state) => ({
             gridSize: state.gridSize,

@@ -38,48 +38,23 @@ export interface PlacedItemType {
     keepAspectRatio?: boolean;
     originalAspectRatio?: number;
     showBorder?: boolean;
-    isTransparent?: boolean;
-    initialVisibility?: boolean;
+    inputType?: string; // "text" | "email" | "number" | "tel" ...
+    required?: boolean;
+    initialVisibility?: boolean; // 初期表示
 
-    color?: string;
+    // 画像トリミング用
+    originalSrc?: string;
+    cropState?: { crop: any; zoom: number };
+    isTransparent?: boolean; // 背景透過
+    isArtboardBackground?: boolean; // アートボード背景かどうか
+    color?: string; // 文字色など
     fontSize?: number;
-    [key: string]: any;
   };
 }
 
-export interface PreviewItemState {
-  isVisible: boolean;
-  x: number;
-  y: number;
-  opacity: number;
-  scale: number;
-  rotation: number;
-  transition: string | null;
+export interface VariableState {
+  [key: string]: any;
 }
-
-export type PreviewState = Record<string, PreviewItemState>;
-export type VariableState = Record<string, any>;
-
-export interface NodeGraph {
-  nodes: Node[];
-  edges: Edge[];
-  comments?: CommentType[]; // ノードエディタ用コメント
-}
-
-// コメント/メモの型定義
-export interface CommentType {
-  id: string;
-  content: string;
-  x: number;
-  y: number;
-  isMinimized: boolean;
-  color?: string; // "#FFE082" (黄色), "#B2DFDB" (青緑) など
-  createdAt: string;
-  updatedAt: string;
-  attachedToItemId?: string; // 要素に紐付ける場合（オプション）
-}
-
-
 
 export interface PageData {
   id: string;
@@ -88,6 +63,14 @@ export interface PageData {
   allItemLogics: Record<string, NodeGraph>;
   comments?: CommentType[]; // コメント配列を追加
   backgroundColor?: string; // 背景色
+  backgroundImage?: {
+    src: string;
+    cropState?: { crop: any; zoom: number };
+    originalSrc?: string;
+    displayMode?: 'cover' | 'contain' | 'stretch' | 'tile' | 'custom';
+    position?: string; // 表示位置（デフォルト: 'center center'）
+    scale?: number; // サイズ倍率（デフォルト: 1.0 = 100%）
+  }; // 背景画像
 
 }
 
@@ -96,6 +79,7 @@ export interface ProjectData {
   pages: Record<string, PageData>;
   pageOrder: string[];
   variables: VariableState;
+  cloud_id?: string; // ★追加: クラウド同期用のID (UUID)
 }
 
 export interface PageInfo {
@@ -107,6 +91,7 @@ export interface SelectionEntry {
   id: string;
   type: 'item' | 'node';
   label: string;
+  pageId?: string; // 所属するページID
 }
 
 
@@ -116,6 +101,7 @@ export type PropertyControlType =
   | 'number'
   | 'textarea'
   | 'select'
+  | 'multiselect'
   | 'checkbox'
   | 'color';
 
@@ -129,18 +115,26 @@ export interface PropertyConfig {
   label: string;
   type: PropertyControlType;
   defaultValue?: any;
-  step?: number;
-  min?: number;
-  options?: PropertySelectOption[];
-  condition?: {
-    name: string;
-    value: any;
-  };
+  options?: PropertySelectOption[]; // for select
+  min?: number; // for number
+  max?: number; // for number
+  step?: number; // for number
+  // 条件付き表示: 関数形式またはオブジェクト形式 { name: string, value: any }
+  condition?: ((data: any) => boolean) | { name: string; value: any };
 }
 
-export interface NodePropertyConfig {
-  title: string;
-  properties: PropertyConfig[];
+// React Flow Types
+export interface NodeGraph {
+  nodes: Node[];
+  edges: Edge[];
+  comments?: CommentType[]; // コメント配列を追加
+}
+
+// Preview State
+export interface PreviewState {
+  currentPageId: string;
+  isFinished: boolean;
+  [key: string]: any; // 動的なアイテム状態を許可
 }
 
 export interface SavedProject {
@@ -148,6 +142,21 @@ export interface SavedProject {
   user_id: string;
   name: string;
   data: ProjectData;
+  is_published: boolean;
+  published_url?: string;
   created_at: string;
   updated_at: string;
+  cloud_id?: string; // ★追加: ストア内でも管理するためのクラウドID
+}
+
+
+export interface CommentType {
+  id: string;
+  content: string;
+  x: number;
+  y: number;
+  color?: string;
+  isMinimized?: boolean;
+  authorId?: string; // 将来的にユーザー識別用
+  createdAt: number;
 }

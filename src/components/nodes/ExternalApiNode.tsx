@@ -1,88 +1,107 @@
-import { memo } from 'react';
-import { Handle, Position, type NodeProps } from 'reactflow';
-import './ExternalApiNode.css';
-import type { NodePropertyConfig } from '../../types';
+import React, { memo } from "react";
+import { Handle, Position, type NodeProps } from "reactflow";
+import { Globe, CheckCircle2, AlertCircle } from "lucide-react";
+import "./ExternalApiNode.css";
+import type { PropertyConfig } from "../../types";
 
-const ExternalApiNode = ({ data, isConnectable }: NodeProps) => {
+const ExternalApiNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
+    const method = data.method || "GET";
+    const url = data.url || "";
+    const variableName = data.variableName || "(なし)";
+
+    // URLの表示用整形ロジック（修正版）
+    const getDisplayUrl = (url: string) => {
+        if (!url) return "(未設定)";
+        // "https://" などのプロトコル部分だけ削除し、あとはCSSの省略機能に任せる
+        return url.replace(/^https?:\/\//, '');
+    };
+
     return (
         <div className="external-api-node">
+            {/* 入力ハンドル (Left) */}
+            <Handle
+                type="target"
+                position={Position.Left}
+                isConnectable={isConnectable}
+                className="external-api-node-handle"
+            />
+
             <div className="external-api-node-header">
-                <span className="external-api-node-icon">🌍</span>
-                <span className="external-api-node-title">External API</span>
-                <span className={`external-api-node-method-badge ${data.method === 'POST' ? 'post' : 'get'}`}>
-                    {data.method || 'GET'}
+                <Globe className="external-api-node-icon" />
+                <span className="external-api-node-title">外部API</span>
+                <span className={`external-api-node-badge ${method.toLowerCase()}`}>
+                    {method}
                 </span>
             </div>
 
             <div className="external-api-node-body">
                 <div className="external-api-node-info-row">
                     <span className="label">URL:</span>
-                    <span className="value" title={data.url}>{data.url || '(Not set)'}</span>
+                    <span className="value url" title={url}>{getDisplayUrl(url)}</span>
                 </div>
                 <div className="external-api-node-info-row">
-                    <span className="label">To:</span>
-                    <span className="value">{data.variableName || '(No var)'}</span>
+                    <span className="label">保存先:</span>
+                    <span className="value">{variableName}</span>
                 </div>
 
-                {/* Outputs Section */}
-                <div className="external-api-node-output-container">
-                    <div className="external-api-node-row" style={{ top: '30%' }}>
-                        <span className="external-api-node-label-success">Success</span>
-                        <Handle
-                            type="source"
-                            position={Position.Right}
-                            id="success"
-                            isConnectable={isConnectable}
-                            className="external-api-node-handle"
-                        />
-                    </div>
-                    <div className="external-api-node-row" style={{ top: '70%' }}>
-                        <span className="external-api-node-label-error">Error</span>
-                        <Handle
-                            type="source"
-                            position={Position.Right}
-                            id="error"
-                            isConnectable={isConnectable}
-                            className="external-api-node-handle"
-                        />
-                    </div>
+                <div className="external-api-node-divider" />
+
+                {/* Success Route */}
+                <div className="external-api-node-status-row success">
+                    <span className="status-label">Success</span>
+                    <CheckCircle2 className="status-icon" />
+                    <Handle
+                        type="source"
+                        position={Position.Right}
+                        id="success"
+                        isConnectable={isConnectable}
+                        className="external-api-node-handle status-handle"
+                    />
+                </div>
+
+                {/* Error Route */}
+                <div className="external-api-node-status-row error">
+                    <span className="status-label">Error</span>
+                    <AlertCircle className="status-icon" />
+                    <Handle
+                        type="source"
+                        position={Position.Right}
+                        id="error"
+                        isConnectable={isConnectable}
+                        className="external-api-node-handle status-handle"
+                    />
                 </div>
             </div>
-
-            <Handle
-                type="target"
-                position={Position.Left}
-                isConnectable={isConnectable}
-                className="external-api-node-handle-input"
-            />
         </div>
     );
 };
 
 export default memo(ExternalApiNode);
 
-export const externalApiNodeConfig: NodePropertyConfig = {
-    title: "API設定",
+export const externalApiNodeConfig: any = {
+    title: "API接続設定",
     properties: [
         {
             name: "url",
-            label: "URL:",
+            label: "エンドポイントURL:",
             type: "text",
             defaultValue: "",
         },
         {
             name: "method",
-            label: "Method:",
+            label: "メソッド:",
             type: "select",
             defaultValue: "GET",
             options: [
-                { label: "GET", value: "GET" },
-                { label: "POST", value: "POST" },
+                { label: "GET (取得)", value: "GET" },
+                { label: "POST (送信)", value: "POST" },
+                { label: "PUT (更新)", value: "PUT" },
+                { label: "DELETE (削除)", value: "DELETE" },
             ],
         },
         {
             name: "variableName",
-            label: "保存先変数名:",
+            label: "保存先変数名 (任意):",
             type: "text",
             defaultValue: "apiResult",
         },

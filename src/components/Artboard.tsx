@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useCallback, useState, useEffect } from "react";
+import React, { useRef, useMemo, useCallback, useState } from "react";
 import { useDrop } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import type { PlacedItemType } from "../types";
@@ -20,7 +20,7 @@ import { useArtboardLogic, snapToGrid } from "./artboard/useArtboardLogic";
 const Artboard: React.FC = () => {
   // ストアデータの取得
   const { addItem, updateItem } = usePageStore(state => ({ addItem: state.addItem, updateItem: state.updateItem }));
-  const { placedItems, comments, addComment, updateComment, deleteComment, backgroundColor } = usePageStore(state => {
+  const { placedItems, comments, addComment, updateComment, deleteComment, backgroundColor, backgroundImage } = usePageStore(state => {
     const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
     return {
       placedItems: page?.placedItems || [],
@@ -29,6 +29,7 @@ const Artboard: React.FC = () => {
       updateComment: state.updateComment,
       deleteComment: state.deleteComment,
       backgroundColor: page?.backgroundColor,
+      backgroundImage: page?.backgroundImage,
     };
   });
 
@@ -65,8 +66,6 @@ const Artboard: React.FC = () => {
     contextMenu,
     setContextMenu,
     handleItemDragStart,
-    groupItems,
-    ungroupItems,
     deleteItems,
     selectedIds
   } = useArtboardLogic(artboardRef);
@@ -76,6 +75,9 @@ const Artboard: React.FC = () => {
 
   // アイテム選択ラッパー
   const onArtboardItemSelect = useCallback((e: React.MouseEvent, id: string, name: string) => {
+    // ★追加: アイテムを選択したら、コメントの選択を解除する
+    setSelectedCommentId(null);
+
     const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
     // アイテムを検索してdisplayNameを取得
     const item = placedItems.find(i => i.id === id);
@@ -122,14 +124,26 @@ const Artboard: React.FC = () => {
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [comments, isPreviewing, zoomLevel, gridSize, updateComment, artboardRef]);
+  }, [comments, isPreviewing, zoomLevel, gridSize, updateComment]);
 
   // ドロップ処理
+  const acceptedTypes = useMemo(() => [
+    ItemTypes.BOX,
+    ItemTypes.IMAGE,
+    ItemTypes.TEXT,
+    ItemTypes.BUTTON,
+    ItemTypes.VIDEO,
+    "EXISTING_ITEM",
+    "COMMENT"
+  ], []);
+
   const [{ isOver }, drop] = useDrop(() => ({
-    accept: [ItemTypes.BOX, ItemTypes.IMAGE, ItemTypes.TEXT, ItemTypes.BUTTON, ItemTypes.VIDEO, "EXISTING_ITEM", "COMMENT"],
+    accept: acceptedTypes,
     drop: (item: any, monitor) => {
       const offset = monitor.getClientOffset();
-      if (!offset || !artboardRef.current) return;
+      if (!offset || !artboardRef.current) {
+        return;
+      }
 
       const rect = artboardRef.current.getBoundingClientRect();
       const x = (offset.x - rect.left) / zoomLevel;
@@ -165,17 +179,57 @@ const Artboard: React.FC = () => {
     collect: (monitor) => ({
       isOver: !!monitor.isOver(),
     }),
-  }), [addItem, gridSize, zoomLevel, artboardRef]);
+  }), [acceptedTypes, addItem, gridSize, zoomLevel]);
 
   // DropターゲットをArtboardに接続
   drop(artboardRef);
 
   // 背景スタイル計算
   const backgroundStyle = useMemo(() => {
-    return {
+    const style: React.CSSProperties = {
       backgroundColor: backgroundColor || '#ffffff',
     };
-  }, [backgroundColor]);
+
+    // 背景画像が設定されている場合は追加
+    if (backgroundImage?.src) {
+      style.backgroundImage = `url(${backgroundImage.src})`;
+
+      // displayModeに応じてスタイルを切り替え
+      const displayMode = backgroundImage.displayMode || 'cover';
+      const position = backgroundImage.position || 'center center';
+      const scale = backgroundImage.scale || 1;
+
+      switch (displayMode) {
+        case 'cover':
+          style.backgroundSize = 'cover';
+          style.backgroundRepeat = 'no-repeat';
+          style.backgroundPosition = position;
+          break;
+        case 'contain':
+          style.backgroundSize = 'contain';
+          style.backgroundRepeat = 'no-repeat';
+          style.backgroundPosition = position;
+          break;
+        case 'stretch':
+          style.backgroundSize = '100% 100%';
+          style.backgroundRepeat = 'no-repeat';
+          style.backgroundPosition = position;
+          break;
+        case 'tile':
+          style.backgroundSize = `${scale * 100}% auto`;
+          style.backgroundRepeat = 'repeat';
+          style.backgroundPosition = position;
+          break;
+        case 'custom':
+          style.backgroundSize = `${scale * 100}% auto`;
+          style.backgroundRepeat = 'no-repeat';
+          style.backgroundPosition = position;
+          break;
+      }
+    }
+
+    return style;
+  }, [backgroundColor, backgroundImage]);
 
 
   const showGridOverlay = !isPreviewing && showGrid && gridSize !== null;
@@ -189,7 +243,8 @@ const Artboard: React.FC = () => {
   // 背景クリックハンドラ
   const handleArtboardBackgroundClick = useCallback(() => {
     if (isPreviewing) return;
-    handleBackgroundClick();
+    handleBackgroundClick(); // アイテム選択解除
+    setSelectedCommentId(null); // ★追加: コメント選択も解除
   }, [isPreviewing, handleBackgroundClick]);
 
   // レンダリング用関数
@@ -200,7 +255,11 @@ const Artboard: React.FC = () => {
         item={item}
         renderChildren={renderChildren}
         onItemSelect={onArtboardItemSelect}
-        onItemDragStart={(e, id) => handleItemDragStart(e, id, handleItemSelect)}
+        // ★修正: ドラッグ開始時もコメント選択を解除する
+        onItemDragStart={(e, id) => {
+          setSelectedCommentId(null);
+          handleItemDragStart(e, id, handleItemSelect);
+        }}
         selectedIds={selectedIds}
         activeTabId={activeTabId}
         isPreviewing={isPreviewing}
@@ -217,28 +276,9 @@ const Artboard: React.FC = () => {
 
   const MemoizedArtboardItem = useMemo(() => React.memo(ArtboardItem), []);
 
-  // グリッドコントロールの状態管理
-  const [isGridMenuOpen, setIsGridMenuOpen] = useState(false);
-  const gridMenuRef = useRef<HTMLDivElement>(null);
-  const { setGridSize, setShowGrid } = useEditorSettingsStore(state => ({
-    setGridSize: state.setGridSize,
-    setShowGrid: state.setShowGrid,
-  }));
 
-  // グリッドメニュー外クリックで閉じる
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (gridMenuRef.current && !gridMenuRef.current.contains(event.target as Node)) {
-        setIsGridMenuOpen(false);
-      }
-    };
-    if (isGridMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isGridMenuOpen]);
+
+
 
 
   // アートボードのサイズ決定
@@ -252,96 +292,6 @@ const Artboard: React.FC = () => {
       onContextMenu={(e) => { e.preventDefault(); if (!isPreviewing) setContextMenu({ visible: true, x: e.clientX, y: e.clientY }); }}
     >
 
-      {/* グリッドコントロール - プレビュー時は非表示 */}
-      {!isPreviewing && (
-        <div ref={gridMenuRef} style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 50 }}>
-          <button
-            onClick={() => setIsGridMenuOpen(!isGridMenuOpen)}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#333',
-              color: '#fff',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: 600,
-            }}
-          >
-            Grid
-          </button>
-
-          {isGridMenuOpen && (
-            <div
-              className="grid-popover"
-              style={{
-                position: 'absolute',
-                top: '40px',
-                right: '0',
-                width: '240px',
-                backgroundColor: '#252526',
-                border: '1px solid #454545',
-                borderRadius: '6px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px',
-              }}
-            >
-              {/* グリッド線表示切り替え */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75em', fontWeight: 600, color: '#999', textTransform: 'uppercase' }}>
-                  グリッド線
-                </label>
-                <button
-                  onClick={() => setShowGrid(!showGrid)}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: showGrid ? '#2a8a4a' : '#333',
-                    color: '#fff',
-                    border: `1px solid ${showGrid ? '#2a8a4a' : '#444'}`,
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  {showGrid ? '表示中 (ON)' : '非表示 (OFF)'}
-                </button>
-              </div>
-
-              <div style={{ height: '1px', backgroundColor: '#3e3e3e' }} />
-
-              {/* グリッドサイズ選択 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '0.75em', fontWeight: 600, color: '#999', textTransform: 'uppercase' }}>
-                  グリッドサイズ (PX)
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                  {[null, 1, 2, 4, 8, 16, 32].map((size) => (
-                    <button
-                      key={size === null ? 'null' : size}
-                      onClick={() => setGridSize(size)}
-                      style={{
-                        padding: '8px 0',
-                        backgroundColor: gridSize === size ? '#007acc' : '#333',
-                        color: gridSize === size ? '#fff' : '#ccc',
-                        border: `1px solid ${gridSize === size ? '#007acc' : '#444'}`,
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.9em',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {size === null ? 'なし' : size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       <div
         ref={artboardRef}
@@ -378,6 +328,7 @@ const Artboard: React.FC = () => {
               isSelected={selectedCommentId === comment.id}
               onClick={() => {
                 setSelectedCommentId(comment.id);
+                // コメントクリック時に背景クリック処理（アイテム選択解除）を呼ぶ
                 handleBackgroundClick();
               }}
               onDragStart={(e) => handleCommentDragStart(e, comment.id)}
@@ -389,8 +340,6 @@ const Artboard: React.FC = () => {
       {contextMenu?.visible && (
         <ContextMenu
           x={contextMenu.x} y={contextMenu.y} selectedCount={selectedIds.length}
-          onGroup={() => { groupItems(selectedIds); setContextMenu(null); }}
-          onUngroup={() => { selectedIds.forEach(id => ungroupItems(id)); setContextMenu(null); }}
           onDelete={() => { deleteItems(selectedIds); setContextMenu(null); }}
           onAddComment={() => {
             // 画面座標をアートボード内座標に変換

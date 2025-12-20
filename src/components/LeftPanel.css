@@ -154,6 +154,8 @@
   color: #e0e0e0;
   border-left: 3px solid transparent;
   /* 選択時のマーカー用 */
+  height: 36px;
+  /* 高さを固定してレイアウト崩れを防ぐ */
 }
 
 .page-list-item:hover {
@@ -176,21 +178,73 @@
   text-overflow: ellipsis;
 }
 
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .page-delete-btn {
   background: none;
   border: none;
   color: #aaa;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 4px;
   font-size: 1.2em;
   line-height: 1;
   border-radius: 4px;
   transition: color 0.2s, background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
 }
 
 .page-delete-btn:hover {
   color: #ff6b6b;
   background-color: rgba(255, 107, 107, 0.1);
+}
+
+.page-rename-btn {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background-color 0.2s;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+  /* デフォルトで非表示 */
+}
+
+/* ページリストアイテムにホバーしたとき、または選択されているときに表示 */
+.page-list-item:hover .page-rename-btn,
+.page-list-item.selected .page-rename-btn {
+  opacity: 1;
+}
+
+.page-rename-btn:hover {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.page-name-input {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #007acc;
+  color: #fff;
+  padding: 4px 6px;
+  border-radius: 2px;
+  outline: none;
+  font-size: 0.9em;
+  width: 100%;
+  margin-right: 8px;
 }
 
 /* ★ 修正: 「ページを追加」ボタンのスタイル */

@@ -1,9 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
+import { MessageSquareText, Minus, X } from 'lucide-react';
 import { usePageStore } from '../../stores/usePageStore';
+import "./CommentNode.css";
 
 interface CommentNodeData {
-    label: string;
+    label?: string;
     content: string;
     isMinimized: boolean;
     color?: string;
@@ -12,189 +14,120 @@ interface CommentNodeData {
 const CommentNode: React.FC<NodeProps<CommentNodeData>> = ({ data, id }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [content, setContent] = useState(data.content || '');
+    const [isHovered, setIsHovered] = useState(false);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const updateNodeData = usePageStore(state => state.updateNodeData);
     const { applyNodesChange } = usePageStore.getState();
 
+    // 自動フォーカス
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+        }
+    }, [isEditing]);
+
     const handleSave = useCallback(() => {
-        // コンテンツを保存
         updateNodeData(id, { content });
         setIsEditing(false);
     }, [content, id, updateNodeData]);
 
-    const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    // ★変更: シングルクリックで編集
+    const handleContentClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         setIsEditing(true);
     }, []);
 
-    const handleMinimize = useCallback((e: React.MouseEvent) => {
+    const toggleMinimize = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        e.preventDefault();
-        updateNodeData(id, { isMinimized: !data.isMinimized });
+        const nextState = !data.isMinimized;
+        updateNodeData(id, { isMinimized: nextState });
+
+        // 展開時に編集モードへ
+        if (!nextState) setIsEditing(true);
     }, [id, data.isMinimized, updateNodeData]);
 
     const handleDelete = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        e.preventDefault();
-        // ノードを削除
         applyNodesChange([{ type: 'remove', id }]);
     }, [id, applyNodesChange]);
 
-    const backgroundColor = data.color || '#FEF3C7';
-
-    // SVGアイコン
-    const MinimizeIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-    );
-
-    const CloseIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-    );
-
+    // --- 最小化モード (Pill Shape) ---
     if (data.isMinimized) {
         return (
             <div
-                onDoubleClick={handleMinimize}
-                style={{
-                    backgroundColor,
-                    border: '2px solid #F59E0B',
-                    borderRadius: '50%',
-                    width: '40px',
-                    height: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                }}
+                className="comment-node-minimized"
+                onDoubleClick={toggleMinimize} // 最小化解除はダブルクリック（誤操作防止）
+                title="ダブルクリックで展開"
             >
-                <span style={{ fontSize: '20px' }}>💬</span>
+                <div className="minimized-icon">
+                    <MessageSquareText size={14} />
+                </div>
+                <span className="minimized-text">
+                    {content.length > 15 ? content.substring(0, 15) + "..." : (content || "Note")}
+                </span>
+
+                <Handle type="target" position={Position.Top} className="hidden-handle" />
+                <Handle type="source" position={Position.Bottom} className="hidden-handle" />
             </div>
         );
     }
 
+    // --- 展開モード (Card Shape) ---
     return (
         <div
-            style={{
-                backgroundColor,
-                border: '2px solid #F59E0B',
-                borderRadius: '8px',
-                minWidth: '200px',
-                minHeight: '100px',
-                padding: '12px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-            }}
+            className={`comment-node-expanded ${isEditing ? 'editing' : ''}`}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
         >
-            {/* ヘッダー */}
-            <div
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '8px',
-                    color: '#92400E',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                }}
-            >
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{ marginRight: '4px' }}>💬</span>
-                    <span>コメント</span>
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                        onClick={handleMinimize}
-                        onPointerDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                        }}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '2px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: '#92400E',
-                            opacity: 0.6,
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-                        title="最小化"
-                    >
-                        <MinimizeIcon />
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        onPointerDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                        }}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '2px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: '#92400E',
-                            opacity: 0.6,
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.6'}
-                        title="削除"
-                    >
-                        <CloseIcon />
-                    </button>
-                </div>
+            {/* ホバー or 編集中にボタンを表示 */}
+            <div className={`comment-actions ${isHovered || isEditing ? 'visible' : ''}`}>
+                <button onClick={toggleMinimize} className="action-btn minimize" title="最小化" onMouseDown={e => e.stopPropagation()}>
+                    <Minus size={14} />
+                </button>
+                <button onClick={handleDelete} className="action-btn delete" title="削除" onMouseDown={e => e.stopPropagation()}>
+                    <X size={14} />
+                </button>
             </div>
 
-            {/* コンテンツ */}
-            <div style={{ fontSize: '14px', lineHeight: '1.5', color: '#78350F' }}>
+            <div className="comment-content-area">
                 {isEditing ? (
                     <textarea
+                        ref={textareaRef}
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         onBlur={handleSave}
-                        autoFocus
-                        style={{
-                            width: '100%',
-                            minHeight: '60px',
-                            border: 'none',
-                            background: 'transparent',
-                            resize: 'vertical',
-                            outline: 'none',
-                            fontFamily: 'inherit',
-                            fontSize: 'inherit',
-                            color: 'inherit',
+                        className="comment-textarea"
+                        placeholder="メモを入力..."
+                        onMouseDown={e => e.stopPropagation()} // ドラッグ防止
+                        onKeyDown={(e) => {
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                handleSave();
+                            }
                         }}
                     />
                 ) : (
                     <div
-                        onDoubleClick={handleDoubleClick}
-                        style={{
-                            minHeight: '60px',
-                            cursor: 'text',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                        }}
+                        onClick={handleContentClick} // ★シングルクリック
+                        className={`comment-display ${!content ? 'empty' : ''}`}
                     >
-                        {content || 'ダブルクリックして編集...'}
+                        {content || 'クリックして編集...'}
                     </div>
                 )}
             </div>
 
-            {/* ハンドルは非表示（接続不要） */}
-            <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
-            <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
+            <div className="comment-footer">
+                <MessageSquareText size={14} className="footer-icon" />
+            </div>
+
+            <Handle type="target" position={Position.Top} className="hidden-handle" />
+            <Handle type="source" position={Position.Bottom} className="hidden-handle" />
         </div>
     );
+};
+
+export const commentNodeConfig = {
+    component: CommentNode
 };
 
 export default CommentNode;

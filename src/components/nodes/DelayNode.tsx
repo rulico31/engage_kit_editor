@@ -1,44 +1,58 @@
-// src/components/nodes/DelayNode.tsx
-
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
-import "./DelayNode.css"; // (★ 新規作成)
-import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
+import { Timer, Hourglass } from "lucide-react";
+import "./DelayNode.css";
+import type { PropertyConfig } from "../../types";
 
-interface DelayNodeProps extends NodeProps { }
+const DelayNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
+  const duration = data.durationS || "1.0";
 
-const DelayNode: React.FC<DelayNodeProps> = ({
-  data,
-}) => {
   return (
     <div className="delay-node">
-      {/* (入力ハンドル) */}
-      <Handle type="target" position={Position.Left} />
+      {/* 入力ハンドル (Left) */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={isConnectable}
+        className="delay-node-handle"
+      />
 
-      {/* ノードの本文 */}
-      <div className="delay-node-label">
-        {data.label || "⏱️ 遅延"}
+      <div className="delay-node-header">
+        <Timer className="delay-node-icon" />
+        <span className="delay-node-title">待機</span>
       </div>
 
-      {/* (設定はプロパティパネルで行う) */}
+      <div className="delay-node-body">
+        <div className="delay-node-info-row">
+          <span className="label">待機時間:</span>
+        </div>
+        <div className="delay-node-timer-display">
+          <Hourglass className="timer-icon-small" />
+          <span className="timer-value">{duration}秒</span>
+        </div>
+      </div>
 
-      {/* (出力ハンドル) */}
-      <Handle type="source" position={Position.Right} />
+      {/* 出力ハンドル (Right) */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable}
+        className="delay-node-handle"
+      />
     </div>
   );
 };
 
 export default memo(DelayNode);
 
-// ★ 以下をファイル末尾に追加
-export const delayNodeConfig: NodePropertyConfig = {
-  title: "ノード設定",
+export const delayNodeConfig: any = {
+  title: "遅延時間設定",
   properties: [
     {
       name: "durationS",
-      label: "遅延 (秒)",
+      label: "待機時間 (秒):",
       type: "text",
-      defaultValue: 1.0,
+      defaultValue: "1.0",
       step: 0.1,
       min: 0,
     },

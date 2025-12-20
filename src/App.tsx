@@ -49,7 +49,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const { undo, redo, deleteItems, groupItems, ungroupItems, updateItem } = usePageStore.getState();
+      const { undo, redo, deleteItems, updateItem } = usePageStore.getState();
       const { selectedIds } = useSelectionStore.getState();
 
       // Undo: Ctrl+Z
@@ -74,25 +74,17 @@ const App: React.FC = () => {
       }
       // Delete: Delete or Backspace
       if (e.key === 'Delete' || e.key === 'Backspace') {
+        // ノードエディタでノードが選択されている場合はスキップ
+        const { tabs, activeTabId } = useSelectionStore.getState();
+        const activeEntry = tabs.find(t => t.id === activeTabId);
+        if (activeEntry && activeEntry.type === 'node') return;
+
         if (selectedIds.length > 0) {
           e.preventDefault();
           deleteItems(selectedIds);
         }
       }
-      // Group: Ctrl+G
-      if ((e.ctrlKey || e.metaKey) && e.key === 'g' && !e.shiftKey) {
-        if (selectedIds.length > 0) {
-          e.preventDefault();
-          groupItems(selectedIds);
-        }
-      }
-      // Ungroup: Ctrl+Shift+G
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'g') {
-        if (selectedIds.length > 0) {
-          e.preventDefault();
-          selectedIds.forEach(id => ungroupItems(id));
-        }
-      }
+
 
       // Arrow keys movement
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -132,6 +124,11 @@ const App: React.FC = () => {
     setCurrentRoute("editor");
   };
 
+  const handleLoadFromJSON = async () => {
+    await loadProject(); // 引数なしで呼び出すとローカルファイル選択ダイアログが開く
+    setCurrentRoute("editor");
+  };
+
   const handleGoHome = () => {
     setCurrentRoute("home");
   };
@@ -155,6 +152,7 @@ const App: React.FC = () => {
         <HomeView
           onCreateProject={handleCreateProject}
           onOpenProject={handleOpenProject}
+          onLoadFromJSON={handleLoadFromJSON}
         />
       )}
 

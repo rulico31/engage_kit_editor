@@ -1,21 +1,103 @@
 /* src/components/nodes/EventNode.css */
 
 .event-node {
-  /* 見た目 */
-  background: #c33a3a; /* イベントノードの専用色 (赤系) */
-  border: 1px solid #7a1b1b;
-  border-radius: 5px;
-  padding: 10px 15px;
-  
-  /* 文字 */
-  color: white;
-  font-size: 14px;
-  font-weight: bold;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e74c3c;
+  /* 赤系のボーダー */
+  width: 220px;
+  font-family: 'Inter', system-ui, sans-serif;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 右側のハンドル(接続点)のスタイルを少し調整 */
-.event-node .react-flow__handle-right {
-  right: -8px; /* 少し外側に */
-  background: #efefef;
-  border: 2px solid #c33a3a;
+.event-node-header {
+  background: #e74c3c;
+  /* 濃い赤色のヘッダー */
+  padding: 10px 15px;
+  border-bottom: 1px solid #c0392b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  /* 白文字 */
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+}
+
+.event-node-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.event-node-title {
+  font-weight: 700;
+  font-size: 14px;
+  flex: 1;
+}
+
+.event-node-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #ffffff;
+  color: #e74c3c;
+  /* バッジの文字色は赤 */
+}
+
+.event-node-body {
+  padding: 12px 15px;
+  display: flex;
+  flex-direction: column;
+  min-height: 40px;
+  border-bottom-left-radius: 7px;
+  border-bottom-right-radius: 7px;
+}
+
+.event-node-info-row {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: #555;
+  gap: 8px;
+}
+
+.event-node-info-row:last-child {
+  margin-bottom: 0;
+}
+
+.event-node-info-row .label {
+  font-weight: 600;
+  color: #999;
+  min-width: 40px;
+}
+
+.event-node-info-row .value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  font-family: monospace;
+  font-weight: 500;
+  color: #333;
+}
+
+/* ハンドルのカスタマイズ */
+.react-flow__handle.event-node-handle {
+  width: 10px;
+  height: 10px;
+  background: #e74c3c;
+  /* 赤色 */
+  border: 2px solid #fff;
+  right: -6px;
+  position: absolute;
+  top: 50% !important;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 1px #c0392b;
+  /* 視認性を高めるための細い枠線 */
 }

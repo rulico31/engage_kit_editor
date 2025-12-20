@@ -1,31 +1,113 @@
 /* src/components/nodes/DelayNode.css */
 
 .delay-node {
-  background: #c26a1d; /* (オレンジ系 - SetVariableNode と同じ色) */
-  border: 1px solid #a0500c;
-  border-radius: 5px;
-  padding: 10px 15px;
-  color: white;
-  font-size: 14px;
-  font-weight: 500;
-  min-width: 170px;
-  text-align: center;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid #d97706;
+  /* アンバー色のボーダー */
+  width: 180px;
+  /* 少しコンパクトに */
+  font-family: 'Inter', system-ui, sans-serif;
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.delay-node-header {
+  background: #d97706;
+  /* 濃いアンバー色のヘッダー */
+  padding: 10px 15px;
+  border-bottom: 1px solid #b45309;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  /* 白文字 */
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+}
+
+.delay-node-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.delay-node-title {
+  font-weight: 700;
+  font-size: 14px;
+  flex: 1;
+}
+
+.delay-node-body {
+  padding: 12px 15px;
+  display: flex;
+  flex-direction: column;
+  min-height: 50px;
+  border-bottom-left-radius: 7px;
+  border-bottom-right-radius: 7px;
+  align-items: center;
+  /* 中央揃え */
+}
+
+.delay-node-info-row {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.delay-node-info-row .label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+}
+
+/* 時間表示エリア */
+.delay-node-timer-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: #fffbeb;
+  /* 薄い黄色背景 */
+  color: #b45309;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid #fcd34d;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.timer-icon-small {
+  width: 14px;
+  height: 14px;
+  opacity: 0.8;
+}
+
+.timer-value {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: monospace;
+}
+
+/* ハンドルのカスタマイズ */
+.react-flow__handle.delay-node-handle {
+  width: 10px;
+  height: 10px;
+  background: #d97706;
+  /* アンバー色 */
+  border: 2px solid #fff;
+  position: absolute;
+  top: 50% !important;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 1px #b45309;
   z-index: 10;
 }
 
-/* (ハンドルスタイル) */
-.delay-node .react-flow__handle {
-  background: #efefef;
-  border: 2px solid #c26a1d;
-}
-.delay-node .react-flow__handle-left {
-  left: -8px;
-}
-.delay-node .react-flow__handle-right {
-  right: -8px;
+.react-flow__handle.delay-node-handle-left {
+  left: -6px;
 }
 
-.delay-node-label {
-  font-weight: bold;
+.react-flow__handle.delay-node-handle-right {
+  right: -6px;
 }

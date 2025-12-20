@@ -5,8 +5,6 @@ interface ContextMenuProps {
   x: number;
   y: number;
   selectedCount: number;
-  onGroup: () => void;
-  onUngroup: () => void;
   onDelete: () => void;
   onAddComment: () => void;
   onClose: () => void;
@@ -16,8 +14,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   x,
   y,
   selectedCount,
-  onGroup,
-  onUngroup,
   onDelete,
   onAddComment,
   onClose
@@ -25,39 +21,24 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   return (
     <>
       {/* 背景クリックで閉じるための透明なレイヤー */}
-      <div 
+      <div
         style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9998 }}
         onClick={onClose}
         onContextMenu={(e) => { e.preventDefault(); onClose(); }}
       />
-      <div 
+      <div
         className="context-menu"
         style={{ top: y, left: x }}
-        onClick={(e) => e.stopPropagation()} 
+        onClick={(e) => e.stopPropagation()}
       >
-        <div 
+        <div
           className="context-menu-item"
           onClick={onAddComment}
         >
           <span>💬 コメントを追加</span>
         </div>
         <div className="context-menu-separator" />
-                <div 
-          className={`context-menu-item ${selectedCount < 2 ? "disabled" : ""}`}
-          onClick={onGroup}
-        >
-          <span>グループ化 (Group)</span>
-          <span className="shortcut-hint">Ctrl+G</span>
-        </div>
-        <div 
-          className={`context-menu-item ${selectedCount === 0 ? "disabled" : ""}`}
-          onClick={onUngroup}
-        >
-          <span>グループ解除 (Ungroup)</span>
-          <span className="shortcut-hint">Shift+Ctrl+G</span>
-        </div>
-        <div className="context-menu-separator" />
-        <div 
+        <div
           className={`context-menu-item ${selectedCount === 0 ? "disabled" : ""}`}
           onClick={onDelete}
         >

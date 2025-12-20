@@ -1,45 +1,74 @@
-// src/components/nodes/SetVariableNode.tsx
-
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
-import "./SetVariableNode.css"; // (★ 対応するCSSを次に作成します)
-import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
+import { Database } from "lucide-react";
+import "./SetVariableNode.css";
+import type { PropertyConfig } from "../../types";
 
-// (Props は NodeProps のみ)
-interface SetVariableNodeProps extends NodeProps {}
+const SetVariableNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
+  const variableName = data.variableName || "variable";
+  const value = data.value || "0";
+  const operation = data.operation || "set";
 
-const SetVariableNode: React.FC<SetVariableNodeProps> = ({
-  data,
-}) => {
+  // 操作内容の表示テキストを生成
+  const getOperationSummary = () => {
+    if (operation === "add") {
+      return `+= ${value}`;
+    }
+    return `= ${value}`; // set
+  };
+
+  const operationSummary = getOperationSummary();
+
   return (
     <div className="set-variable-node">
-      {/* (入力ハンドル) */}
-      <Handle type="target" position={Position.Left} />
+      {/* 入力ハンドル (Left) */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={isConnectable}
+        className="set-variable-node-handle"
+      />
 
-      {/* ノードの本文 */}
-      <div className="set-variable-node-label">
-        {data.label || "変数をセット"}
+      <div className="set-variable-node-header">
+        <Database className="set-variable-node-icon" />
+        <span className="set-variable-node-title">変数操作</span>
+        <span className="set-variable-node-badge">
+          {operation === "add" ? "加算" : "代入"}
+        </span>
       </div>
 
-      {/* (設定はプロパティパネルで行うため、ここにはUIなし) */}
-      
-      {/* (出力ハンドル) */}
-      <Handle type="source" position={Position.Right} />
+      <div className="set-variable-node-body">
+        <div className="set-variable-node-info-row">
+          <span className="label">変数:</span>
+          <span className="value variable-name" title={variableName}>{variableName}</span>
+        </div>
+        <div className="set-variable-node-code-block">
+          <span className="code-variable">{variableName}</span>
+          <span className="code-operator"> {operationSummary}</span>
+        </div>
+      </div>
+
+      {/* 出力ハンドル (Right) */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable}
+        className="set-variable-node-handle"
+      />
     </div>
   );
 };
 
 export default memo(SetVariableNode);
 
-// ★ 以下をファイル末尾に追加
-export const setVariableNodeConfig: NodePropertyConfig = {
-  title: "ノード設定",
+export const setVariableNodeConfig: any = {
+  title: "変数操作設定",
   properties: [
     {
       name: "variableName",
       label: "変数名:",
       type: "text",
-      defaultValue: "",
+      defaultValue: "score",
     },
     {
       name: "operation",
@@ -55,7 +84,7 @@ export const setVariableNodeConfig: NodePropertyConfig = {
       name: "value",
       label: "値:",
       type: "text",
-      defaultValue: "",
+      defaultValue: "0",
     },
   ],
 };

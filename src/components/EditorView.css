@@ -24,7 +24,8 @@
   flex-direction: row;
   width: 100%;
   overflow: hidden;
-  min-height: 0; /* Flexbox内スクロールに必須 */
+  min-height: 0;
+  /* Flexbox内スクロールに必須 */
 }
 
 /* 下段の行 (縦積みの一部として) */
@@ -37,7 +38,8 @@
 
 /* --- パネル共通設定 --- */
 
-.panel-left, .panel-right {
+.panel-left,
+.panel-right {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -73,8 +75,13 @@
   background-color: #222;
 }
 
-.design-section { background-color: #1a1a1a; }
-.logic-section { background-color: #1a1a1a; }
+.design-section {
+  background-color: #1a1a1a;
+}
+
+.logic-section {
+  background-color: #1a1a1a;
+}
 
 .canvas-viewport {
   width: 100%;
@@ -100,13 +107,15 @@
   flex-shrink: 0;
   height: 12px;
   width: 100%;
-  margin: -2px 0; /* 上下のパネルに重ねる */
+  margin: -2px 0;
+  /* 上下のパネルに重ねる */
   background-color: transparent;
   cursor: row-resize;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 20; /* 最前面 */
+  z-index: 20;
+  /* 最前面 */
   transition: background-color 0.2s;
 }
 
@@ -115,7 +124,8 @@
 }
 
 .resize-handle-pill-horizontal {
-  width: 60px; /* 全幅なので少し広く */
+  width: 60px;
+  /* 全幅なので少し広く */
   height: 6px;
   background-color: #444;
   border-radius: 3px;
@@ -123,7 +133,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .resize-handle-dots-horizontal {
@@ -139,6 +149,7 @@
   background-color: #007acc;
   transform: scale(1.1);
 }
+
 .resize-separator-horizontal:active .resize-handle-pill-horizontal {
   background-color: #008be6;
 }
@@ -171,23 +182,24 @@
   background-color: #444;
   border-radius: 3px;
   transition: all 0.2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .resize-separator-vertical:hover .resize-handle-pill-vertical {
   background-color: #007acc;
   transform: scale(1.1);
 }
+
 .resize-separator-vertical:active .resize-handle-pill-vertical {
   background-color: #008be6;
 }
 
-/* ★ 追加: グリッド・スナップUIのラッパー */
+/* ★ グリッドコントロールのラッパー - キャンバスビューポート内に固定 */
 .grid-controls-wrapper {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 10;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
 }
 
 .grid-toggle-button {
@@ -201,16 +213,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s, border-color 0.2s;
 }
+
 .grid-toggle-button:hover {
   background-color: #3a3a3a;
   border-color: #555;
 }
+
 .grid-toggle-button:active {
   background-color: #4a4a4a;
 }
+
 .grid-icon {
   width: 18px;
   height: 18px;

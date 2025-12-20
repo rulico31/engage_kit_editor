@@ -1,219 +1,229 @@
 // src/stores/useSelectionStore.ts
 
-import create from 'zustand';
+import { create } from 'zustand';
 import type { SelectionEntry } from '../types';
-import type { Node } from 'reactflow';
+import { usePageStore } from './usePageStore';
 
-interface SelectionStoreState {
-  // タブ管理と選択状態を分離
-  tabs: SelectionEntry[];        // プロパティパネルに表示するタブ一覧（履歴）
-  selectedIds: string[];         // キャンバス上で選択されているアイテムID一覧
-  
-  activeTabId: string | null;    // 現在プロパティパネルで表示中のタブID
-  activeLogicGraphId: string | null; // ロジックエディタで表示する対象ID
-  
-  // --- Actions ---
-  resetSelection: () => void;
-  
-  // アイテム選択時の処理（タブ追加 ＋ 選択状態更新）
-  handleItemSelect: (itemId: string, label: string, multiSelect?: boolean) => void;
-  
-  // ノード選択時の処理
-  handleNodeClick: (nodeId: string, label: string) => void;
-  
-  // 背景クリック（選択解除）
+interface SelectionState {
+  // Data
+  selectedIds: string[];
+  tabs: SelectionEntry[]; // プロパティパネルのタブとして使用
+  activeTabId: string | null; // 現在表示中のプロパティタブID
+  highlightedItemIds: string[]; // ハイライト表示するアイテムのID（WaitForClickノードのターゲット等）
+
+  // Logic Editor state
+  activeLogicGraphId: string | null;
+
+  // Actions
+  // 汎用的な選択アクション (Artboard等で使用)
+  handleItemSelect: (id: string, label: string, isMulti: boolean) => void;
   handleBackgroundClick: () => void;
-  
-  // タブをクリックした時の処理（選択状態も切り替える）
-  handleTabSelect: (tabId: string) => void;
-  
-  // タブを閉じる処理
-  handleTabClose: (idToClose: string) => void;
-  
-  // 一括選択（レイヤーパネル等から）
-  setSelection: (items: { id: string; label: string }[]) => void;
 
-  // --- ストア間通信用アクション ---
+  // 低レベル/特定用途のアクション
+  selectItem: (id: string, type?: 'item' | 'node', label?: string) => void;
+  toggleSelection: (id: string, type?: 'item' | 'node', label?: string) => void;
+  clearSelection: () => void;
+  setSelection: (ids: string[]) => void;
+
+  setActiveTabId: (id: string) => void;
+  setActiveLogicGraphId: (id: string | null) => void;
+  handleTabSelect: (id: string) => void;
+  handleTabClose: (id: string) => void;
   updateTabLabel: (id: string, newLabel: string) => void;
-  updateNodeTabLabels: (nodes: Node[]) => void;
+  setHighlightedItems: (ids: string[]) => void;
+  clearHighlightedItems: () => void;
 }
 
-const initialState = {
-  tabs: [],
+export const useSelectionStore = create<SelectionState>((set, get) => ({
   selectedIds: [],
+  tabs: [],
   activeTabId: null,
   activeLogicGraphId: null,
-};
+  highlightedItemIds: [],
 
-export const useSelectionStore = create<SelectionStoreState>((set) => ({
-  ...initialState,
-  
-  resetSelection: () => {
-    set(initialState);
-  },
-  
-  handleItemSelect: (itemId, label, multiSelect = false) => {
-    set(state => {
-      // 1. タブリストへの追加（まだ無ければ）
-      let newTabs = [...state.tabs];
-      const existingTabIndex = newTabs.findIndex(t => t.id === itemId);
-      if (existingTabIndex === -1) {
-        newTabs.push({ id: itemId, type: 'item', label: `🔘 ${label}` });
-      }
+  // アイテム選択のメインロジック（複数選択対応）
+  handleItemSelect: (id, label, isMulti) => {
+    const { selectedIds, tabs, activeTabId, activeLogicGraphId } = get();
+    const currentPageId = usePageStore.getState().selectedPageId;
 
-      // 2. 選択状態の更新
-      let newSelectedIds = [...state.selectedIds];
-      const isAlreadySelected = newSelectedIds.includes(itemId);
+    if (isMulti) {
+      const isSelected = selectedIds.includes(id);
+      if (isSelected) {
+        // 選択解除
+        const newIds = selectedIds.filter(pid => pid !== id);
+        const newTabs = tabs.filter(t => t.id !== id);
 
-      if (multiSelect) {
-        // 複数選択モード: トグル
-        if (isAlreadySelected) {
-          newSelectedIds = newSelectedIds.filter(id => id !== itemId);
-        } else {
-          newSelectedIds.push(itemId);
+        // アクティブなタブが消えた場合、別のタブをアクティブにする
+        let newActiveId = activeTabId;
+        if (activeTabId === id) {
+          newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
         }
+
+        // ロジックエディタのアクティブIDも同期させる
+        let newActiveLogicId = activeLogicGraphId;
+        if (activeLogicGraphId === id) {
+          // 選択解除されたアイテムがロジック表示中だった場合、新しいアクティブタブに合わせる
+          newActiveLogicId = newActiveId;
+        }
+
+        set({
+          selectedIds: newIds,
+          tabs: newTabs,
+          activeTabId: newActiveId,
+          activeLogicGraphId: newActiveLogicId
+        });
       } else {
-        // 単一選択モード: これだけを選択
-        newSelectedIds = [itemId];
+        // 追加選択
+        set({
+          selectedIds: [...selectedIds, id],
+          tabs: [...tabs, { id, type: 'item', label, pageId: currentPageId || undefined }],
+          activeTabId: id, // 新しく選択したものをアクティブに
+          activeLogicGraphId: id // ★ロジックエディタもこのアイテムを表示
+        });
+      }
+    } else {
+      // 単一選択（アイテム選択は置き換え、タブは履歴として維持）
+      const existingTab = tabs.find(t => t.id === id);
+      let newTabs = tabs;
+      if (!existingTab) {
+        newTabs = [...tabs, { id, type: 'item', label, pageId: currentPageId || undefined }];
       }
 
-      // 3. アクティブタブの更新
-      return {
+      set({
+        selectedIds: [id],
         tabs: newTabs,
-        selectedIds: newSelectedIds,
-        activeTabId: itemId,
-        activeLogicGraphId: itemId,
-      };
+        activeTabId: id,
+        activeLogicGraphId: id // ★ロジックエディタもこのアイテムを表示
+      });
+    }
+  },
+
+  handleBackgroundClick: () => {
+    set({
+      selectedIds: [],
+      // tabs: [], // タブ履歴は維持する
+      activeTabId: null,
+      activeLogicGraphId: null // ★ロジック表示もクリア
     });
   },
-  
-  setSelection: (items) => {
-    // レイヤーパネル等からの一括選択
-    if (items.length === 0) {
-      set({ selectedIds: [], activeTabId: null, activeLogicGraphId: null });
-      return;
+
+  selectItem: (id, type = 'item', label = '') => {
+    const currentState = get();
+    const currentPageId = usePageStore.getState().selectedPageId;
+
+    // 既存タブ確認
+    const existingTab = currentState.tabs.find(t => t.id === id);
+    let newTabs = currentState.tabs;
+    if (!existingTab) {
+      newTabs = [...currentState.tabs, { id, type, label, pageId: currentPageId || undefined }];
     }
 
-    set(state => {
-      let newTabs = [...state.tabs];
-      const newSelectedIds = items.map(i => i.id);
-      
-      // タブにないものは追加
-      items.forEach(item => {
-        if (!newTabs.find(t => t.id === item.id)) {
-          newTabs.push({ id: item.id, type: 'item', label: `🔘 ${item.label}` });
-        }
+    set({
+      selectedIds: [id],
+      tabs: newTabs,
+      activeTabId: id,
+      // ノード選択時はactiveLogicGraphIdを変更しない(アイテム選択時のみ変更)
+      activeLogicGraphId: type === 'node' ? currentState.activeLogicGraphId : id
+    });
+  },
+
+  toggleSelection: (id, type = 'item', label = '') => {
+    const state = get();
+    const currentPageId = usePageStore.getState().selectedPageId;
+    const isSelected = state.selectedIds.includes(id);
+
+    if (isSelected) {
+      const newIds = state.selectedIds.filter(pid => pid !== id);
+      const newTabs = state.tabs.filter(t => t.id !== id);
+
+      let newActiveId = state.activeTabId;
+      if (state.activeTabId === id) {
+        newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+      }
+
+      let newActiveLogicId = state.activeLogicGraphId;
+      if (state.activeLogicGraphId === id) {
+        newActiveLogicId = newActiveId;
+      }
+
+      set({
+        selectedIds: newIds,
+        tabs: newTabs,
+        activeTabId: newActiveId,
+        activeLogicGraphId: newActiveLogicId
       });
-
-      const lastItem = items[items.length - 1];
-
-      return {
-        tabs: newTabs,
-        selectedIds: newSelectedIds,
-        activeTabId: lastItem.id,
-        activeLogicGraphId: lastItem.id,
-      };
-    });
-  },
-  
-  handleNodeClick: (nodeId, label) => {
-    set(state => {
-      // ノードもタブとして管理する
-      let newTabs = [...state.tabs];
-      if (!newTabs.find(t => t.id === nodeId)) {
-        newTabs.push({ id: nodeId, type: 'node', label: label || 'ノード' });
-      }
-
-      return {
-        tabs: newTabs,
-        // ノード選択時はキャンバスアイテムの選択状態は維持する（または変更しない）
-        activeTabId: nodeId,
-      };
-    });
-  },
-  
-  handleBackgroundClick: () => {
-    // 選択解除（タブは残しつつ、アクティブIDとロジック表示IDをクリアする）
-    set({ selectedIds: [], activeTabId: null, activeLogicGraphId: null });
-  },
-  
-  handleTabSelect: (tabId) => {
-    set(state => {
-      const entry = state.tabs.find(s => s.id === tabId);
-      
-      // タブをクリックしたら、そのアイテムを「単一選択」状態にする
-      let newSelectedIds = state.selectedIds;
-      let newActiveLogicGraphId = state.activeLogicGraphId;
-
-      if (entry && entry.type === 'item') {
-        newSelectedIds = [tabId]; // 選択状態もこれ一つにする
-        newActiveLogicGraphId = tabId;
-      }
-      
-      return { 
-        selectedIds: newSelectedIds,
-        activeTabId: tabId, 
-        activeLogicGraphId: newActiveLogicGraphId 
-      };
-    });
-  },
-  
-  handleTabClose: (idToClose) => {
-    set(state => {
-      const closedEntry = state.tabs.find(s => s.id === idToClose);
-      if (!closedEntry) return state;
-
-      // タブ一覧から削除
-      const newTabs = state.tabs.filter(s => s.id !== idToClose);
-      
-      // 選択状態からも削除
-      const newSelectedIds = state.selectedIds.filter(id => id !== idToClose);
-
-      // アクティブだった場合、別のタブへ移動
-      let newActiveTabId = state.activeTabId;
-      if (state.activeTabId === idToClose) {
-        newActiveTabId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
-      }
-
-      // ロジック表示対象の更新
-      let newActiveLogicGraphId = state.activeLogicGraphId;
-      if (closedEntry.type === 'item' && state.activeLogicGraphId === idToClose) {
-        newActiveLogicGraphId = null;
-        // 次のアクティブタブがアイテムなら、それをロジック対象にする
-        const nextActive = newTabs.find(s => s.id === newActiveTabId);
-        if (nextActive && nextActive.type === 'item') {
-          newActiveLogicGraphId = nextActive.id;
-        }
-      }
-
-      return {
-        tabs: newTabs,
-        selectedIds: newSelectedIds,
-        activeTabId: newActiveTabId,
-        activeLogicGraphId: newActiveLogicGraphId,
-      };
-    });
-  },
-
-  // --- ストア間通信用アクション ---
-  updateTabLabel: (id, newLabel) => {
-    set(state => ({
-      tabs: state.tabs.map(s => 
-        s.id === id ? { ...s, label: s.type === 'item' ? `🔘 ${newLabel}` : newLabel } : s
-      ),
-    }));
-  },
-  
-  updateNodeTabLabels: (nodes) => {
-    set(state => {
-      const newTabs = [...state.tabs];
-      nodes.forEach(node => {
-        const tabEntry = newTabs.find(s => s.id === node.id);
-        if (tabEntry && tabEntry.label !== node.data.label) {
-          tabEntry.label = node.data.label;
-        }
+    } else {
+      set({
+        selectedIds: [...state.selectedIds, id],
+        tabs: [...state.tabs, { id, type, label, pageId: currentPageId || undefined }],
+        activeTabId: id,
+        // ノード選択時はactiveLogicGraphIdを変更しない
+        activeLogicGraphId: type === 'node' ? state.activeLogicGraphId : id
       });
-      return { tabs: newTabs };
+    }
+  },
+
+  clearSelection: () => set({
+    selectedIds: [],
+    tabs: [],
+    activeTabId: null,
+    activeLogicGraphId: null
+  }),
+
+  setSelection: (ids) => set({ selectedIds: ids }), // 注: tabsの整合性は呼び出し元で管理が必要になる場合があります
+
+  setActiveTabId: (id) => set({ activeTabId: id }),
+
+  setActiveLogicGraphId: (id) => set({ activeLogicGraphId: id }),
+
+  handleTabSelect: (id: string) => {
+    const state = get();
+    const tab = state.tabs.find(t => t.id === id);
+    if (tab && tab.pageId) {
+      const currentPageId = usePageStore.getState().selectedPageId;
+      if (tab.pageId !== currentPageId) {
+        usePageStore.getState().setSelectedPageId(tab.pageId);
+      }
+    }
+
+    set({
+      selectedIds: [id],
+      activeTabId: id,
+      activeLogicGraphId: id // タブ切り替え時にロジックエディタも同期
     });
   },
+
+  handleTabClose: (id: string) => {
+    const state = get();
+    // 選択状態からも削除
+    const newIds = state.selectedIds.filter(pid => pid !== id);
+    const newTabs = state.tabs.filter(t => t.id !== id);
+
+    // アクティブなタブが消えた場合、別のタブをアクティブにする
+    let newActiveId = state.activeTabId;
+    if (state.activeTabId === id) {
+      newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+    }
+
+    // ロジックエディタのアクティブIDも同期させる
+    let newActiveLogicId = state.activeLogicGraphId;
+    if (state.activeLogicGraphId === id) {
+      newActiveLogicId = newActiveId;
+    }
+
+    set({
+      selectedIds: newIds,
+      tabs: newTabs,
+      activeTabId: newActiveId,
+      activeLogicGraphId: newActiveLogicId
+    });
+  },
+
+  updateTabLabel: (id: string, newLabel: string) => set((state) => ({
+    tabs: state.tabs.map(tab => tab.id === id ? { ...tab, label: newLabel } : tab)
+  })),
+
+  setHighlightedItems: (ids: string[]) => set({ highlightedItemIds: ids }),
+
+  clearHighlightedItems: () => set({ highlightedItemIds: [] }),
 }));

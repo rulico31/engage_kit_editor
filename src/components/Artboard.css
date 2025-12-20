@@ -6,7 +6,8 @@
   justify-content: center;
   align-items: center;
   overflow: auto;
-  background-color: #1e1e1e; /* キャンバス外の背景色（暗いグレー） */
+  background-color: #1e1e1e;
+  /* キャンバス外の背景色（暗いグレー） */
 }
 
 /* --- アートボード本体 --- */
@@ -61,21 +62,45 @@
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  
+
   transition: border-color 0.1s, box-shadow 0.1s;
 }
 
 /* 選択状態 */
 .artboard-item.selected {
-  border-color: #3b82f6; /* 青色 */
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5); /* 外光彩 */
+  border-color: #3b82f6;
+  /* 青色 */
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5);
+  /* 外光彩 */
   z-index: 10;
 }
 
 /* アクティブ（タブ選択中） */
 .artboard-item.active-item {
-  border-color: #f59e0b; /* オレンジ/黄色 */
+  border-color: #f59e0b;
+  /* オレンジ/黄色 */
   z-index: 11;
+}
+
+/* ハイライト表示（WaitForClickノードのターゲット等） */
+.artboard-item.highlighted {
+  border-color: #10b981;
+  /* 青緑色 */
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  animation: highlight-pulse 2s infinite;
+  z-index: 9;
+}
+
+@keyframes highlight-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.5);
+  }
 }
 
 /* グループアイテム */
@@ -83,6 +108,7 @@
   border: 1px dashed #999;
   background-color: rgba(0, 0, 0, 0.03);
 }
+
 .artboard-item.is-group.selected {
   border-color: #3b82f6;
   background-color: rgba(59, 130, 246, 0.05);
@@ -92,9 +118,12 @@
 .artboard-item.no-border {
   border-color: transparent;
 }
+
 .artboard-item.no-border.selected {
-  border-color: #3b82f6; /* 選択時は枠線を出す */
+  border-color: #3b82f6;
+  /* 選択時は枠線を出す */
 }
+
 .artboard-item.is-transparent {
   background-color: transparent;
 }
@@ -131,12 +160,14 @@
   justify-content: center;
   overflow: hidden;
 }
+
 .item-image-content img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   pointer-events: none;
 }
+
 .item-image-content.is-placeholder {
   background-color: #e5e5e5;
   color: #777;
@@ -148,6 +179,7 @@
   width: 100%;
   height: 100%;
 }
+
 .artboard-item-textarea {
   width: 100%;
   height: 100%;
@@ -159,6 +191,11 @@
   font: inherit;
   color: inherit;
   overflow: hidden;
+}
+
+.artboard-item-textarea::placeholder {
+  color: var(--placeholder-color, #999999);
+  opacity: 0.7;
 }
 
 /* --- コンテキストメニュー --- */
@@ -182,14 +219,17 @@
   justify-content: space-between;
   align-items: center;
 }
+
 .context-menu-item:hover {
   background-color: #3b82f6;
   color: white;
 }
+
 .context-menu-item.disabled {
   color: #666;
   cursor: default;
 }
+
 .context-menu-item.disabled:hover {
   background-color: transparent;
   color: #666;
@@ -206,6 +246,7 @@
   color: #888;
   margin-left: 12px;
 }
+
 .context-menu-item:hover .shortcut-hint {
   color: #ddd;
 }

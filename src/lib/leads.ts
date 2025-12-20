@@ -6,7 +6,6 @@ import { getOrCreateSessionId } from './analytics';
 
 /**
  * ユーザーのIPアドレスを取得するヘルパー関数
- * (外部APIを使用する簡易実装)
  */
 const fetchIpAddress = async (): Promise<string | null> => {
   try {
@@ -40,19 +39,43 @@ const getDeviceType = (): string => {
 export const submitLeadData = async (variables: Record<string, any>): Promise<boolean> => {
   const projectId = useProjectStore.getState().currentProjectId;
 
-  // プレビュー中などでプロジェクトIDがない場合はスキップ
+  // プレビュー中などでプロジェクトIDがない場合はスキップ（開発用）
   if (!projectId) {
-    console.log('[Leads/Dev] Data submission simulation:', variables);
-    return true; // Simulate success
+    console.log('[Leads/Dev] Data submission simulation (No Project ID):', variables);
+    return true;
   }
 
+  // 1. 月間回答数制限のチェック (Phase 4: Billing Gate)
+  try {
+    const { data: isAllowed, error: rpcError } = await supabase.rpc('check_monthly_lead_limit', {
+      project_uuid: projectId
+    });
+
+    if (rpcError) {
+      console.error('[Leads] Limit check failed:', rpcError);
+      // チェックに失敗しても、サーバーエラーでユーザーをブロックしないように
+      // 安全側に倒して送信を許可するか、厳格にするかはビジネス判断。
+      // ここでは厳格にエラーログを出して続行とします（ベータ版想定）。
+    }
+
+    if (isAllowed === false) {
+      console.warn('[Leads] Monthly limit reached for project:', projectId);
+      alert("このプロジェクトの今月の回答受付数は上限に達しました。\n(Monthly submission limit reached)");
+      return false; // 送信ブロック
+    }
+
+  } catch (e) {
+    console.error('[Leads] Exception during limit check:', e);
+  }
+
+  // 2. データ送信処理
   const sessionId = getOrCreateSessionId();
   const ipAddress = await fetchIpAddress();
 
   const payload = {
     project_id: projectId,
     session_id: sessionId,
-    data: variables, // 全変数をJSONとして保存
+    data: variables,
     ip_address: ipAddress,
     user_agent: navigator.userAgent,
     referrer: document.referrer,

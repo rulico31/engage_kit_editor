@@ -83,6 +83,11 @@
   background-color: #fafafa;
 }
 
+.preview-input-content::placeholder {
+  color: var(--placeholder-color, #999999);
+  opacity: 0.7;
+}
+
 /* ボタン */
 .preview-item.is-button {
   cursor: pointer;

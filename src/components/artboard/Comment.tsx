@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { CommentType } from '../../types';
+import { MessageCircle, X, Minus } from 'lucide-react';
+// ★追加: 選択状態を管理するストアをインポート
+import { useSelectionStore } from '../../stores/useSelectionStore';
 import './Comment.css';
 
 interface CommentProps {
@@ -21,6 +24,15 @@ export const Comment: React.FC<CommentProps> = ({
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(comment.content);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // 編集モード時に自動フォーカス & カーソルを末尾へ
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.setSelectionRange(textareaRef.current.value.length, textareaRef.current.value.length);
+        }
+    }, [isEditing]);
 
     const handleSave = () => {
         onUpdate({ content: editContent });
@@ -29,83 +41,67 @@ export const Comment: React.FC<CommentProps> = ({
 
     const toggleMinimize = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onUpdate({ isMinimized: !comment.isMinimized });
+        const nextState = !comment.isMinimized;
+        onUpdate({ isMinimized: nextState });
+
+        // 展開時は自動で編集モードへ、最小化時は解除
+        if (!nextState) setIsEditing(true);
+        else setIsEditing(false);
     };
 
-    const handleContentDoubleClick = (e: React.MouseEvent) => {
+    // シングルクリックで編集開始
+    const handleContentClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsEditing(true);
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        // 編集中はドラッグさせない
         if (!isEditing) {
-            onClick();
+            e.stopPropagation(); // 親へのイベント伝播を止める
+
+            // ★重要: コメントをクリックしたら、他のアイテムの選択を全解除する
+            useSelectionStore.getState().handleBackgroundClick();
+
+            onClick(); // このコメントを選択状態にする
             onDragStart(e);
         }
     };
 
-    // SVG Icons
-    const MinimizeIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-    );
-
-    const CloseIcon = () => (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-    );
-
-    const CommentIcon = () => (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-    );
-
+    // --- 最小化モード (Badge Style) ---
     if (comment.isMinimized) {
         return (
             <div
-                className={`comment-minimized ${isSelected ? 'selected' : ''}`}
-                style={{
-                    left: comment.x,
-                    top: comment.y,
-                    backgroundColor: comment.color || '#FFFFFF', // Default to clean white
-                }}
-                onClick={onClick}
+                className={`comment-badge ${isSelected ? 'selected' : ''}`}
+                style={{ left: comment.x, top: comment.y }}
                 onMouseDown={handleMouseDown}
                 onDoubleClick={toggleMinimize}
+                title="ダブルクリックで展開"
             >
-                <div className="comment-icon">
-                    <CommentIcon />
-                </div>
+                <MessageCircle size={18} fill="currentColor" className="badge-icon" />
             </div>
         );
     }
 
+    // --- 展開モード (Note Style) ---
     return (
         <div
-            className={`comment-expanded ${isSelected ? 'selected' : ''}`}
-            style={{
-                left: comment.x,
-                top: comment.y,
-                backgroundColor: comment.color || '#FEF3C7', // Default to pastel yellow
-            }}
-            onClick={onClick}
+            className={`comment-note ${isSelected ? 'selected' : ''} ${isEditing ? 'editing' : ''}`}
+            style={{ left: comment.x, top: comment.y }}
             onMouseDown={handleMouseDown}
         >
-            <div className="comment-header">
+            {/* アクションボタン */}
+            <div className="comment-actions">
                 <button
-                    className="comment-minimize-btn"
+                    className="action-btn minimize"
                     onClick={toggleMinimize}
                     onMouseDown={(e) => e.stopPropagation()}
                     title="最小化"
                 >
-                    <MinimizeIcon />
+                    <Minus size={14} />
                 </button>
                 <button
-                    className="comment-delete-btn"
+                    className="action-btn delete"
                     onClick={(e) => {
                         e.stopPropagation();
                         onDelete();
@@ -113,27 +109,43 @@ export const Comment: React.FC<CommentProps> = ({
                     onMouseDown={(e) => e.stopPropagation()}
                     title="削除"
                 >
-                    <CloseIcon />
+                    <X size={14} />
                 </button>
             </div>
+
+            {/* コンテンツエリア */}
             <div className="comment-body">
                 {isEditing ? (
                     <textarea
-                        className="comment-textarea"
+                        ref={textareaRef}
+                        className="comment-textarea comment-text-style"
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
                         onBlur={handleSave}
                         onMouseDown={(e) => e.stopPropagation()}
-                        autoFocus
+                        placeholder="コメントを入力..."
+                        onKeyDown={(e) => {
+                            // Ctrl+Enter または Cmd+Enter で保存
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                                handleSave();
+                            }
+                        }}
                     />
                 ) : (
                     <div
-                        className="comment-content"
-                        onDoubleClick={handleContentDoubleClick}
+                        className={`comment-content comment-text-style ${!comment.content ? 'empty' : ''}`}
+                        onClick={handleContentClick}
                     >
-                        {comment.content || 'ダブルクリックして編集...'}
+                        {comment.content || 'クリックして編集...'}
                     </div>
                 )}
+            </div>
+
+            {/* フッター */}
+            <div className="comment-footer">
+                <div className="footer-avatar-placeholder">
+                    <MessageCircle size={12} />
+                </div>
             </div>
         </div>
     );

@@ -1,28 +1,49 @@
 /* src/components/NodeEditor.css */
 
+/* ReactFlowのアトリビューション（右下の文字）を非表示 */
+.react-flow__attribution {
+  display: none;
+}
+
 .node-editor-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   color: #888;
   font-style: italic;
   text-align: center;
   padding-top: 40px;
 }
 
+/* ノードエディタのコンテナ（パレット + エディタ） */
+.node-editor-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+}
+
 /* (1) ラッパー (Flexbox) */
 .node-editor-wrapper {
   display: flex;
-  width: 100%;
+  flex: 1;
+  /* 残りのスペースを使用 */
   /* (★ 修正: ヘッダー削除に伴い、高さを100%に変更) */
   height: 100%;
 }
 
 .react-flow-drop-target {
-  flex-grow: 1; /* 残りのスペースすべてを使う */
+  flex-grow: 1;
+  /* 残りのスペースすべてを使う */
   height: 100%;
-  position: relative; /* オーバーレイの基準点 */
+  position: relative;
+  /* オーバーレイの基準点 */
 }
 
 .react-flow-canvas {
-  width: 100%; /* 親(.drop-target)の 100% */
+  width: 100%;
+  /* 親(.drop-target)の 100% */
   height: 100%;
   background-color: #1a1a1a;
 }
@@ -36,7 +57,8 @@
   background-color: rgba(0, 122, 204, 0.1);
   border: 2px dashed #007acc;
   box-sizing: border-box;
-  pointer-events: none; /* マウスイベントを透過 */
+  pointer-events: none;
+  /* マウスイベントを透過 */
 }
 
 /* (ツールボックスのスタイルは変更なし) */
@@ -77,9 +99,11 @@
   cursor: grab;
   transition: background-color 0.2s;
 }
+
 .toolbox-item:hover {
   background-color: #4a4a4a;
 }
+
 .toolbox-item:active {
   cursor: grabbing;
 }
@@ -94,7 +118,8 @@
 .rf-controls-dark .react-flow__controls-button {
   background-color: #3a3a3a;
   border: none;
-  color: #aaa; /* アイコンの色 */
+  color: #aaa;
+  /* アイコンの色 */
 }
 
 .rf-controls-dark .react-flow__controls-button:hover {
@@ -102,6 +127,38 @@
   color: #eee;
 }
 
-.rf-controls-dark .react-flow__controls-button + .react-flow__controls-button {
+.rf-controls-dark .react-flow__controls-button+.react-flow__controls-button {
   border-top: 1px solid #555;
+}
+
+/* ノードエディタの右クリックメニュー */
+.node-editor-context-menu {
+  position: fixed;
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  min-width: 200px;
+  z-index: 9999;
+}
+
+.node-editor-context-menu-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  color: #e4e4e7;
+  font-size: 14px;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.node-editor-context-menu-item:hover {
+  background-color: #3a3a3a;
+}
+
+.node-editor-context-menu-item:active {
+  background-color: #4a4a4a;
 }

@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSelectionStore } from "../../stores/useSelectionStore";
+import { usePageStore } from "../../stores/usePageStore";
+import { ExternalLink } from "lucide-react";
 
 // --- アコーディオン ---
 interface AccordionProps {
@@ -37,6 +39,11 @@ export const InspectorTabs: React.FC = () => {
     })
   );
 
+  const { pages, selectedPageId } = usePageStore(s => ({
+    pages: s.pages,
+    selectedPageId: s.selectedPageId
+  }));
+
   const tabsContainerRef = useRef<HTMLDivElement>(null);
 
   // Ensure active tab is visible
@@ -54,25 +61,38 @@ export const InspectorTabs: React.FC = () => {
 
   return (
     <div className="inspector-tabs-container" ref={tabsContainerRef}>
-      {tabs.map((entry) => (
-        <div
-          key={entry.id}
-          className={`inspector-tab ${entry.id === activeTabId ? "is-active" : ""}`}
-          onClick={() => handleTabSelect(entry.id)}
-          title={entry.label} // Tooltip for full text
-        >
-          <span className="tab-label">{entry.label}</span>
-          <span
-            className="tab-close"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleTabClose(entry.id);
-            }}
+      {tabs.map((entry) => {
+        const isOtherPage = entry.pageId && entry.pageId !== selectedPageId;
+        const pageName = entry.pageId && pages[entry.pageId] ? pages[entry.pageId].name : 'Unknown';
+        const tooltip = isOtherPage
+          ? `${entry.label} (in ${pageName}) - Click to jump`
+          : entry.label;
+
+        return (
+          <div
+            key={entry.id}
+            className={`inspector-tab ${entry.id === activeTabId ? "is-active" : ""}`}
+            onClick={() => handleTabSelect(entry.id)}
+            title={tooltip}
           >
-            ×
-          </span>
-        </div>
-      ))}
+            <span className="tab-label" style={{ display: 'flex', alignItems: 'center' }}>
+              {isOtherPage && (
+                <ExternalLink size={11} style={{ marginRight: 4, opacity: 0.7, minWidth: 11 }} />
+              )}
+              {entry.label}
+            </span>
+            <span
+              className="tab-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTabClose(entry.id);
+              }}
+            >
+              ×
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 };

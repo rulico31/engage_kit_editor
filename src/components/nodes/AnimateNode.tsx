@@ -1,44 +1,149 @@
-// src/components/nodes/AnimateNode.tsx
-
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
-import "./AnimateNode.css"; // (★ 対応するCSSを次に作成します)
-import type { NodePropertyConfig } from "../../types"; // ★ 型をインポート
+import { Film, Move, Maximize, RotateCw, Sun } from "lucide-react";
+import { usePageStore } from "../../stores/usePageStore";
+import "./AnimateNode.css";
+import type { PropertyConfig } from "../../types";
 
-interface AnimateNodeProps extends NodeProps { }
+const AnimateNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
+  // ストアからアイテムリストを取得して、IDから名前を引けるようにする
+  const placedItems = usePageStore((s) =>
+    s.selectedPageId ? s.pages[s.selectedPageId]?.placedItems || [] : []
+  );
 
-const AnimateNode: React.FC<AnimateNodeProps> = ({
-  data,
-}) => {
+  // ターゲットアイテムの情報を検索
+  const targetItem = placedItems.find(item => item.id === data.targetItemId);
+  const targetName = targetItem
+    ? (targetItem.displayName || targetItem.data.text || targetItem.name)
+    : "(Not Set)";
+
+  // アニメーションタイプに応じたアイコンと要約テキストの生成
+  const getAnimationInfo = () => {
+    const type = data.animType || 'opacity';
+    const mode = data.animationMode || 'absolute';
+    const val = data.value || 0;
+    const duration = data.durationS || 0.5;
+
+    // 追加: 詳細設定の取得
+    const delay = Number(data.delayS) || 0;
+    const easing = data.easing || 'ease';
+
+    let icon = <Film className="animate-node-icon" />;
+    let label = "アニメーション";
+    let summary = "";
+
+    switch (type) {
+      case 'opacity':
+        icon = <Sun className="animate-node-icon" />;
+        label = "フェード";
+        if (mode === 'relative') {
+          const op = data.relativeOperation === 'subtract' ? '-' : '*';
+          summary = `不透明度 ${op} ${val}`;
+        } else {
+          summary = `不透明度を ${val} に`;
+        }
+        break;
+      case 'moveX':
+        icon = <Move className="animate-node-icon" />;
+        label = "X移動";
+        summary = mode === 'relative' ? `Xを ${val}px 移動` : `Xを ${val}px に`;
+        break;
+      case 'moveY':
+        icon = <Move className="animate-node-icon" style={{ transform: 'rotate(90deg)' }} />;
+        label = "Y移動";
+        summary = mode === 'relative' ? `Yを ${val}px 移動` : `Yを ${val}px に`;
+        break;
+      case 'scale':
+        icon = <Maximize className="animate-node-icon" />;
+        label = "拡大縮小";
+        summary = mode === 'relative' ? `倍率を ${val}倍 変更` : `${val}倍 に`;
+        break;
+      case 'rotate':
+        icon = <RotateCw className="animate-node-icon" />;
+        label = "回転";
+        summary = mode === 'relative' ? `${val}° 回転` : `${val}° に`;
+        break;
+      default:
+        break;
+    }
+
+    return { icon, label, summary, duration, delay, easing };
+  };
+
+  const { icon, summary, duration, delay, easing } = getAnimationInfo();
+
+  // タイミング情報の表示テキストを作成
+  const getTimingText = () => {
+    const parts = [];
+    if (delay > 0) parts.push(`+${delay}秒 遅延`);
+    if (easing !== 'ease') parts.push(easing);
+    return parts.join(', ');
+  };
+
+  const timingText = getTimingText();
+
   return (
     <div className="animate-node">
-      {/* (入力ハンドル) */}
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={isConnectable}
+        className="animate-node-handle"
+      />
 
-      {/* ノードの本文 */}
-      <div className="animate-node-label">
-        {data.label || "アニメーション"}
+      <div className="animate-node-header">
+        {icon}
+        <span className="animate-node-title">アニメーション</span>
+        <span className="animate-node-badge">{duration}秒</span>
       </div>
 
-      {/* (設定はプロパティパネルで行う) */}
+      <div className="animate-node-body">
+        <div className="animate-node-info-row">
+          <span className="label">対象:</span>
+          <span className="value" title={targetName}>{targetName}</span>
+        </div>
+        <div className="animate-node-info-row">
+          <span className="label">効果:</span>
+          <span className="value">{summary}</span>
+        </div>
 
-      {/* (出力ハンドル) */}
-      <Handle type="source" position={Position.Right} />
+        {/* タイミング詳細（遅延やイージングがある場合のみ表示） */}
+        {timingText && (
+          <div className="animate-node-info-row">
+            <span className="label">タイミング:</span>
+            <span className="value" style={{ fontSize: '11px', color: '#666' }}>{timingText}</span>
+          </div>
+        )}
+
+        {/* 繰り返し設定がある場合のみ表示 */}
+        {data.loopMode === 'count' && (
+          <div className="animate-node-info-row">
+            <span className="label">ループ:</span>
+            <span className="value">{data.loopCount} 回</span>
+          </div>
+        )}
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable}
+        className="animate-node-handle"
+      />
     </div>
   );
 };
 
 export default memo(AnimateNode);
 
-// ★ 以下をファイル末尾に追加
-export const animateNodeConfig: NodePropertyConfig[] = [
+export const animateNodeConfig: any[] = [
   {
     title: "ターゲット",
     properties: [
       {
         name: "targetItemId",
         label: "ターゲット:",
-        type: "select", // (PropertiesPanel側で placedItems から options を生成)
+        type: "select",
       },
     ],
   },
@@ -51,17 +156,17 @@ export const animateNodeConfig: NodePropertyConfig[] = [
         type: "select",
         defaultValue: "opacity",
         options: [
-          { label: "不透明度 (Opacity)", value: "opacity" },
-          { label: "X位置 (Move X)", value: "moveX" },
-          { label: "Y位置 (Move Y)", value: "moveY" },
-          { label: "拡大縮小 (Scale)", value: "scale" },
-          { label: "回転 (Rotate)", value: "rotate" },
+          { label: "不透明度", value: "opacity" },
+          { label: "X位置", value: "moveX" },
+          { label: "Y位置", value: "moveY" },
+          { label: "拡大縮小", value: "scale" },
+          { label: "回転", value: "rotate" },
         ],
       },
       {
         name: "animationMode",
         label: "指定方法:",
-        type: "select", // (ラジオボタンの代用)
+        type: "select",
         defaultValue: "absolute",
         options: [
           { label: "指定した値にする (絶対値)", value: "absolute" },
@@ -77,8 +182,6 @@ export const animateNodeConfig: NodePropertyConfig[] = [
           { label: "乗算 (現在の値 * X)", value: "multiply" },
           { label: "減算 (現在の値 - X)", value: "subtract" },
         ],
-        // (注: 本来は animType === 'opacity' も条件だが、
-        //  指定された型では1つの条件しか設定できないため animationMode のみで判定)
         condition: {
           name: "animationMode",
           value: "relative",
@@ -86,7 +189,7 @@ export const animateNodeConfig: NodePropertyConfig[] = [
       },
       {
         name: "value",
-        label: "目標値 / 増減値:", // (ラベルは動的に変更できないため固定)
+        label: "目標値 / 増減値:",
         type: "text",
         defaultValue: 0,
       },

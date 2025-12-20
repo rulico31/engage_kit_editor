@@ -1,44 +1,105 @@
-// src/components/nodes/ActionNode.tsx
-
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
+import { Eye, EyeOff, ToggleLeft, Zap } from "lucide-react";
+import { usePageStore } from "../../stores/usePageStore";
 import "./ActionNode.css";
-import type { NodePropertyConfig } from "../../types";
+import type { PropertyConfig } from "../../types";
 
-// ★ 修正: id を削除 (または _id とする)
-interface ActionNodeProps extends NodeProps {}
+const ActionNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
+  // ストアからアイテムリストを取得して、IDから名前を引けるようにする
+  const placedItems = usePageStore((s) =>
+    s.selectedPageId ? s.pages[s.selectedPageId]?.placedItems || [] : []
+  );
 
-const ActionNode: React.FC<ActionNodeProps> = ({
-  data,
-}) => {
+  // ターゲットアイテムの情報を検索
+  const targetItem = placedItems.find(item => item.id === data.targetItemId);
+  const targetName = targetItem
+    ? (targetItem.displayName || targetItem.data.text || targetItem.name)
+    : "(Not Set)";
+
+  // モードに応じたアイコンとラベルの定義
+  const getActionInfo = () => {
+    const mode = data.mode || 'show';
+    switch (mode) {
+      case 'show':
+        return {
+          icon: <Eye className="action-node-icon" />,
+          label: '表示',
+          badgeColor: 'bg-blue-100 text-blue-700'
+        };
+      case 'hide':
+        return {
+          icon: <EyeOff className="action-node-icon" />,
+          label: '非表示',
+          badgeColor: 'bg-gray-100 text-gray-700'
+        };
+      case 'toggle':
+        return {
+          icon: <ToggleLeft className="action-node-icon" />,
+          label: '切替',
+          badgeColor: 'bg-purple-100 text-purple-700'
+        };
+      default:
+        return {
+          icon: <Zap className="action-node-icon" />,
+          label: 'Action',
+          badgeColor: 'bg-blue-100 text-blue-700'
+        };
+    }
+  };
+
+  const { icon, label } = getActionInfo();
+
   return (
     <div className="action-node">
-      {/* (入力ハンドル) */}
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectable={isConnectable}
+        className="action-node-handle"
+      />
 
-      {/* ノードの本文 */}
-      <div className="action-node-label">{data.label || "アクション"}</div>
-      
-      {/* (出力ハンドル) */}
-      <Handle type="source" position={Position.Right} />
+      <div className="action-node-header">
+        {icon}
+        <span className="action-node-title">表示切替</span>
+        <span className="action-node-badge">{label}</span>
+      </div>
+
+      <div className="action-node-body">
+        <div className="action-node-info-row">
+          <span className="label">対象:</span>
+          <span className="value" title={targetName}>{targetName}</span>
+        </div>
+        <div className="action-node-info-row">
+          <span className="label">動作:</span>
+          <span className="value">{label}</span>
+        </div>
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable}
+        className="action-node-handle"
+      />
     </div>
   );
 };
 
 export default memo(ActionNode);
 
-// ★ 設定オブジェクトは変更なし
-export const actionNodeConfig: NodePropertyConfig = {
-  title: "ノード設定",
+export const actionNodeConfig: any = {
+  title: "表示切り替え設定",
   properties: [
     {
       name: "targetItemId",
       label: "ターゲット:",
-      type: "select", 
+      type: "select",
+      // 選択肢はエディタ側で動的に生成
     },
     {
       name: "mode",
-      label: "モード:",
+      label: "動作モード:",
       type: "select",
       defaultValue: "show",
       options: [

@@ -1,263 +1,371 @@
 // src/components/NodeEditor.tsx
 
-import React, { useRef, useEffect, useMemo, useState, useCallback } from "react";
+import React, { useCallback, useRef, useMemo } from 'react';
 import ReactFlow, {
   Background,
-  Controls,
-  useReactFlow,
+  addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
+  type Connection,
+  type Edge,
   type Node,
-  type NodeProps,
+  type NodeChange,
+  type EdgeChange,
   ReactFlowProvider,
-} from "reactflow";
-import { useDrop, type DropTargetMonitor } from "react-dnd";
-import { ItemTypes } from "../ItemTypes";
-import NodeToolboxItem from "./NodeToolboxItem";
-import { ContextMenu } from "./artboard/ContextMenu";
-import "reactflow/dist/style.css";
-import "./NodeEditor.css";
+  useReactFlow,
+  type NodeTypes,
+} from 'reactflow';
+import { useDrop, type DropTargetMonitor } from 'react-dnd';
+import { ItemTypes } from '../ItemTypes';
+import 'reactflow/dist/style.css';
+import './NodeEditor.css';
 
-// ★ Zustand ストアをインポート
-import { usePageStore } from "../stores/usePageStore";
-import { useSelectionStore } from "../stores/useSelectionStore";
+// ノードパレットのインポート
+import NodePalette from './NodePalette';
 
-// ノードコンポーネント
-import EventNode from "./nodes/EventNode";
-import ActionNode from "./nodes/ActionNode";
-import IfNode from "./nodes/IfNode";
-import PageNode from "./nodes/PageNode";
-import SetVariableNode from "./nodes/SetVariableNode";
-import AnimateNode from "./nodes/AnimateNode";
-import DelayNode from "./nodes/DelayNode";
-import WaitForClickNode from "./nodes/WaitForClickNode";
-import ABTestNode from "./nodes/ABTestNode";
-import SubmitFormNode from "./nodes/SubmitFormNode";
-import ExternalApiNode from "./nodes/ExternalApiNode";
-import CommentNode from "./nodes/CommentNode";
+// カスタムノードのインポート
+import ActionNode from './nodes/ActionNode';
+import EventNode from './nodes/EventNode';
+import IfNode from './nodes/IfNode';
+import PageNode from './nodes/PageNode';
+import AnimateNode from './nodes/AnimateNode';
+import DelayNode from './nodes/DelayNode';
+import SetVariableNode from './nodes/SetVariableNode';
+import WaitForClickNode from './nodes/WaitForClickNode';
+import ExternalApiNode from './nodes/ExternalApiNode';
+import ABTestNode from './nodes/ABTestNode';
+import CommentNode from './nodes/CommentNode';
+import SubmitFormNode from './nodes/SubmitFormNode';
 
+import { usePageStore } from '../stores/usePageStore';
+import { useSelectionStore } from '../stores/useSelectionStore';
 
-interface NodeToolDragItem { nodeType: string; nodeName: string; }
-type NodeClickHandler = (event: React.MouseEvent, node: Node) => void;
+// nodeTypesをコンポーネントの外で定義（再レンダリング防止）
+const nodeTypes: NodeTypes = {
+  actionNode: ActionNode,
+  eventNode: EventNode,
+  ifNode: IfNode,
+  pageNode: PageNode,
+  animateNode: AnimateNode,
+  delayNode: DelayNode,
+  setVariableNode: SetVariableNode,
+  waitForClickNode: WaitForClickNode,
+  externalApiNode: ExternalApiNode,
+  abTestNode: ABTestNode,
+  commentNode: CommentNode,
+  submitFormNode: SubmitFormNode,
+};
 
-// ★ 内部コンポーネント: ReactFlowProvider の子として動作する
+// 空のグラフデータを定数として定義（参照安定化のため）
+const defaultGraph = { nodes: [] as Node[], edges: [] as Edge[] };
+
 const NodeEditorContent: React.FC = () => {
-  const activeLogicGraphId = useSelectionStore((s) => s.activeLogicGraphId);
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const reactFlowInstance = useReactFlow();
 
-  const { allItemLogics, placedItems, setLogicGraph } = usePageStore((s) => {
-    const page = s.selectedPageId ? s.pages[s.selectedPageId] : undefined;
-    return {
-      allItemLogics: page?.allItemLogics ?? {},
-      placedItems: page?.placedItems ?? [],
-      setLogicGraph: s.setLogicGraph,
-    };
-  });
+  // 右クリックメニューの状態
+  const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
 
-  // ロジックデータが存在しない場合は初期化待ち、または空
-  const currentGraph = activeLogicGraphId ? allItemLogics[activeLogicGraphId] : undefined;
+  // ストアからデータを個別に取得（再レンダリング最適化）
+  const pages = usePageStore((state) => state.pages);
+  const selectedPageId = usePageStore((state) => state.selectedPageId);
+  const activeLogicGraphId = useSelectionStore((state) => state.activeLogicGraphId);
+  const selectItem = useSelectionStore((state) => state.selectItem);
 
-  // ★ 追加: ロジックがまだ存在しない場合、デフォルトのノード（イベント）を自動生成する
-  useEffect(() => {
-    if (activeLogicGraphId && !currentGraph) {
-      const item = placedItems.find(p => p.id === activeLogicGraphId);
-      if (item) {
-        const initialNodes: Node[] = [];
-        const timestamp = Date.now();
+  // 現在編集中のグラフデータを取得
+  const currentGraph = useMemo(() => {
+    if (!selectedPageId || !activeLogicGraphId) return defaultGraph;
+    const page = pages[selectedPageId];
+    if (!page) return defaultGraph;
+    return page.allItemLogics[activeLogicGraphId] || defaultGraph;
+  }, [pages, selectedPageId, activeLogicGraphId]);
 
-        // アイテムタイプに応じて最適な初期イベントを1つだけ設定
-        if (item.name.startsWith("テキスト入力欄")) {
-          // 入力欄の場合: 入力完了時のみ
-          initialNodes.push({
-            id: `evt-input-${timestamp}`,
-            type: 'eventNode',
-            position: { x: 50, y: 50 },
-            data: { label: '✅ 入力完了時', eventType: 'onInputComplete' }
-          });
-        }
-        else if (item.name.startsWith("画像")) {
-          // 画像の場合: 画像読み込み時のみ
-          initialNodes.push({
-            id: `evt-load-${timestamp}`,
-            type: 'eventNode',
-            position: { x: 50, y: 50 },
-            data: { label: '🖼️ 画像読み込み時', eventType: 'onImageLoad' }
-          });
-        }
-        else if (!item.id.startsWith('group')) {
-          // その他（ボタン、テキスト等）の場合: クリック時のみ
-          initialNodes.push({
-            id: `evt-click-${timestamp}`,
-            type: 'eventNode',
-            position: { x: 50, y: 50 },
-            data: { label: '👆 クリック時', eventType: 'click' }
-          });
-        }
+  // ストア更新用ヘルパー関数
+  const updateGraph = useCallback((newNodes: Node[], newEdges: Edge[]) => {
+    if (!selectedPageId || !activeLogicGraphId) return;
 
-        // グラフを初期化保存
-        setLogicGraph(activeLogicGraphId, { nodes: initialNodes, edges: [] });
+    // 現在のページ状態を取得して更新
+    usePageStore.setState((state) => {
+      const page = state.pages[selectedPageId];
+      if (!page) return state; // 安全策
+
+      return {
+        pages: {
+          ...state.pages,
+          [selectedPageId]: {
+            ...page,
+            allItemLogics: {
+              ...page.allItemLogics,
+              [activeLogicGraphId]: {
+                nodes: newNodes,
+                edges: newEdges,
+              },
+            },
+          },
+        },
+      };
+    });
+  }, [selectedPageId, activeLogicGraphId]);
+
+  // ノードの変更（ドラッグ移動、選択など）を処理
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      const nextNodes = applyNodeChanges(changes, currentGraph.nodes);
+      updateGraph(nextNodes, currentGraph.edges);
+    },
+    [currentGraph.nodes, currentGraph.edges, updateGraph]
+  );
+
+  // エッジの変更を処理
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      const nextEdges = applyEdgeChanges(changes, currentGraph.edges);
+      updateGraph(currentGraph.nodes, nextEdges);
+    },
+    [currentGraph.nodes, currentGraph.edges, updateGraph]
+  );
+
+  // エッジ接続時の処理
+  const onConnect = useCallback(
+    (params: Connection) => {
+      const nextEdges = addEdge(params, currentGraph.edges);
+      updateGraph(currentGraph.nodes, nextEdges);
+    },
+    [currentGraph.nodes, currentGraph.edges, updateGraph]
+  );
+
+  // useDropフックを使用してドロップ処理を実装
+  const [{ isOver }, drop] = useDrop(() => ({
+    accept: ItemTypes.NODE_PALETTE_ITEM,
+    drop: (item: any, monitor: DropTargetMonitor) => {
+      console.log('[NodeEditor] useDrop triggered', item);
+      const nodeType = item.type;
+
+      if (!nodeType) {
+        console.log('[NodeEditor] No nodeType found, returning');
+        return;
       }
+
+      // ドロップ位置を取得（クライアント座標）
+      const clientOffset = monitor.getClientOffset();
+      if (!clientOffset) {
+        console.log('[NodeEditor] No clientOffset, returning');
+        return;
+      }
+
+      // React Flow の座標系に変換
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: clientOffset.x,
+        y: clientOffset.y,
+      });
+      console.log('[NodeEditor] position:', position);
+
+      // 新しいノードを作成
+      const nodeTypeLabels: Record<string, string> = {
+        'eventNode': 'イベント',
+        'actionNode': '表示切替',
+        'ifNode': '条件分岐',
+        'pageNode': 'ページ遷移',
+        'animateNode': 'アニメーション',
+        'delayNode': '遅延',
+        'setVariableNode': '変数設定',
+        'waitForClickNode': 'クリック待機',
+        'externalApiNode': '外部API',
+        'abTestNode': 'A/Bテスト',
+        'commentNode': 'コメント',
+        'submitFormNode': 'フォーム送信',
+      };
+
+      // 各ノードタイプのデフォルト値を取得
+      const getDefaultNodeData = (type: string) => {
+        const baseData = { label: nodeTypeLabels[type] || '新しいノード' };
+
+        switch (type) {
+          case 'setVariableNode':
+            return { ...baseData, variableName: 'score', operation: 'set', value: '0' };
+          case 'actionNode':
+            return { ...baseData, mode: 'toggle' };
+          case 'eventNode':
+            return { ...baseData, eventType: 'click' };
+          case 'ifNode':
+            return { ...baseData, conditionSource: 'item', conditionType: 'isVisible', comparison: '==', comparisonType: 'string' };
+          case 'animateNode':
+            return { ...baseData, animType: 'opacity', value: '1', durationS: '0.5', delayS: '0', easing: 'ease', animationMode: 'absolute' };
+          case 'delayNode':
+            return { ...baseData, durationS: '1.0' };
+          case 'pageNode':
+            return { ...baseData };
+          case 'waitForClickNode':
+            return { ...baseData };
+          case 'externalApiNode':
+            return { ...baseData, method: 'GET' };
+          case 'abTestNode':
+            return { ...baseData, ratioA: 50 };
+          case 'commentNode':
+            return { ...baseData, content: '' };
+          case 'submitFormNode':
+            return { ...baseData };
+          default:
+            return baseData;
+        }
+      };
+
+      const newNode: Node = {
+        id: `${nodeType}_${Date.now()}`,
+        type: nodeType,
+        position,
+        data: getDefaultNodeData(nodeType),
+      };
+
+      // ノードを追加
+      const nextNodes = [...currentGraph.nodes, newNode];
+      updateGraph(nextNodes, currentGraph.edges);
+
+      // 新しく追加したノードを選択状態にする
+      selectItem(newNode.id, 'node', nodeTypeLabels[nodeType] || '新しいノード');
+      console.log('[NodeEditor] Node added via react-dnd');
+    },
+    collect: (monitor) => ({
+      isOver: !!monitor.isOver(),
+    }),
+  }), [currentGraph.nodes, currentGraph.edges, updateGraph, selectItem, reactFlowInstance]);
+
+  // dropリファレンスとreactFlowWrapperリファレンスを結合
+  // react-dndのdrop関数はrefを受け取り、その要素をドロップターゲットとして登録する
+  // reactFlowWrapperは既にuseRefで作成されているため、コールバックrefパターンで両方を設定する
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      // @ts-ignore - reactFlowWrapper.currentはreadonlyではないが、TSが誤検知する場合がある
+      reactFlowWrapper.current = node;
+      drop(node);
+    },
+    [drop]
+  );
+
+  // デバッグ用: isOverの状態監視
+  React.useEffect(() => {
+    if (isOver) {
+      console.log('[NodeEditor] isOver: true');
     }
-  }, [activeLogicGraphId, currentGraph, placedItems, setLogicGraph]);
+  }, [isOver]);
 
-  const {
-    applyNodesChange: onNodesChange,
-    applyEdgesChange: onEdgesChange,
-    addNodeToCurrentGraph: onAddNode,
-    applyConnect: onConnect
-  } = usePageStore.getState();
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    selectItem(node.id, 'node', node.data.label || 'ノード');
 
-  const onNodeClick = useSelectionStore(state => state.handleNodeClick);
+    // WaitForClickノードが選択された場合、ターゲットアイテムをハイライト
+    if (node.type === 'waitForClickNode') {
+      const targetIds = node.data.targetItemIds || (node.data.targetItemId ? [node.data.targetItemId] : []);
+      useSelectionStore.getState().setHighlightedItems(targetIds);
+    } else {
+      // 他のノードが選択された場合はハイライトをクリア
+      useSelectionStore.getState().clearHighlightedItems();
+    }
+  }, [selectItem]);
 
-  const nodes = currentGraph?.nodes || [];
-  const edges = currentGraph?.edges || [];
-
-  const { fitView, project } = useReactFlow();
-  const dropRef = useRef<HTMLDivElement>(null);
-
-  // コンテキストメニュー
-  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number } | null>(null);
-
-  // 右クリックメニューハンドラ
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+  const onPaneClick = useCallback(() => {
+    // メニューを閉じる
+    setContextMenu(null);
+    // ハイライトもクリア
+    useSelectionStore.getState().clearHighlightedItems();
   }, []);
 
-  const [{ isOver }, drop] = useDrop(
-    () => ({
-      accept: ItemTypes.NODE_TOOL,
-      collect: (monitor: DropTargetMonitor) => ({ isOver: !!monitor.isOver() }),
-      drop: (item: NodeToolDragItem, monitor: DropTargetMonitor) => {
-        const { nodeType, nodeName } = item;
-        const clientOffset = monitor.getClientOffset();
-        if (!clientOffset || !dropRef.current) return;
+  // 右クリックメニューハンドラー
+  const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
 
-        const position = project({
-          x: clientOffset.x - (dropRef.current.getBoundingClientRect().left ?? 0),
-          y: clientOffset.y - (dropRef.current.getBoundingClientRect().top ?? 0),
-        });
+  // コメントノード追加ハンドラー
+  const handleAddComment = useCallback(() => {
+    if (!contextMenu) return;
 
-        const newNodeData: any = { label: nodeName };
-        if (nodeType === 'delayNode') newNodeData.durationS = 1.0;
-        if (nodeType === 'waitForClickNode') newNodeData.label = "ターゲット未設定";
+    // クライアント座標をReactFlow座標に変換
+    const position = reactFlowInstance.screenToFlowPosition({
+      x: contextMenu.x,
+      y: contextMenu.y,
+    });
 
-        const newNode: Node = {
-          id: `node-${Date.now()}`,
-          type: nodeType,
-          position,
-          data: newNodeData,
-        };
-        onAddNode(newNode);
-      },
-    }),
-    [project, onAddNode]
-  );
-  drop(dropRef);
+    // コメントノードを作成
+    const newNode: Node = {
+      id: `commentNode_${Date.now()}`,
+      type: 'commentNode',
+      position,
+      data: { label: 'コメント', content: '' },
+    };
 
-  useEffect(() => {
-    if (nodes.length > 0) {
-      setTimeout(() => fitView({ duration: 200 }), 100);
-    }
-  }, [nodes.length > 0 ? nodes[0].id : null, fitView]);
+    // ノードを追加
+    const nextNodes = [...currentGraph.nodes, newNode];
+    updateGraph(nextNodes, currentGraph.edges);
 
-  const nodeTypes = useMemo(() => ({
-    eventNode: (props: NodeProps) => <EventNode {...props} />,
-    actionNode: (props: NodeProps) => <ActionNode {...props} />,
-    ifNode: (props: NodeProps) => <IfNode {...props} />,
-    pageNode: (props: NodeProps) => <PageNode {...props} />,
-    setVariableNode: (props: NodeProps) => <SetVariableNode {...props} />,
-    animateNode: (props: NodeProps) => <AnimateNode {...props} />,
-    delayNode: (props: NodeProps) => <DelayNode {...props} />,
-    waitForClickNode: (props: NodeProps) => <WaitForClickNode {...props} />,
-    abTestNode: (props: NodeProps) => <ABTestNode {...props} />,
-    submitFormNode: (props: NodeProps) => <SubmitFormNode {...props} />,
-    externalApiNode: (props: NodeProps) => <ExternalApiNode {...props} />,
-    commentNode: (props: NodeProps) => <CommentNode {...props} />,
-  }), []);
+    // メニューを閉じる
+    setContextMenu(null);
 
-  const handleNodeClick: NodeClickHandler = (_event, node) => {
-    onNodeClick(node.id, node.data?.label);
-  };
+    // 新しく追加したノードを選択状態にする
+    selectItem(newNode.id, 'node', 'コメント');
+  }, [contextMenu, currentGraph.nodes, currentGraph.edges, updateGraph, selectItem, reactFlowInstance]);
 
-  if (!activeLogicGraphId) return <div className="node-editor-placeholder">アイテムを選択してください</div>;
+  if (!activeLogicGraphId) {
+    return (
+      <div className="node-editor-placeholder">
+        <p>ロジックを編集するアイテムを選択してください</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="node-editor-wrapper">
-      <aside className="node-toolbox">
-        {/* イベントノードの手動追加機能は削除 */}
+    <div className="node-editor-container">
+      {/* ノードパレット */}
+      <NodePalette />
 
-        <div className="toolbox-header">アクション</div>
-        <NodeToolboxItem nodeType="actionNode" nodeName="⚡ 表示/非表示">⚡ 表示/非表示</NodeToolboxItem>
-        <NodeToolboxItem nodeType="animateNode" nodeName="⚡ アニメーション">⚡ アニメーション</NodeToolboxItem>
-        <NodeToolboxItem nodeType="pageNode" nodeName="⚡ ページ遷移">⚡ ページ遷移</NodeToolboxItem>
-        <NodeToolboxItem nodeType="setVariableNode" nodeName="⚡ 変数をセット">⚡ 変数をセット</NodeToolboxItem>
-        <NodeToolboxItem nodeType="submitFormNode" nodeName="📤 フォーム送信">📤 フォーム送信</NodeToolboxItem>
-        <NodeToolboxItem nodeType="externalApiNode" nodeName="🌍 外部API">🌍 外部API</NodeToolboxItem>
-        <div style={{ height: 10 }} />
-
-        <div className="toolbox-header">ロジック</div>
-        <NodeToolboxItem nodeType="delayNode" nodeName="⏱️ 遅延 (Wait)">⏱️ 遅延</NodeToolboxItem>
-        <NodeToolboxItem nodeType="ifNode" nodeName="🧠 もし〜なら">🧠 もし〜なら</NodeToolboxItem>
-        <NodeToolboxItem nodeType="abTestNode" nodeName="⚖️ A/B Test">⚖️ A/B Test</NodeToolboxItem>
-        <NodeToolboxItem nodeType="waitForClickNode" nodeName="👆 クリック待ち">👆 クリック待ち</NodeToolboxItem>
-      </aside>
-
-      <div ref={dropRef} className="react-flow-drop-target" onContextMenu={handleContextMenu}>
+      {/* ReactFlow エディタ */}
+      <div
+        className="node-editor-wrapper"
+        ref={setRefs}
+      >
         <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          nodes={currentGraph.nodes} // Storeの値を直接使用
+          edges={currentGraph.edges} // Storeの値を直接使用
+          onNodesChange={onNodesChange} // 変更を直接Storeへ反映
+          onEdgesChange={onEdgesChange} // 変更を直接Storeへ反映
           onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          onPaneContextMenu={onPaneContextMenu}
           nodeTypes={nodeTypes}
-          onNodeClick={handleNodeClick}
-          className="react-flow-canvas"
           fitView
-          proOptions={{ hideAttribution: true }}
         >
           <Background />
-          <Controls className="rf-controls-dark" />
         </ReactFlow>
-        {isOver && <div className="react-flow-drop-overlay" />}
+
+        {/* 右クリックメニュー */}
+        {contextMenu && (
+          <>
+            {/* 背景クリックで閉じるための透明なレイヤー */}
+            <div
+              style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9998 }}
+              onClick={() => setContextMenu(null)}
+              onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+            />
+            <div
+              className="node-editor-context-menu"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="node-editor-context-menu-item"
+                onClick={handleAddComment}
+              >
+                <span>💬 コメントを追加</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
-
-      {/* 右クリックメニュー */}
-      {contextMenu?.visible && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          selectedCount={0}
-          onGroup={() => { }}
-          onUngroup={() => { }}
-          onDelete={() => { }}
-          onAddComment={() => {
-            if (!dropRef.current) {
-              setContextMenu(null);
-              return;
-            }
-
-            // ReactFlowの座標系に変換
-            const rect = dropRef.current.getBoundingClientRect();
-            const position = project({
-              x: contextMenu.x - rect.left,
-              y: contextMenu.y - rect.top,
-            });
-
-            // コメントノードを追加
-            const newNode: Node = {
-              id: `comment-${Date.now()}`,
-              type: 'commentNode',
-              position,
-              data: { label: 'コメント', content: '', isMinimized: false },
-            };
-            onAddNode(newNode);
-            setContextMenu(null);
-          }}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
     </div>
   );
 };
 
+// Providerでラップする
 const NodeEditor: React.FC = () => {
   return (
     <ReactFlowProvider>
@@ -266,4 +374,4 @@ const NodeEditor: React.FC = () => {
   );
 };
 
-export default React.memo(NodeEditor);
+export default NodeEditor;

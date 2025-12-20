@@ -74,10 +74,22 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     }
   }
   else if (isInput) {
+    let placeholder = item.data.placeholder || "入力してください";
+    // 必須入力の場合、プレースホルダーにアスタリスクを追加
+    if (item.data?.required) {
+      placeholder = `* ${placeholder}`;
+    }
+
     content = (
       <textarea
         className="preview-input-content"
-        placeholder={item.data.placeholder || "入力してください"}
+        style={{
+          // @ts-ignore - CSS変数の設定
+          '--placeholder-color': item.data?.color || '#999999',
+          color: item.data?.color || '#333333',
+          fontSize: item.data?.fontSize ? `${item.data.fontSize}px` : '15px',
+        }}
+        placeholder={placeholder}
         value={inputValue}
         onChange={(e) => {
           setInputValue(e.target.value);
