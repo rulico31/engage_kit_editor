@@ -8,6 +8,7 @@ create table if not exists projects (
   user_id uuid references auth.users not null,
   title text default 'Untitled Project',
   content jsonb default '{}'::jsonb,
+  published_data jsonb,
   is_published boolean default false,
   published_content jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()),

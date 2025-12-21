@@ -11,6 +11,7 @@ import { GridControls } from "./GridControls";
 import "./EditorView.css";
 import "./GridPopover.css";
 import EmbedModal from "./EmbedModal";
+import { ProjectSettingsModal } from "./ProjectSettingsModal";
 
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { useProjectStore } from "../stores/useProjectStore";
@@ -85,6 +86,7 @@ const EditorView: React.FC<EditorViewProps> = ({
 
   const { saveProject } = useProjectStore();
   const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const handleSave = async () => {
     try {
@@ -198,6 +200,7 @@ const EditorView: React.FC<EditorViewProps> = ({
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onPublish={onPublish}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
 
       <div className="editor-workspace-vertical" ref={workspaceRef}>
@@ -300,6 +303,12 @@ const EditorView: React.FC<EditorViewProps> = ({
         <EmbedModal
           projectId={useProjectStore.getState().currentProjectId || ""}
           onClose={() => setIsEmbedModalOpen(false)}
+        />
+      )}
+
+      {isSettingsModalOpen && (
+        <ProjectSettingsModal
+          onClose={() => setIsSettingsModalOpen(false)}
         />
       )}
 

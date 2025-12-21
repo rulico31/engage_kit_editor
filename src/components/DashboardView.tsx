@@ -46,8 +46,66 @@ const DashboardView: React.FC = () => {
     loadData();
   }, [currentProjectId]);
 
-  const handleDownloadCSV = () => {
-    downloadLeadsAsCSV(leads, `leads_${new Date().toISOString().slice(0, 10)}.csv`);
+  /* エクスポート設定用のState */
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState<string>("");
+  const [exportEndDate, setExportEndDate] = useState<string>("");
+  const [exportColumns, setExportColumns] = useState<string[]>([]);
+
+  // 利用可能な全カラムのリスト（データから抽出）
+  const [availableColumns, setAvailableColumns] = useState<string[]>([]);
+
+  // データロード時に全カラムを抽出
+  useEffect(() => {
+    if (leads.length > 0) {
+      const keys = new Set<string>();
+      leads.forEach(l => Object.keys(l.data).forEach(k => keys.add(k)));
+      setAvailableColumns(Array.from(keys).sort());
+      setExportColumns(Array.from(keys).sort()); // デフォルトで全選択
+    }
+  }, [leads]);
+
+  const handleExportClick = () => {
+    setShowExportModal(true);
+    // 日付初期値（直近30日など）
+    const today = new Date();
+    const lastMonth = new Date();
+    lastMonth.setDate(today.getDate() - 30);
+    if (!exportStartDate) setExportStartDate(lastMonth.toISOString().slice(0, 10));
+    if (!exportEndDate) setExportEndDate(today.toISOString().slice(0, 10));
+  };
+
+  const executeExport = () => {
+    // 1. 日付フィルタリング
+    let filteredLeads = leads;
+    if (exportStartDate && exportEndDate) {
+      const start = new Date(exportStartDate);
+      const end = new Date(exportEndDate);
+      end.setHours(23, 59, 59, 999); // 終了日の終わりまで
+
+      filteredLeads = leads.filter(l => {
+        const d = new Date(l.created_at);
+        return d >= start && d <= end;
+      });
+    }
+
+    if (filteredLeads.length === 0) {
+      alert("指定された期間にデータがありません");
+      return;
+    }
+
+    // 2. CSVダウンロード実行
+    downloadLeadsAsCSV(filteredLeads, {
+      fileName: `leads_${exportStartDate}_to_${exportEndDate}.csv`,
+      columns: exportColumns.length > 0 ? exportColumns : undefined
+    });
+    setShowExportModal(false);
+  };
+
+  const toggleColumn = (col: string) => {
+    setExportColumns(prev =>
+      prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
+    );
   };
 
   if (!currentProjectId) {
@@ -66,10 +124,68 @@ const DashboardView: React.FC = () => {
     <div className="dashboard-container">
       <div className="dashboard-header-row">
         <h2 className="dashboard-title">📊 統計ダッシュボード</h2>
-        <button className="dashboard-csv-button" onClick={handleDownloadCSV} disabled={leads.length === 0}>
-          📥 CSVダウンロード
+        <button className="dashboard-csv-button" onClick={handleExportClick} disabled={leads.length === 0}>
+          📥 CSVダウンロード設定
         </button>
       </div>
+
+      {/* エクスポート設定モーダル */}
+      {showExportModal && (
+        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div className="modal-content export-modal" onClick={e => e.stopPropagation()}>
+            <h3>エクスポート設定</h3>
+
+            <div className="export-section">
+              <label>期間指定</label>
+              <div className="date-range-inputs">
+                <input
+                  type="date"
+                  value={exportStartDate}
+                  onChange={e => setExportStartDate(e.target.value)}
+                />
+                <span> ~ </span>
+                <input
+                  type="date"
+                  value={exportEndDate}
+                  onChange={e => setExportEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="export-section">
+              <label>出力項目 (選択: {exportColumns.length}/{availableColumns.length})</label>
+              <div className="columns-selector">
+                <label className="column-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={availableColumns.length > 0 && exportColumns.length === availableColumns.length}
+                    onChange={(e) => setExportColumns(e.target.checked ? availableColumns : [])}
+                  />
+                  <span>すべて選択 / 解除</span>
+                </label>
+                <hr />
+                {availableColumns.map(col => (
+                  <label key={col} className="column-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={exportColumns.includes(col)}
+                      onChange={() => toggleColumn(col)}
+                    />
+                    <span>{col}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="cancel-button" onClick={() => setShowExportModal(false)}>キャンセル</button>
+              <button className="primary-button" onClick={executeExport} disabled={exportColumns.length === 0}>
+                CSVダウンロードを実行
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 統計カードエリア */}
       <div className="dashboard-stats-grid">

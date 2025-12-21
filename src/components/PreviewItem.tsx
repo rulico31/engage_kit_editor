@@ -8,16 +8,15 @@ import { usePreviewStore } from "../stores/usePreviewStore";
 interface PreviewItemProps {
   item: PlacedItemType;
   previewState: PreviewState;
-  setPreviewState: (
-    newState: PreviewState | ((prev: PreviewState) => PreviewState)
-  ) => void;
   allItemLogics: Record<string, NodeGraph>;
   isMobile?: boolean;
+  setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void;
 }
 
 const PreviewItem: React.FC<PreviewItemProps> = ({
   item,
   previewState,
+  setPreviewState,
   isMobile = false,
 }) => {
   const { id, name } = item;
@@ -56,6 +55,61 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const isInput = name.startsWith("テキスト入力欄");
   const isButton = name.includes("ボタン");
 
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 外部からのエラーステート更新 (submitFormNode等から) を反映
+    if (itemState?.error) {
+      setError(itemState.error);
+    }
+  }, [itemState?.error]);
+
+  const validate = (val: string) => {
+    let newError: string | null = null;
+    const trimmed = val ? val.trim() : "";
+
+    // 1. 必須チェック
+    if (item.data.required && !trimmed) {
+      newError = "必須項目です";
+    }
+    // 2. 入力タイプ別チェック
+    else if (trimmed) {
+      if (item.data.inputType === 'email') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmed)) {
+          newError = "メールアドレスの形式が正しくありません";
+        }
+      } else if (item.data.inputType === 'tel') {
+        const telRegex = /^[0-9-]{10,}$/;
+        if (!telRegex.test(trimmed)) {
+          newError = "電話番号の形式が正しくありません";
+        }
+      } else if (item.data.inputType === 'number') {
+        if (isNaN(Number(trimmed))) {
+          newError = "数値を入力してください";
+        }
+      }
+    }
+
+    // エラー状態更新（前回と異なる場合のみ）
+    if (newError !== error) {
+      setError(newError);
+      // store側の状態もクリア（ユーザーが修正し始めたらエラーを消すため）
+      if (!newError && itemState?.error) {
+        setPreviewState(prev => ({
+          ...prev,
+          [id]: { ...prev[id], error: null }
+        }));
+      }
+    }
+    return newError === null;
+  };
+
+  const handleBlur = () => {
+    validate(inputValue);
+    onItemEvent("onInputComplete", id);
+  };
+
   if (name.startsWith("画像")) {
     if (item.data.src) {
       content = (
@@ -81,30 +135,33 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     }
 
     content = (
-      <textarea
-        className="preview-input-content"
-        style={{
-          // @ts-ignore - CSS変数の設定
-          '--placeholder-color': item.data?.color || '#999999',
-          color: item.data?.color || '#333333',
-          fontSize: item.data?.fontSize ? `${item.data.fontSize}px` : '15px',
-        }}
-        placeholder={placeholder}
-        value={inputValue}
-        onChange={(e) => {
-          setInputValue(e.target.value);
-          onVariableChange(variableName, e.target.value);
-        }}
-        onBlur={() => {
-          onItemEvent("onInputComplete", id);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.currentTarget.blur();
-          }
-        }}
-        onClick={(e) => e.stopPropagation()}
-      />
+      <>
+        <textarea
+          className={`preview-input-content ${error ? 'has-error' : ''}`}
+          style={{
+            // @ts-ignore - CSS変数の設定
+            '--placeholder-color': item.data?.color || '#999999',
+            color: item.data?.color || '#333333',
+            fontSize: item.data?.fontSize ? `${item.data.fontSize}px` : '15px',
+          }}
+          placeholder={placeholder}
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            onVariableChange(variableName, e.target.value);
+            // 入力中にエラーをクリアするか？ UX的にはBlurまで待つのが一般的だが、即座に消すのもあり
+            if (error) validate(e.target.value);
+          }}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+        {error && <div className="input-error-message">{error}</div>}
+      </>
     );
   }
   else {

@@ -44,6 +44,23 @@ export interface ABTestStats {
  * プロジェクトの統計情報とリード一覧を取得
  */
 export const fetchProjectStats = async (projectId: string) => {
+  // ローカルプロジェクトまたはIDなしの場合は、APIコールをスキップして空データを返す
+  if (!projectId || projectId.startsWith('local-')) {
+    console.log('[Dashboard/Dev] Skipping stats fetch for local project:', projectId);
+    return {
+      stats: {
+        totalViews: 0,
+        totalLeads: 0,
+        conversionRate: 0,
+        deviceBreakdown: { desktop: 0, mobile: 0, tablet: 0 },
+      },
+      leads: [],
+      dailyStats: [],
+      nodeStats: [],
+      abStats: [],
+    };
+  }
+
   // 1. PV数の取得 (analytics_logs)
   const { count: pvCount, error: pvError } = await supabase
     .from('analytics_logs')
@@ -116,34 +133,59 @@ export const fetchProjectStats = async (projectId: string) => {
 /**
  * リードデータをCSV形式に変換してダウンロード
  */
-export const downloadLeadsAsCSV = (leads: LeadData[], fileName: string = 'leads_data.csv') => {
+export interface ExportOptions {
+  fileName?: string;
+  columns?: string[]; // 出力するカラム（変数のキー）の指定。未指定の場合は全カラム
+}
+
+/**
+ * リードデータをCSV形式に変換してダウンロード
+ */
+export const downloadLeadsAsCSV = (leads: LeadData[], options: ExportOptions = {}) => {
   if (leads.length === 0) {
     alert("データがありません");
     return;
   }
 
-  // 1. JSONデータのキーを全網羅してヘッダーを作成
-  // (ユーザーによって回答項目が異なる可能性があるため)
-  const dataKeys = new Set<string>();
-  leads.forEach(lead => {
-    Object.keys(lead.data).forEach(k => dataKeys.add(k));
-  });
+  const { fileName = 'leads_data.csv', columns } = options;
 
-  const sortedDataKeys = Array.from(dataKeys).sort();
-  const headers = ['ID', 'Date', 'IP Address', 'Device', 'Referrer', ...sortedDataKeys];
+  // 1. ヘッダーの決定
+  // columns指定があればそれを使用、なければデータから全キーを抽出
+  let dataKeys: string[] = [];
+
+  if (columns && columns.length > 0) {
+    dataKeys = columns;
+  } else {
+    const keysSet = new Set<string>();
+    leads.forEach(lead => {
+      Object.keys(lead.data).forEach(k => keysSet.add(k));
+    });
+    dataKeys = Array.from(keysSet).sort();
+  }
+
+  const headers = ['ID', 'Date', 'IP Address', 'Device', 'Referrer', ...dataKeys];
 
   // 2. CSV行の作成
   const rows = leads.map(lead => {
-    const date = new Date(lead.created_at).toLocaleString();
+    // 日付フォーマット: YYYY-MM-DD HH:mm:ss (Excelでソートしやすい形式)
+    const d = new Date(lead.created_at);
+    // 日本時間(JST)などローカルを意識しつつ、フォーマットを固定
+    const dateStr = d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0') + ' ' +
+      String(d.getHours()).padStart(2, '0') + ':' +
+      String(d.getMinutes()).padStart(2, '0') + ':' +
+      String(d.getSeconds()).padStart(2, '0');
+
     const baseInfo = [
       lead.id,
-      `"${date}"`, // 日付にカンマが含まれる場合のためクォート
+      dateStr,
       lead.ip_address || '',
       lead.device_type || '',
-      `"${lead.referrer || ''}"`
+      `"${(lead.referrer || '').replace(/"/g, '""')}"`
     ];
 
-    const answers = sortedDataKeys.map(key => {
+    const answers = dataKeys.map(key => {
       const val = lead.data[key];
       // 値にカンマや改行が含まれる場合はエスケープ
       if (typeof val === 'string') {

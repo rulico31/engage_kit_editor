@@ -9,6 +9,7 @@ import PreviewHost from "./PreviewHost";
 import type { ProjectData } from "../types";
 import "./Artboard.css";
 import { logAnalyticsEvent } from "../lib/analytics";
+import { ViewerErrorBoundary } from "./ViewerErrorBoundary";
 
 interface ViewerHostProps {
   projectId: string;
@@ -78,20 +79,40 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         useProjectStore.setState({ currentProjectId: projectId });
 
         // 1. データベースからデータを取得
-        // ★修正: 'content' カラムは廃止されたため 'data' を取得するように変更
+        // ★修正: 'published_data' を取得するように変更 (Phase 2)
         const { data, error } = await supabase
           .from("projects")
-          .select("published_content, is_published, data")
+          .select("published_data, is_published")
           .eq("id", projectId)
           .single();
 
         if (error) throw error;
         if (!data) throw new Error("プロジェクトが見つかりません");
 
-        // 公開データがあればそれを優先、なければ下書き(data)を表示
-        const projectData = (data.is_published && data.published_content)
-          ? (data.published_content as ProjectData)
-          : (data.data as ProjectData); // content -> data に変更
+        // 公開状態かつ公開データがある場合のみ表示
+        // 下書きデータ ('data') へのフォールバックは廃止 (Safe Integrity)
+        if (!data.is_published || !data.published_data) {
+          throw new Error("このプロジェクトは現在公開されていません。");
+        }
+
+        const projectData = data.published_data as ProjectData;
+
+        // ★ テーマをCSS変数として適用
+        if (projectData.theme) {
+          const root = document.documentElement;
+          if (projectData.theme.fontFamily) {
+            root.style.setProperty('--viewer-font-family', projectData.theme.fontFamily);
+          }
+          if (projectData.theme.accentColor) {
+            root.style.setProperty('--viewer-accent-color', projectData.theme.accentColor);
+          }
+          if (projectData.theme.backgroundColor) {
+            root.style.setProperty('--viewer-bg-color', projectData.theme.backgroundColor);
+          }
+          if (projectData.theme.borderRadius !== undefined) {
+            root.style.setProperty('--viewer-border-radius', `${projectData.theme.borderRadius}px`);
+          }
+        }
 
         if (!projectData) {
           throw new Error("表示できるコンテンツがありません");
@@ -179,13 +200,15 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         height: "100%",
         position: "relative"
       }}>
-        <PreviewHost
-          placedItems={placedItems}
-          previewState={previewState}
-          setPreviewState={setPreviewState}
-          allItemLogics={allItemLogics}
-          isMobile={isMobile}
-        />
+        <ViewerErrorBoundary>
+          <PreviewHost
+            placedItems={placedItems}
+            previewState={previewState}
+            setPreviewState={setPreviewState}
+            allItemLogics={allItemLogics}
+            isMobile={isMobile}
+          />
+        </ViewerErrorBoundary>
 
         {showWatermark && <PoweredByBadge />}
       </div>

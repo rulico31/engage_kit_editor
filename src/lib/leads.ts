@@ -39,9 +39,9 @@ const getDeviceType = (): string => {
 export const submitLeadData = async (variables: Record<string, any>): Promise<boolean> => {
   const projectId = useProjectStore.getState().currentProjectId;
 
-  // プレビュー中などでプロジェクトIDがない場合はスキップ（開発用）
-  if (!projectId) {
-    console.log('[Leads/Dev] Data submission simulation (No Project ID):', variables);
+  // プレビュー中などでプロジェクトIDがない場合、またはローカルプロジェクトの場合はスキップ
+  if (!projectId || projectId.startsWith('local-')) {
+    console.log('[Leads/Dev] Data submission simulation (Local/No ID):', variables);
     return true;
   }
 

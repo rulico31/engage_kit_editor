@@ -26,7 +26,8 @@ export type AnalyticsEventType =
   | 'page_view'       // ビュー数 (PV)
   | 'node_execution'  // ノード実行 (ステップ進行・完了率・離脱率の基礎)
   | 'logic_branch'    // ロジック分岐 (Ifノードの結果など)
-  | 'interaction';    // ユーザー操作 (クリックなど)
+  | 'interaction'     // ユーザー操作 (クリックなど)
+  | 'error';          // ランタイムエラー
 
 /**
  * 分析イベントのペイロード型

@@ -74,12 +74,21 @@ export interface PageData {
 
 }
 
+export interface ThemeConfig {
+  fontFamily?: string;
+  accentColor?: string;
+  backgroundColor?: string;
+  borderRadius?: number; // px
+}
+
 export interface ProjectData {
   projectName: string;
   pages: Record<string, PageData>;
   pageOrder: string[];
   variables: VariableState;
   cloud_id?: string; // ★追加: クラウド同期用のID (UUID)
+  theme?: ThemeConfig; // ★追加: テーマ設定
+  dataRetentionPeriod?: 'forever' | '1year' | '3months';
 }
 
 export interface PageInfo {

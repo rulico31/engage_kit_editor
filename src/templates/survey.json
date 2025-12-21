@@ -1,0 +1,197 @@
+{
+    "projectName": "アンケート",
+    "pages": {
+        "survey-start": {
+            "id": "survey-start",
+            "name": "開始",
+            "placedItems": [
+                {
+                    "id": "title",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 80,
+                    "width": 300,
+                    "height": 60,
+                    "data": {
+                        "text": "ご協力ありがとうございます",
+                        "fontSize": 20
+                    }
+                },
+                {
+                    "id": "desc",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 150,
+                    "width": 300,
+                    "height": 50,
+                    "data": {
+                        "text": "簡単なアンケートにご回答ください",
+                        "fontSize": 14,
+                        "color": "#6b7280"
+                    }
+                },
+                {
+                    "id": "start-btn",
+                    "type": "button",
+                    "name": "ボタン",
+                    "x": 100,
+                    "y": 230,
+                    "width": 200,
+                    "height": 50,
+                    "data": {
+                        "text": "開始"
+                    }
+                }
+            ],
+            "allItemLogics": {
+                "start-btn": {
+                    "nodes": [
+                        {
+                            "id": "event-1",
+                            "type": "eventNode",
+                            "position": {
+                                "x": 100,
+                                "y": 100
+                            },
+                            "data": {
+                                "eventType": "click",
+                                "targetItemIds": [
+                                    "start-btn"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "page-1",
+                            "type": "pageNode",
+                            "position": {
+                                "x": 300,
+                                "y": 100
+                            },
+                            "data": {
+                                "targetPageId": "question-1"
+                            }
+                        }
+                    ],
+                    "edges": [
+                        {
+                            "id": "e1",
+                            "source": "event-1",
+                            "target": "page-1"
+                        }
+                    ]
+                }
+            }
+        },
+        "question-1": {
+            "id": "question-1",
+            "name": "質問1",
+            "placedItems": [
+                {
+                    "id": "q1-text",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 70,
+                    "width": 300,
+                    "height": 40,
+                    "data": {
+                        "text": "Q1. 満足度を教えてください",
+                        "fontSize": 16
+                    }
+                },
+                {
+                    "id": "input-1",
+                    "type": "input",
+                    "name": "入力",
+                    "x": 50,
+                    "y": 130,
+                    "width": 300,
+                    "height": 40,
+                    "data": {
+                        "placeholder": "こちらに入力",
+                        "variableName": "answer1"
+                    }
+                },
+                {
+                    "id": "next-btn",
+                    "type": "button",
+                    "name": "ボタン",
+                    "x": 120,
+                    "y": 200,
+                    "width": 160,
+                    "height": 45,
+                    "data": {
+                        "text": "次へ"
+                    }
+                }
+            ],
+            "allItemLogics": {
+                "next-btn": {
+                    "nodes": [
+                        {
+                            "id": "event-2",
+                            "type": "eventNode",
+                            "position": {
+                                "x": 100,
+                                "y": 100
+                            },
+                            "data": {
+                                "eventType": "click",
+                                "targetItemIds": [
+                                    "next-btn"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "page-2",
+                            "type": "pageNode",
+                            "position": {
+                                "x": 300,
+                                "y": 100
+                            },
+                            "data": {
+                                "targetPageId": "complete"
+                            }
+                        }
+                    ],
+                    "edges": [
+                        {
+                            "id": "e2",
+                            "source": "event-2",
+                            "target": "page-2"
+                        }
+                    ]
+                }
+            }
+        },
+        "complete": {
+            "id": "complete",
+            "name": "完了",
+            "placedItems": [
+                {
+                    "id": "thanks",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 150,
+                    "width": 300,
+                    "height": 80,
+                    "data": {
+                        "text": "ご回答ありがとうございました！",
+                        "fontSize": 20,
+                        "color": "#10b981"
+                    }
+                }
+            ],
+            "allItemLogics": {}
+        }
+    },
+    "pageOrder": [
+        "survey-start",
+        "question-1",
+        "complete"
+    ],
+    "variables": {}
+}

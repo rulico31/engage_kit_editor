@@ -1,0 +1,155 @@
+{
+    "projectName": "ランディングページ",
+    "pages": {
+        "lp-page": {
+            "id": "lp-page",
+            "name": "LP",
+            "placedItems": [
+                {
+                    "id": "hero-title",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 50,
+                    "width": 300,
+                    "height": 70,
+                    "data": {
+                        "text": "魅力的なキャッチコピー",
+                        "fontSize": 28,
+                        "color": "#1f2937"
+                    }
+                },
+                {
+                    "id": "hero-subtitle",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 130,
+                    "width": 300,
+                    "height": 50,
+                    "data": {
+                        "text": "サブタイトルや説明文をここに",
+                        "fontSize": 16,
+                        "color": "#6b7280"
+                    }
+                },
+                {
+                    "id": "cta-button",
+                    "type": "button",
+                    "name": "ボタン",
+                    "x": 100,
+                    "y": 200,
+                    "width": 200,
+                    "height": 50,
+                    "data": {
+                        "text": "今すぐ始める"
+                    }
+                },
+                {
+                    "id": "feature-1",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 300,
+                    "width": 280,
+                    "height": 60,
+                    "data": {
+                        "text": "✓ 特徴1：簡単に使える",
+                        "fontSize": 14
+                    }
+                },
+                {
+                    "id": "feature-2",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 370,
+                    "width": 280,
+                    "height": 60,
+                    "data": {
+                        "text": "✓ 特徴2：高機能",
+                        "fontSize": 14
+                    }
+                },
+                {
+                    "id": "feature-3",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 440,
+                    "width": 280,
+                    "height": 60,
+                    "data": {
+                        "text": "✓ 特徴3：無料で始められる",
+                        "fontSize": 14
+                    }
+                }
+            ],
+            "allItemLogics": {
+                "cta-button": {
+                    "nodes": [
+                        {
+                            "id": "event-1",
+                            "type": "eventNode",
+                            "position": {
+                                "x": 100,
+                                "y": 100
+                            },
+                            "data": {
+                                "eventType": "click",
+                                "targetItemIds": [
+                                    "cta-button"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "page-1",
+                            "type": "pageNode",
+                            "position": {
+                                "x": 300,
+                                "y": 100
+                            },
+                            "data": {
+                                "targetPageId": "thank-you"
+                            }
+                        }
+                    ],
+                    "edges": [
+                        {
+                            "id": "e1",
+                            "source": "event-1",
+                            "target": "page-1"
+                        }
+                    ]
+                }
+            },
+            "backgroundColor": "#ffffff"
+        },
+        "thank-you": {
+            "id": "thank-you",
+            "name": "完了",
+            "placedItems": [
+                {
+                    "id": "thank-title",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 150,
+                    "width": 300,
+                    "height": 100,
+                    "data": {
+                        "text": "ありがとうございます！",
+                        "fontSize": 24,
+                        "color": "#10b981"
+                    }
+                }
+            ],
+            "allItemLogics": {}
+        }
+    },
+    "pageOrder": [
+        "lp-page",
+        "thank-you"
+    ],
+    "variables": {}
+}

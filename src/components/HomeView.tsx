@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./HomeView.css";
 import { supabase } from "../lib/supabaseClient";
 import ConfirmModal from "./ConfirmModal";
+import { TemplateSelectionModal } from "./TemplateSelectionModal";
 
 interface HomeViewProps {
   onCreateProject: (name: string, initialData?: any) => void;
@@ -21,8 +22,10 @@ interface Project {
 const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onLoadFromJSON }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -53,11 +56,29 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
     }
   };
 
-  const handleCreateSubmit = () => {
+  const handleTemplateSelect = (templateId: string | null) => {
+    setSelectedTemplateId(templateId);
+    setIsTemplateModalOpen(false);
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateSubmit = async () => {
     if (!newProjectName.trim()) return;
-    onCreateProject(newProjectName);
+
+    let templateData = null;
+    if (selectedTemplateId) {
+      try {
+        const module = await import(`../templates/${selectedTemplateId}.json`);
+        templateData = module.default;
+      } catch (e) {
+        console.error('Failed to load template:', e);
+      }
+    }
+
+    onCreateProject(newProjectName, templateData);
     setIsCreateModalOpen(false);
     setNewProjectName("");
+    setSelectedTemplateId(null);
   };
 
   const handleCreateKeyDown = (e: React.KeyboardEvent) => {
@@ -258,6 +279,14 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
           confirmLabel="削除する"
           isDanger={true}
         />
+
+        {/* テンプレート選択モーダル */}
+        {isTemplateModalOpen && (
+          <TemplateSelectionModal
+            onClose={() => setIsTemplateModalOpen(false)}
+            onSelectTemplate={handleTemplateSelect}
+          />
+        )}
 
       </div>
     </div>

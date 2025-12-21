@@ -14,6 +14,7 @@ interface HeaderProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onPublish: () => void;
+  onOpenSettings: () => void;
 }
 
 const IconUndo = () => (
@@ -70,6 +71,13 @@ const IconStop = () => (
   </svg>
 );
 
+const IconSettings = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 1v6m0 6v6m5.2-13.8-4.2 4.2m-5.6 5.6-4.2 4.2M23 12h-6m-6 0H5m13.8-5.2-4.2 4.2m-5.6 5.6-4.2 4.2" />
+  </svg>
+);
+
 const Header: React.FC<HeaderProps> = ({
   projectName,
   isPreviewing,
@@ -80,6 +88,7 @@ const Header: React.FC<HeaderProps> = ({
   viewMode,
   onViewModeChange,
   onPublish,
+  onOpenSettings,
 }) => {
   const { undo, redo, canUndo, canRedo } = usePageStore(state => ({
     undo: state.undo,
@@ -157,6 +166,10 @@ const Header: React.FC<HeaderProps> = ({
 
         <button className="icon-button-ghost" onClick={onSave} title="下書き保存">
           <IconCloud />
+        </button>
+
+        <button className="icon-button-ghost" onClick={onOpenSettings} title="プロジェクト設定">
+          <IconSettings />
         </button>
 
         <div className="separator" />

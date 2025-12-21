@@ -1,0 +1,235 @@
+{
+    "projectName": "診断テンプレート",
+    "pages": {
+        "page-1": {
+            "id": "page-1",
+            "name": "スタート",
+            "placedItems": [
+                {
+                    "id": "title-1",
+                    "type": "text",
+                    "name": "テキスト",
+                    "displayName": "タイトル",
+                    "x": 50,
+                    "y": 100,
+                    "width": 300,
+                    "height": 60,
+                    "data": {
+                        "text": "あなたにぴったりの○○診断",
+                        "color": "#333333",
+                        "fontSize": 24
+                    }
+                },
+                {
+                    "id": "start-btn",
+                    "type": "button",
+                    "name": "ボタン",
+                    "displayName": "スタートボタン",
+                    "x": 100,
+                    "y": 250,
+                    "width": 200,
+                    "height": 50,
+                    "data": {
+                        "text": "診断を始める"
+                    }
+                }
+            ],
+            "allItemLogics": {
+                "start-btn": {
+                    "nodes": [
+                        {
+                            "id": "event-1",
+                            "type": "eventNode",
+                            "position": {
+                                "x": 100,
+                                "y": 100
+                            },
+                            "data": {
+                                "eventType": "click",
+                                "targetItemIds": [
+                                    "start-btn"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "page-1",
+                            "type": "pageNode",
+                            "position": {
+                                "x": 300,
+                                "y": 100
+                            },
+                            "data": {
+                                "targetPageId": "page-2"
+                            }
+                        }
+                    ],
+                    "edges": [
+                        {
+                            "id": "e1",
+                            "source": "event-1",
+                            "target": "page-1"
+                        }
+                    ]
+                }
+            },
+            "backgroundColor": "#f5f5f5"
+        },
+        "page-2": {
+            "id": "page-2",
+            "name": "質問1",
+            "placedItems": [
+                {
+                    "id": "question-1",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 80,
+                    "width": 300,
+                    "height": 40,
+                    "data": {
+                        "text": "あなたの好みは？",
+                        "fontSize": 18
+                    }
+                },
+                {
+                    "id": "option-a",
+                    "type": "button",
+                    "name": "ボタン",
+                    "x": 75,
+                    "y": 150,
+                    "width": 250,
+                    "height": 45,
+                    "data": {
+                        "text": "選択肢A"
+                    }
+                },
+                {
+                    "id": "option-b",
+                    "type": "button",
+                    "name": "ボタン",
+                    "x": 75,
+                    "y": 210,
+                    "width": 250,
+                    "height": 45,
+                    "data": {
+                        "text": "選択肢B"
+                    }
+                }
+            ],
+            "allItemLogics": {
+                "option-a": {
+                    "nodes": [
+                        {
+                            "id": "event-2",
+                            "type": "eventNode",
+                            "position": {
+                                "x": 100,
+                                "y": 100
+                            },
+                            "data": {
+                                "eventType": "click",
+                                "targetItemIds": [
+                                    "option-a"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "page-2",
+                            "type": "pageNode",
+                            "position": {
+                                "x": 300,
+                                "y": 100
+                            },
+                            "data": {
+                                "targetPageId": "page-3"
+                            }
+                        }
+                    ],
+                    "edges": [
+                        {
+                            "id": "e2",
+                            "source": "event-2",
+                            "target": "page-2"
+                        }
+                    ]
+                },
+                "option-b": {
+                    "nodes": [
+                        {
+                            "id": "event-3",
+                            "type": "eventNode",
+                            "position": {
+                                "x": 100,
+                                "y": 100
+                            },
+                            "data": {
+                                "eventType": "click",
+                                "targetItemIds": [
+                                    "option-b"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "page-3",
+                            "type": "pageNode",
+                            "position": {
+                                "x": 300,
+                                "y": 100
+                            },
+                            "data": {
+                                "targetPageId": "page-3"
+                            }
+                        }
+                    ],
+                    "edges": [
+                        {
+                            "id": "e3",
+                            "source": "event-3",
+                            "target": "page-3"
+                        }
+                    ]
+                }
+            }
+        },
+        "page-3": {
+            "id": "page-3",
+            "name": "結果",
+            "placedItems": [
+                {
+                    "id": "result-title",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 100,
+                    "width": 300,
+                    "height": 50,
+                    "data": {
+                        "text": "診断結果",
+                        "fontSize": 22,
+                        "color": "#2563eb"
+                    }
+                },
+                {
+                    "id": "result-text",
+                    "type": "text",
+                    "name": "テキスト",
+                    "x": 50,
+                    "y": 170,
+                    "width": 300,
+                    "height": 100,
+                    "data": {
+                        "text": "あなたは○○タイプです！",
+                        "fontSize": 16
+                    }
+                }
+            ],
+            "allItemLogics": {}
+        }
+    },
+    "pageOrder": [
+        "page-1",
+        "page-2",
+        "page-3"
+    ],
+    "variables": {}
+}

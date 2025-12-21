@@ -4,6 +4,10 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabaseClient';
 import type { ProjectData, SavedProject } from '../types';
 import { usePageStore } from './usePageStore';
+import { ValidationService } from '../lib/ValidationService';
+import type { ValidationResult } from '../lib/ValidationService';
+import { DataMinifier } from '../lib/DataMinifier';
+import type { ThemeConfig } from '../types';
 
 // =========================================================
 // ★ 修正 1: Electron APIの型定義の参照
@@ -48,6 +52,12 @@ interface ProjectStoreState {
   resetProject: () => void;
   // ★追加: クラウドIDを更新するアクション（Publish完了時に呼ぶ）
   updateCloudId: (cloudId: string) => void;
+  // ★追加: プロジェクトの公開アクション
+  publishProject: () => Promise<ValidationResult | boolean>;
+  // ★追加: プロジェクトの非公開化アクション
+  unpublishProject: () => Promise<boolean>;
+  // ★追加: プロジェクト名の更新アクション
+  updateProjectName: (name: string) => void;
 }
 
 export const useProjectStore = create<ProjectStoreState>((set, get) => ({
@@ -276,6 +286,186 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       set({ error: err.message, isLoading: false });
       throw err;
     }
+  },
+
+  // --- ★追加: プロジェクト公開 ---
+  publishProject: async (): Promise<ValidationResult | boolean> => {
+    const { currentProjectId, projectMeta } = get();
+    if (!currentProjectId) return false;
+
+    set({ isLoading: true, error: null });
+
+    // 現状の下書きデータ ("data") を取得
+    // 注: saveProject() が直前に呼ばれている前提、またはここで明示的に最新をとる
+    const pageState = usePageStore.getState();
+    const dataToPublish: ProjectData = {
+      projectName: projectMeta?.name || "無題",
+      pages: pageState.pages,
+      pageOrder: pageState.pageOrder,
+      variables: {},
+      cloud_id: projectMeta?.cloud_id
+    };
+
+    // ★ 検証: データの品質チェック
+    const validationResult = ValidationService.validate(dataToPublish);
+
+    // エラーがある場合は公開を中止
+    if (!validationResult.isValid) {
+      console.error('Validation failed:', validationResult);
+      set({ isLoading: false });
+      return validationResult; // 検証結果を返す
+    }
+
+    // 警告がある場合はログ出力（公開は続行）
+    if (validationResult.warnings.length > 0) {
+      console.warn('Validation warnings:', validationResult.warnings);
+    }
+
+    // 1. Electronアプリの場合 (ローカル)
+    // ローカル環境での「公開」のセマンティクスは曖昧だが、ここでは
+    // メタデータの is_published フラグを立てるのみとする (または外部へのアップロード処理などをここに記述)
+    if (window.electronAPI) {
+      // ローカルでは実質的な「公開」はないため、保存と同様の扱い + フラグ更新
+      // 本来はここでデプロイ等の処理が入る
+      console.log('Local Publish: Just saving with is_published=true');
+
+      // 保存処理を呼んでファイルを更新 (メタデータも更新される)
+      // ただしローカルファイルに is_published を持たせるかどうかは仕様次第 => SavedProject型にはある
+      if (projectMeta) {
+        set({
+          projectMeta: { ...projectMeta, is_published: true }
+        });
+      }
+
+      // まずは保存を実行
+      const saved = await get().saveProject();
+      set({ isLoading: false });
+      return saved;
+    }
+
+    // 2. Web (Supabase) の場合
+    try {
+      // ★ 最適化: 公開用データをminify（エディタ専用プロパティを削除）
+      const minifiedData = DataMinifier.minifyForPublish(dataToPublish);
+
+      // transactions的な処理が望ましいが、Supabase単体ではRPC等が必要。
+      // ここでは update で data を published_data にコピーする
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          published_data: minifiedData, // 最適化されたデータを公開
+          is_published: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentProjectId);
+
+      if (error) throw error;
+
+      console.log('Project published successfully via Supabase!');
+
+      if (projectMeta) {
+        set({
+          projectMeta: {
+            ...projectMeta,
+            is_published: true,
+            updated_at: new Date().toISOString(),
+            // メモリ上のメタデータに published_data を持たせるかは任意だが、
+            // SavedProject型には通常 data があるのみ。
+            // 必要なら拡張するが、ここではフラグ更新のみに留める
+          },
+          isLoading: false
+        });
+      }
+      return true;
+
+    } catch (err: any) {
+      console.error('Publish error:', err);
+      set({ error: err.message, isLoading: false });
+      return false;
+    }
+  },
+
+  // --- ★追加: プロジェクトの非公開化 ---
+  unpublishProject: async (): Promise<boolean> => {
+    const { currentProjectId, projectMeta } = get();
+    if (!currentProjectId) return false;
+
+    set({ isLoading: true, error: null });
+
+    // 1. Electronアプリの場合 (ローカル)
+    if (window.electronAPI) {
+      // ローカルではメタデータのフラグのみ更新
+      if (projectMeta) {
+        set({
+          projectMeta: { ...projectMeta, is_published: false },
+          isLoading: false
+        });
+      }
+      return true;
+    }
+
+    // 2. Web (Supabase) の場合
+    try {
+      // published_dataは保持したまま、is_publishedのみfalseにする
+      // これにより再公開が高速に行える
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          is_published: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentProjectId);
+
+      if (error) throw error;
+
+      console.log('Project unpublished successfully');
+
+      if (projectMeta) {
+        set({
+          projectMeta: {
+            ...projectMeta,
+            is_published: false,
+            updated_at: new Date().toISOString(),
+          },
+          isLoading: false
+        });
+      }
+      return true;
+
+    } catch (err: any) {
+      console.error('Unpublish error:', err);
+      set({ error: err.message, isLoading: false });
+      return false;
+    }
+  },
+
+  // --- ★追加: プロジェクト名の更新 ---
+  updateProjectName: (name: string) => {
+    const { projectMeta } = get();
+    if (projectMeta) {
+      set({
+        projectMeta: {
+          ...projectMeta,
+          name: name
+        }
+      });
+    }
+  },
+
+  // --- ★追加: テーマ更新 ---
+  updateTheme: (theme) => {
+    const pageState = usePageStore.getState();
+    const currentData = {
+      projectName: get().projectMeta?.name || "無題",
+      pages: pageState.pages,
+      pageOrder: pageState.pageOrder,
+      variables: {},
+      cloud_id: get().projectMeta?.cloud_id,
+      theme: theme
+    };
+
+    // PageStoreに反映
+    usePageStore.getState().loadFromData(currentData);
   },
 
   // --- ★追加: クラウドIDの更新 ---
