@@ -3,6 +3,7 @@ import "./HomeView.css";
 import { supabase } from "../lib/supabaseClient";
 import ConfirmModal from "./ConfirmModal";
 import { TemplateSelectionModal } from "./TemplateSelectionModal";
+import { useAuthStore } from "../stores/useAuthStore";
 
 interface HomeViewProps {
   onCreateProject: (name: string, initialData?: any) => void;
@@ -22,6 +23,7 @@ interface Project {
 const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onLoadFromJSON }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProjectLoading, setIsProjectLoading] = useState(false); // プロジェクト読み込み中の状態
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -34,6 +36,15 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
   // Rename State
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+
+  // ユーザー情報を取得
+  const user = useAuthStore(state => state.user);
+  const isAnonymous = useAuthStore(state => state.isAnonymous);
+
+  // メールログイン用のstate
+  const [emailInput, setEmailInput] = useState('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   useEffect(() => {
     fetchProjects();
@@ -93,17 +104,37 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
     setIsDeleteModalOpen(true);
   };
 
+  // プロジェクトクリック時のハンドラ
+  const handleProjectClick = (projectId: string) => {
+    setIsProjectLoading(true); // ローディング開始
+    // 少し遅延させて視覚的なフィードバックを確実にする（UX向上）
+    // 実際の読み込みはonOpenProject内で行われる
+    requestAnimationFrame(() => {
+      onOpenProject(projectId);
+    });
+  };
+
   // 削除実行
   const executeDeleteProject = async () => {
     if (!projectToDelete) return;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("projects")
         .delete()
-        .eq("id", projectToDelete.id);
+        .eq("id", projectToDelete.id)
+        .select();
 
       if (error) throw error;
+
+      // 実際に削除されたかを確認（dataが空またはnullの場合は削除失敗）
+      if (!data || data.length === 0) {
+        console.error("Delete failed: No rows affected");
+        alert("プロジェクトの削除に失敗しました。権限がない可能性があります。");
+        setIsDeleteModalOpen(false);
+        setProjectToDelete(null);
+        return;
+      }
 
       // UI更新
       setProjects(projects.filter((p) => p.id !== projectToDelete.id));
@@ -112,6 +143,8 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
     } catch (err) {
       console.error("Error deleting project:", err);
       alert("プロジェクトの削除に失敗しました");
+      setIsDeleteModalOpen(false);
+      setProjectToDelete(null);
     }
   };
 
@@ -119,6 +152,31 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
   const formatDate = (dateString: string) => {
     const d = new Date(dateString);
     return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  };
+
+  // メールログイン処理
+  const handleEmailLogin = async () => {
+    if (!emailInput.trim()) {
+      setEmailError('メールアドレスを入力してください');
+      return;
+    }
+
+    // 簡単なメールアドレス検証
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailInput)) {
+      setEmailError('有効なメールアドレスを入力してください');
+      return;
+    }
+
+    try {
+      await useAuthStore.getState().signInWithEmail(emailInput);
+      setEmailSent(true);
+      setEmailError('');
+      setEmailInput('');
+    } catch (error: any) {
+      setEmailError(error.message || 'メール送信に失敗しました');
+      setEmailSent(false);
+    }
   };
 
   // リネーム開始
@@ -163,22 +221,111 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
     }
   };
 
+  // スクロール検知用のstate
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    setIsScrolled(scrollTop > 50);
+  };
+
   return (
-    <div className="home-view">
+    <div className="home-view" onScroll={handleScroll}>
       <div className="home-container">
 
         {/* ヘッダー */}
-        <div className="home-header">
+        <div className={`home-header ${isScrolled ? 'scrolled' : ''}`}>
           <div className="brand-logo">EngageKit</div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+
+          {/* 右側のボタングループ */}
+          <div className="header-actions">
+            {/* JSONから読み込みボタン */}
             {onLoadFromJSON && (
               <button className="load-json-btn" onClick={onLoadFromJSON}>
                 📂 JSONから読み込み
               </button>
             )}
+
+            {/* 新規プロジェクトボタン */}
             <button className="create-project-btn" onClick={() => setIsCreateModalOpen(true)}>
               + 新規プロジェクト
             </button>
+
+            {/* 認証ボタン（Googleログイン or ログアウト） */}
+            {!user || isAnonymous ? (
+              <>
+                <button
+                  className="google-login-btn"
+                  onClick={() => {
+                    useAuthStore.getState().signInWithGoogle();
+                  }}
+                >
+                  <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                    <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+                    <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+                    <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+                    <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+                  </svg>
+                  Googleでログイン
+                </button>
+
+                {/* 区切り線 */}
+                <div className="auth-divider">
+                  <span>または</span>
+                </div>
+
+                {/* メールログインフォーム */}
+                <div className="email-login-form">
+                  <input
+                    type="email"
+                    placeholder="メールアドレスを入力"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="email-input"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleEmailLogin();
+                      }
+                    }}
+                  />
+                  <button
+                    className="email-login-btn"
+                    onClick={handleEmailLogin}
+                  >
+                    ログインリンクを送信
+                  </button>
+
+                  {emailSent && (
+                    <div className="email-success">
+                      📧 メールを送信しました。受信箱を確認してください。
+                    </div>
+                  )}
+
+                  {emailError && (
+                    <div className="email-error">
+                      ⚠️ {emailError}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <button
+                className="logout-btn"
+                onClick={async () => {
+                  if (confirm('ログアウトしますか？')) {
+                    await useAuthStore.getState().signOut();
+                    window.location.reload();
+                  }
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                ログアウト
+              </button>
+            )}
           </div>
         </div>
 
@@ -196,7 +343,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
               <div
                 key={project.id}
                 className="project-card"
-                onClick={() => onOpenProject(project.id)}
+                onClick={() => handleProjectClick(project.id)}
               >
                 <div className="project-thumbnail">
                   {/* サムネイル機能は未実装のため、プレースホルダー */}
@@ -279,6 +426,17 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
           confirmLabel="削除する"
           isDanger={true}
         />
+
+        {/* 全画面ローディングオーバーレイ */}
+        {isProjectLoading && (
+          <div className="loading-overlay">
+            <div className="loading-content">
+              <div className="loading-logo">EngageKit</div>
+              <div className="loading-spinner"></div>
+              <div className="loading-text">Editorを起動中...</div>
+            </div>
+          </div>
+        )}
 
         {/* テンプレート選択モーダル */}
         {isTemplateModalOpen && (

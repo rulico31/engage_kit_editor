@@ -5,6 +5,8 @@ import type { Node, Edge } from "reactflow";
 // ★ 修正: ダッシュボードモードを追加
 export type ViewMode = "design" | "logic" | "split" | "dashboard";
 
+
+
 export interface PlacedItemType {
   id: string;
   type: string; // added
@@ -49,6 +51,10 @@ export interface PlacedItemType {
     isArtboardBackground?: boolean; // アートボード背景かどうか
     color?: string; // 文字色など
     fontSize?: number;
+
+    // 電話番号入力用
+    enableCountryCode?: boolean; // 国コード選択UIを表示するか
+    countryCode?: string; // 選択された国コード (例: "+81")
   };
 }
 
@@ -128,6 +134,7 @@ export interface PropertyConfig {
   min?: number; // for number
   max?: number; // for number
   step?: number; // for number
+  checkboxLabel?: string; // チェックボックスの横に表示するテキスト
   // 条件付き表示: 関数形式またはオブジェクト形式 { name: string, value: any }
   condition?: ((data: any) => boolean) | { name: string; value: any };
 }
@@ -143,6 +150,16 @@ export interface NodeGraph {
 export interface PreviewState {
   currentPageId: string;
   isFinished: boolean;
+  confirmationModal?: {
+    isOpen: boolean;
+    nodeId: string;
+    variables: Record<string, any>;
+    headerText: string;
+    noticeText: string;
+    targetItemIds?: string[]; // ★ 追加: 表示対象のアイテムID
+    backPageId?: string; // ★ 追加: 戻る先のページID
+    isSubmitConfirmation?: boolean; // ★ 追加: 送信前の確認かどうか
+  };
   [key: string]: any; // 動的なアイテム状態を許可
 }
 

@@ -21,6 +21,7 @@ const nodeTypes: NodeTypeDefinition[] = [
     { type: 'pageNode', label: 'ページ遷移', icon: '📄', category: 'action', description: 'ページを移動' },
     { type: 'animateNode', label: 'アニメーション', icon: '🎬', category: 'action', description: 'アニメーション実行' },
     { type: 'submitFormNode', label: 'フォーム送信', icon: '📮', category: 'action', description: 'フォームデータ送信' },
+    { type: 'confirmationNode', label: '確認画面', icon: '✅', category: 'action', description: '入力内容の確認画面を表示' },
     { type: 'externalApiNode', label: '外部API', icon: '🌐', category: 'action', description: 'API呼び出し' },
 
     // 制御フロー

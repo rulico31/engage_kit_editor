@@ -36,6 +36,7 @@ import ExternalApiNode from './nodes/ExternalApiNode';
 import ABTestNode from './nodes/ABTestNode';
 import CommentNode from './nodes/CommentNode';
 import SubmitFormNode from './nodes/SubmitFormNode';
+import ConfirmationNode from './nodes/ConfirmationNode';
 
 import { usePageStore } from '../stores/usePageStore';
 import { useSelectionStore } from '../stores/useSelectionStore';
@@ -54,6 +55,7 @@ const nodeTypes: NodeTypes = {
   abTestNode: ABTestNode,
   commentNode: CommentNode,
   submitFormNode: SubmitFormNode,
+  confirmationNode: ConfirmationNode,
 };
 
 // 空のグラフデータを定数として定義（参照安定化のため）
@@ -175,6 +177,7 @@ const NodeEditorContent: React.FC = () => {
         'abTestNode': 'A/Bテスト',
         'commentNode': 'コメント',
         'submitFormNode': 'フォーム送信',
+        'confirmationNode': '確認画面',
       };
 
       // 各ノードタイプのデフォルト値を取得
@@ -195,17 +198,29 @@ const NodeEditorContent: React.FC = () => {
           case 'delayNode':
             return { ...baseData, durationS: '1.0' };
           case 'pageNode':
-            return { ...baseData };
+            return { ...baseData, enableValidation: true };
           case 'waitForClickNode':
             return { ...baseData };
           case 'externalApiNode':
-            return { ...baseData, method: 'GET' };
+            return { ...baseData, method: 'POST' };
           case 'abTestNode':
             return { ...baseData, ratioA: 50 };
           case 'commentNode':
             return { ...baseData, content: '' };
           case 'submitFormNode':
-            return { ...baseData };
+            return {
+              ...baseData,
+              enableConfirmation: false,
+              confirmHeaderText: '入力内容をご確認ください',
+              confirmNoticeText: '内容に誤りがないかご確認の上、送信ボタンを押してください。'
+            };
+          // case 'confirmationNode':
+          //   return {
+          //     ...baseData,
+          //     displayMode: 'auto',
+          //     headerText: '入力内容をご確認ください',
+          //     noticeText: '内容に誤りがないかご確認の上、OKボタンを押してください。'
+          //   };
           default:
             return baseData;
         }

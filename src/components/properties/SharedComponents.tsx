@@ -20,7 +20,7 @@ export const AccordionSection: React.FC<AccordionProps> = ({
   return (
     <div className="accordion-section">
       <div className="accordion-header" onClick={() => setIsOpen(!isOpen)}>
-        <span className={`accordion-icon ${isOpen ? "is-open" : ""}`}>▼</span>
+        <span className={`accordion-icon ${isOpen ? "is-open" : ""}`}>▶</span>
         <span className="accordion-title">{title}</span>
       </div>
       {isOpen && <div className="accordion-content">{children}</div>}

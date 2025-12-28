@@ -1,0 +1,99 @@
+/* ConfirmationNode.css */
+
+.confirmation-node {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: 2px solid #5a67d8;
+    border-radius: 8px;
+    min-width: 180px;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    transition: all 0.2s ease;
+}
+
+.confirmation-node:hover {
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+.confirmation-node-handle {
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border: 2px solid #5a67d8;
+}
+
+.confirmation-node-handle:hover {
+    background: #5a67d8;
+}
+
+.confirmation-node-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.confirmation-node-icon {
+    width: 18px;
+    height: 18px;
+    color: #ffffff;
+}
+
+.confirmation-node-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+}
+
+.confirmation-node-body {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.confirmation-node-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    position: relative;
+    transition: background 0.2s ease;
+}
+
+.confirmation-node-status-row:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.confirmation-node-status-row.back {
+    border-left: 3px solid #f59e0b;
+}
+
+.confirmation-node-status-row.confirm {
+    border-left: 3px solid #10b981;
+}
+
+.confirmation-node-status-row .status-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    flex: 1;
+}
+
+.confirmation-node-status-row .status-icon {
+    width: 16px;
+    height: 16px;
+    color: #ffffff;
+    opacity: 0.8;
+    margin-right: 8px;
+}
+
+.confirmation-node-status-row .status-handle {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+}

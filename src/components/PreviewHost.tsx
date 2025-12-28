@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import PreviewItem from "./PreviewItem";
+import ConfirmationModal from "./ConfirmationModal";
+import DebugLogPanel from "./DebugLogPanel";
+import { useDebugLogStore } from "../stores/useDebugLogStore";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./Artboard.css"; // (Artboard のスタイルを流用)
 
@@ -20,6 +23,13 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
   allItemLogics,
   isMobile = false,
 }) => {
+  const clearLogs = useDebugLogStore(state => state.clearLogs);
+
+  // プレビュー開始時にログをクリア
+  useEffect(() => {
+    clearLogs();
+  }, [clearLogs]);
+
   // コンテナのスタイル
   // 背景設定は親コンポーネント（ViewerHostやEditorView）側で行うため、ここでは指定しない
   const containerStyle: React.CSSProperties = {
@@ -56,6 +66,12 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
           />
         );
       })}
+
+      {/* 確認モーダル */}
+      <ConfirmationModal />
+
+      {/* デバッグログパネル - 本番では非表示 */}
+      {/* <DebugLogPanel /> */}
     </div>
   );
 };

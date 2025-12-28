@@ -91,12 +91,9 @@ export const externalApiNodeConfig: any = {
             name: "method",
             label: "メソッド:",
             type: "select",
-            defaultValue: "GET",
+            defaultValue: "POST",
             options: [
-                { label: "GET (取得)", value: "GET" },
                 { label: "POST (送信)", value: "POST" },
-                { label: "PUT (更新)", value: "PUT" },
-                { label: "DELETE (削除)", value: "DELETE" },
             ],
         },
         {

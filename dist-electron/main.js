@@ -22,24 +22,34 @@ function createWindow() {
       sandbox: false
     }
   });
-  ipcMain.handle("save-project-file", async (event, data) => {
-    if (!mainWindow) return false;
-    try {
-      const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-        title: "EngageKit プロジェクトを保存",
-        defaultPath: path.join(app.getPath("documents"), "New Project.engage"),
-        filters: [
-          { name: "EngageKit Project", extensions: ["engage"] }
-        ]
-      });
-      if (canceled || !filePath) {
-        return false;
+  ipcMain.handle("save-project-file", async (event, data, filePath, projectName) => {
+    if (!mainWindow) return { success: false };
+    let targetPath = filePath;
+    if (!targetPath) {
+      try {
+        const defaultFileName = projectName ? `${projectName}.engage` : "New Project.engage";
+        const { canceled, filePath: selectedPath } = await dialog.showSaveDialog(mainWindow, {
+          title: "EngageKit プロジェクトを保存",
+          defaultPath: path.join(app.getPath("documents"), defaultFileName),
+          filters: [
+            { name: "EngageKit Project", extensions: ["engage"] }
+          ]
+        });
+        if (canceled || !selectedPath) {
+          return { success: false };
+        }
+        targetPath = selectedPath;
+      } catch (error) {
+        console.error("保存ダイアログエラー:", error);
+        return { success: false, error: String(error) };
       }
-      await fs.writeFile(filePath, data, "utf-8");
-      return true;
+    }
+    try {
+      await fs.writeFile(targetPath, data, "utf-8");
+      return { success: true, filePath: targetPath };
     } catch (error) {
       console.error("ファイル保存エラー:", error);
-      return false;
+      return { success: false, error: String(error) };
     }
   });
   ipcMain.handle("open-project-file", async (event) => {
@@ -57,7 +67,7 @@ function createWindow() {
       }
       const filePath = filePaths[0];
       const data = await fs.readFile(filePath, "utf-8");
-      return data;
+      return { data, filePath };
     } catch (error) {
       console.error("ファイル読込エラー:", error);
       return null;

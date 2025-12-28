@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useProjectStore } from '../stores/useProjectStore';
-import { usePageStore } from '../stores/usePageStore';
+
 import type { ValidationResult } from '../lib/ValidationService';
-import type { ThemeConfig } from '../types';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
 import './ProjectSettingsModal.css';
 
@@ -24,23 +23,14 @@ const IconCheck = () => (
 );
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onClose }) => {
-    const { currentProjectId, projectMeta, publishProject, unpublishProject, updateProjectName } = useProjectStore();
-    const pageState = usePageStore();
+    const { currentProjectId, projectMeta, publishProject, unpublishProject, updateProjectName, saveProject } = useProjectStore();
     const [projectName, setProjectName] = useState(projectMeta?.name || '');
     const [isPublishing, setIsPublishing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
     const [activeTab, setActiveTab] = useState<'settings' | 'analytics'>('settings');
 
-    // テーマ設定（現在のプロジェクトデータから取得）
-    const currentTheme = pageState.pages[Object.keys(pageState.pages)[0]]?.id ?
-        Object.values(pageState.pages)[0] : null;
-    const [theme, setTheme] = useState<ThemeConfig>({
-        fontFamily: 'system-ui',
-        accentColor: '#3b82f6',
-        backgroundColor: '#ffffff',
-        borderRadius: 8
-    });
+
 
     // 公開URLの生成
     const publicUrl = currentProjectId
@@ -62,11 +52,40 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
         }
     };
 
+    // 設定のみ保存
+    const handleSaveSettings = async () => {
+        setIsPublishing(true); // ローディング表示
+        try {
+            // プロジェクト名更新（変更があれば）
+            if (projectName.trim() && projectName !== projectMeta?.name) {
+                updateProjectName(projectName.trim());
+            }
+
+            // ストア保存（永続化）
+            await saveProject();
+
+            // alert('設定を保存しました'); // トーストが出るのでアラートは不要かもだが、明示的に
+            alert('設定を保存しました');
+        } catch (e) {
+            console.error(e);
+            alert('保存に失敗しました');
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
     const handlePublish = async () => {
         setIsPublishing(true);
         setValidationResult(null); // リセット
 
         try {
+            // 公開前に最新の設定を保存・適用
+            if (projectName.trim() && projectName !== projectMeta?.name) {
+                updateProjectName(projectName.trim());
+            }
+            // saveProjectはpublishProject内でも呼ばれる可能性があるが、念のため
+            await saveProject();
+
             const result = await publishProject();
 
             // 検証結果が返された場合(エラーあり)
@@ -202,66 +221,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
                             </div>
                         </div>
 
-                        {/* テーマ設定 */}
-                        <div className="settings-section">
-                            <label className="settings-label">テーマ設定</label>
-                            <div className="theme-controls">
-                                <div className="theme-control-row">
-                                    <label>フォント</label>
-                                    <select
-                                        className="settings-input"
-                                        value={theme.fontFamily}
-                                        onChange={(e) => setTheme({ ...theme, fontFamily: e.target.value })}
-                                    >
-                                        <option value="system-ui">システムフォント</option>
-                                        <option value="'Noto Sans JP', sans-serif">Noto Sans JP</option>
-                                        <option value="'M PLUS Rounded 1c', sans-serif">M PLUS Rounded</option>
-                                        <option value="'Zen Kaku Gothic New', sans-serif">Zen Kaku Gothic</option>
-                                    </select>
-                                </div>
-                                <div className="theme-control-row">
-                                    <label>アクセントカラー</label>
-                                    <input
-                                        type="color"
-                                        className="color-picker"
-                                        value={theme.accentColor}
-                                        onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
-                                    />
-                                    <input
-                                        type="text"
-                                        className="color-text"
-                                        value={theme.accentColor}
-                                        onChange={(e) => setTheme({ ...theme, accentColor: e.target.value })}
-                                    />
-                                </div>
-                                <div className="theme-control-row">
-                                    <label>背景色</label>
-                                    <input
-                                        type="color"
-                                        className="color-picker"
-                                        value={theme.backgroundColor}
-                                        onChange={(e) => setTheme({ ...theme, backgroundColor: e.target.value })}
-                                    />
-                                    <input
-                                        type="text"
-                                        className="color-text"
-                                        value={theme.backgroundColor}
-                                        onChange={(e) => setTheme({ ...theme, backgroundColor: e.target.value })}
-                                    />
-                                </div>
-                                <div className="theme-control-row">
-                                    <label>角丸 (px)</label>
-                                    <input
-                                        type="number"
-                                        className="settings-input"
-                                        min="0"
-                                        max="50"
-                                        value={theme.borderRadius}
-                                        onChange={(e) => setTheme({ ...theme, borderRadius: parseInt(e.target.value) || 0 })}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+
 
                         {/* データ保持期間設定 */}
                         <div className="settings-section">
@@ -334,12 +294,24 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
                         )}
                     </div>
                 ) : (
-                    <AnalyticsDashboard projectId={currentProjectId || ''} />
+                    <div className="settings-modal-body">
+                        <AnalyticsDashboard projectId={currentProjectId || ''} />
+                    </div>
                 )}
 
                 <div className="settings-modal-footer">
                     <button className="settings-button-secondary" onClick={onClose}>
                         閉じる
+                    </button>
+                    {/* 設定保存ボタン追加 */}
+                    <button
+                        className="settings-button-secondary"
+                        onClick={handleSaveSettings}
+                        disabled={isPublishing}
+                        style={{ marginLeft: 'auto', marginRight: '8px' }}
+                        title="公開せずに現在の設定を保存します"
+                    >
+                        {isPublishing ? '保存中...' : '設定を保存'}
                     </button>
                     <button
                         className="settings-button-primary"

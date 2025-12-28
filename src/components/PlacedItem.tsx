@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
-import "./PreviewItem.css"; 
-import { usePreviewStore } from "../stores/usePreviewStore"; 
+import "./PreviewItem.css";
+import { usePreviewStore } from "../stores/usePreviewStore";
 
 interface PreviewItemProps {
   item: PlacedItemType;
@@ -30,11 +30,11 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     if (variableName && variables[variableName] !== undefined) {
       setInputValue(variables[variableName]);
     }
-  }, [variableName]); 
+  }, [variableName]);
 
   const handleClick = () => {
     if (name.includes("ボタン") || name.includes("画像")) {
-        onItemEvent("click", id);
+      onItemEvent("click", id);
     }
   };
 
@@ -50,9 +50,9 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   if (name.startsWith("画像")) {
     if (item.data.src) {
       content = (
-        <img 
-          src={item.data.src} 
-          alt={item.data.text || "image"} 
+        <img
+          src={item.data.src}
+          alt={item.data.text || "image"}
           className="preview-image-content"
           draggable={false}
           onLoad={() => {
@@ -64,7 +64,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     } else {
       content = <div className="preview-placeholder">No Image</div>;
     }
-  } 
+  }
   else if (isInput) {
     content = (
       <textarea
@@ -80,7 +80,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            e.currentTarget.blur(); 
+            e.currentTarget.blur();
           }
         }}
         onClick={(e) => e.stopPropagation()}
@@ -102,19 +102,22 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         left: `${itemState.x}px`,
         top: `${itemState.y}px`,
         width: `${width}px`,
-        
+
         height: isAutoHeight ? 'auto' : `${height}px`,
         minHeight: isAutoHeight ? `${height}px` : undefined,
-        
-        zIndex: 0, 
+
+        zIndex: 0,
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
         color: item.data.color || '#333333',
-        
+
         // 枠線の制御（入力欄はCSSで制御するためここではborder指定をスキップする場合もあるが、一貫性のため残す）
         border: (item.data.showBorder === false) ? 'none' : undefined,
-        backgroundColor: (item.data.isTransparent) ? 'transparent' : undefined,
+        backgroundColor: (item.data.isTransparent) ? 'transparent' : ((item.style as any)?.backgroundColor || undefined),
+        // @ts-ignore
+        borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
+        overflow: 'hidden',
       }}
       onClick={handleClick}
     >

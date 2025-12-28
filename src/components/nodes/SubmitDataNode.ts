@@ -1,6 +1,6 @@
 // src/components/nodes/SubmitDataNode.ts
 
-import type { PropertyConfig } from "../../types";
+
 
 export const submitDataNodeConfig: any = {
   title: "データ送信設定",

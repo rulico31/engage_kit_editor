@@ -31,28 +31,43 @@ function createWindow() {
     // --- IPCハンドラ ---
 
     // --- ★IPCハンドラの登録 (ここから) ---
-    ipcMain.handle('save-project-file', async (event, data: string) => {
-        if (!mainWindow) return false;
+    // --- ★IPCハンドラの登録 (ここから) ---
+    ipcMain.handle('save-project-file', async (event, data: string, filePath?: string, projectName?: string) => {
+        if (!mainWindow) return { success: false };
+
+        let targetPath = filePath;
+
+        // パスが渡されていない場合（初回保存、または「名前を付けて保存」）のみダイアログを出す
+        if (!targetPath) {
+            try {
+                // プロジェクト名が渡されていればそれを使用、なければデフォルト名
+                const defaultFileName = projectName ? `${projectName}.engage` : 'New Project.engage';
+                const { canceled, filePath: selectedPath } = await dialog.showSaveDialog(mainWindow, {
+                    title: 'EngageKit プロジェクトを保存',
+                    defaultPath: path.join(app.getPath('documents'), defaultFileName),
+                    filters: [
+                        { name: 'EngageKit Project', extensions: ['engage'] },
+                    ]
+                });
+
+                if (canceled || !selectedPath) {
+                    return { success: false }; // キャンセルされた
+                }
+                targetPath = selectedPath;
+            } catch (error) {
+                console.error('保存ダイアログエラー:', error);
+                return { success: false, error: String(error) };
+            }
+        }
 
         try {
-            const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-                title: 'EngageKit プロジェクトを保存',
-                defaultPath: path.join(app.getPath('documents'), 'New Project.engage'),
-                filters: [
-                    { name: 'EngageKit Project', extensions: ['engage'] },
-                ]
-            });
-
-            if (canceled || !filePath) {
-                return false; // キャンセルされた
-            }
-
-            await fs.writeFile(filePath, data, 'utf-8');
-            return true;
-
-        } catch (error) {
+            await fs.writeFile(targetPath, data, 'utf-8');
+            return { success: true, filePath: targetPath };
+        } catch (error: any) {
             console.error('ファイル保存エラー:', error);
-            return false;
+            // エラーが発生した場合（パスが無効など）、失敗を返す
+            // Renderer側でこれを検知して、再度ダイアログを出すなどのフォールバックを行う想定
+            return { success: false, error: String(error) };
         }
     });
 
@@ -74,7 +89,8 @@ function createWindow() {
 
             const filePath = filePaths[0];
             const data = await fs.readFile(filePath, 'utf-8');
-            return data; // ファイルの内容を返す
+            // パス情報も返す
+            return { data, filePath };
 
         } catch (error) {
             console.error('ファイル読込エラー:', error);

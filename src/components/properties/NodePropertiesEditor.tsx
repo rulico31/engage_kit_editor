@@ -16,8 +16,10 @@ import { pageNodeConfig } from "../nodes/PageNode";
 import { setVariableNodeConfig } from "../nodes/SetVariableNode";
 import { waitForClickNodeConfig } from "../nodes/WaitForClickNode";
 import { submitDataNodeConfig } from "../nodes/SubmitDataNode";
+import { submitFormNodeConfig } from "../nodes/SubmitFormNode"; // 追加
 import { externalApiNodeConfig } from "../nodes/ExternalApiNode";
 import { abTestNodeConfig } from "../nodes/ABTestNode"; // 追加
+import { confirmationNodeConfig } from "../nodes/ConfirmationNode"; // 追加
 
 const nodeConfigMap: Record<string, any> = {
   "actionNode": actionNodeConfig,
@@ -29,8 +31,10 @@ const nodeConfigMap: Record<string, any> = {
   "setVariableNode": setVariableNodeConfig,
   "waitForClickNode": waitForClickNodeConfig,
   "submitDataNode": submitDataNodeConfig,
+  "submitFormNode": submitFormNodeConfig, // 追加
   "externalApiNode": externalApiNodeConfig,
   "abTestNode": abTestNodeConfig, // 追加
+  "confirmationNode": confirmationNodeConfig, // 追加
 };
 
 // --- プロパティ入力コンポーネント ---
@@ -40,11 +44,33 @@ interface DynamicPropertyInputProps {
 }
 
 const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propConfig }) => {
-  const { updateNodeData, placedItems, pageInfoList } = usePageStore((s) => {
+  const { updateNodeData, placedItems, allTextInputItems, pageInfoList } = usePageStore((s) => {
     const page = s.selectedPageId ? s.pages[s.selectedPageId] : undefined;
+
+    // 全ページのテキスト入力欄を取得（確認画面ノード用）
+    const allTextInputs: any[] = [];
+    s.pageOrder.forEach(pageId => {
+      const pageData = s.pages[pageId];
+      if (pageData) {
+        pageData.placedItems.forEach(item => {
+          if (item.name.startsWith("テキスト入力欄") &&
+            item.x !== undefined &&
+            item.y !== undefined &&
+            !item.id.startsWith('temp-') &&
+            !item.id.startsWith('upload-')) {
+            allTextInputs.push({
+              ...item,
+              pageName: pageData.name // ページ名を追加して識別しやすくする
+            });
+          }
+        });
+      }
+    });
+
     return {
       updateNodeData: s.updateNodeData,
       placedItems: page?.placedItems ?? [],
+      allTextInputItems: allTextInputs,
       pageInfoList: s.pageOrder.map((id) => ({ id, name: s.pages[id]?.name ?? "無題" })),
     };
   });
@@ -118,9 +144,10 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
       });
       dynamicOptions = [
         { label: "-- アイテムを選択 --", value: "" },
+        { label: "⚡ Trigger Item (発火したアイテム)", value: "TRIGGER_ITEM" },
         ...validItems.map(item => ({ label: item.data.text || item.name, value: item.id })),
       ];
-    } else if (name === "targetPageId") {
+    } else if (name === "targetPageId" || name === "backPageId") {
       dynamicOptions = [
         { label: "-- ページを選択 --", value: "" },
         ...pageInfoList.map(page => ({ label: page.name, value: page.id })),
@@ -153,17 +180,32 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
 
   // レンダリング
   if (type === 'multiselect') {
-    // アートボード上に実際に配置されているアイテムのみをフィルタリング
-    const validItems = placedItems.filter(item => {
-      return item.x !== undefined && item.y !== undefined &&
-        !item.id.startsWith('temp-') &&
-        !item.id.startsWith('upload-');
-    });
+    // targetItemIdsの場合は全ページのテキスト入力欄を表示（確認画面ノード用）
+    // それ以外は現在のページのアイテムのみ
+    let itemsToDisplay = [];
+
+    if (name === "targetItemIds") {
+      // 確認画面ノード：全ページのテキスト入力欄のみ
+      itemsToDisplay = allTextInputItems;
+    } else {
+      // その他のmultiselect：現在のページのアイテム
+      itemsToDisplay = placedItems.filter(item => {
+        return item.x !== undefined && item.y !== undefined &&
+          !item.id.startsWith('temp-') &&
+          !item.id.startsWith('upload-');
+      });
+    }
+
     return (
       <div className="prop-group">
         <label className="prop-label">{label}</label>
         <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #3e3e3e', borderRadius: '4px', padding: '8px' }}>
-          {validItems.map(item => (
+          {itemsToDisplay.length === 0 && (
+            <div style={{ padding: '8px', color: '#888', fontSize: '12px' }}>
+              {name === "targetItemIds" ? "テキスト入力欄が見つかりません" : "アイテムがありません"}
+            </div>
+          )}
+          {itemsToDisplay.map(item => (
             <label key={item.id} style={{ display: 'block', padding: '4px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -171,7 +213,14 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
                 onChange={(e) => handleMultiSelectChange(item.id, e.target.checked)}
                 style={{ marginRight: '8px' }}
               />
-              <span>{item.displayName || item.data.text || item.name}</span>
+              <span>
+                {item.displayName || item.data.text || item.name}
+                {item.pageName && name === "targetItemIds" && (
+                  <span style={{ marginLeft: '8px', color: '#888', fontSize: '11px' }}>
+                    ({item.pageName})
+                  </span>
+                )}
+              </span>
             </label>
           ))}
         </div>
@@ -209,6 +258,27 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
           onKeyDown={handleKeyDown}
           rows={4}
         />
+      </div>
+    );
+  }
+
+  if (type === 'checkbox') {
+    return (
+      <div className="prop-group">
+        <label className="prop-label" style={{ marginBottom: '4px' }}>{label}</label>
+        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px', color: '#fff' }}>
+          <input
+            type="checkbox"
+            className="prop-checkbox"
+            name={name}
+            checked={!!value}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            style={{ marginRight: '8px' }}
+          />
+          {propConfig.checkboxLabel || "有効にする"}
+        </label>
       </div>
     );
   }

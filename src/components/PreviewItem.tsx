@@ -32,7 +32,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const onVariableChange = usePreviewStore(state => state.handleVariableChangeFromItem);
   const variables = usePreviewStore(state => state.variables);
 
-  const variableName = item.data.variableName || "";
+  const variableName = item.data.variableName || item.id;
   const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
@@ -42,7 +42,9 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   }, [variableName]);
 
   const handleClick = () => {
-    if (name.includes("ボタン") || name.includes("画像")) {
+    console.log("📍 PreviewItem clicked:", name, id);
+    // すべてのアイテムでクリックイベントを発火（入力欄以外）
+    if (!name.startsWith("テキスト入力欄")) {
       onItemEvent("click", id);
     }
   };
@@ -75,14 +77,31 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     // 2. 入力タイプ別チェック
     else if (trimmed) {
       if (item.data.inputType === 'email') {
+        // メールアドレスの形式チェック（ドメインチェック強化）
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(trimmed)) {
           newError = "メールアドレスの形式が正しくありません";
+        } else {
+          // ドメイン部分の検証
+          const domain = trimmed.split('@')[1];
+          if (!domain || domain.length < 3 || !domain.includes('.')) {
+            newError = "有効なドメイン名を含むメールアドレスを入力してください";
+          }
         }
       } else if (item.data.inputType === 'tel') {
-        const telRegex = /^[0-9-]{10,}$/;
-        if (!telRegex.test(trimmed)) {
-          newError = "電話番号の形式が正しくありません";
+        // 電話番号の検証（国コード対応）
+        if (item.data.enableCountryCode) {
+          // 国コード選択が有効な場合は数字のみ許可（ハイフンは任意）
+          const telRegex = /^[0-9\-\s]{8,}$/;
+          if (!telRegex.test(trimmed)) {
+            newError = "電話番号は8桁以上の数字で入力してください";
+          }
+        } else {
+          // 国コード選択が無効な場合は通常の電話番号形式
+          const telRegex = /^[0-9\-]{10,}$/;
+          if (!telRegex.test(trimmed)) {
+            newError = "電話番号の形式が正しくありません";
+          }
         }
       } else if (item.data.inputType === 'number') {
         if (isNaN(Number(trimmed))) {
@@ -105,9 +124,31 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     return newError === null;
   };
 
+  // リアルタイムバリデーション（デバウンス処理）
+  // ユーザーが入力を止めてから一定時間後に検証を行う
+  useEffect(() => {
+    // 値が空の場合は検証しない（必須チェックはBlur時のみでUXとしては十分）
+    if (!inputValue) return;
+
+    // 既にエラーが表示されている場合は、onChangeハンドラ内で即時検証が行われているため
+    // ここでのデバウンス検証は不要（二重処理を防ぐ）
+    if (error) return;
+
+    // 入力タイプがテキスト以外（検証が必要なタイプ）の場合のみタイマーセット
+    if (item.data.inputType === 'email' || item.data.inputType === 'tel' || item.data.inputType === 'number') {
+      const timer = setTimeout(() => {
+        validate(inputValue);
+      }, 800); // 0.8秒待機
+      return () => clearTimeout(timer);
+    }
+  }, [inputValue, error, item.data.inputType, item.data.required]);
+
   const handleBlur = () => {
-    validate(inputValue);
-    onItemEvent("onInputComplete", id);
+    // バリデーションを実行し、成功した場合のみ完了イベントを発火
+    const isValid = validate(inputValue);
+    if (isValid) {
+      onItemEvent("onInputComplete", id);
+    }
   };
 
   if (name.startsWith("画像")) {
@@ -134,8 +175,39 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
       placeholder = `* ${placeholder}`;
     }
 
+    // 国コード選択が有効な場合のstate
+    const [countryCode, setCountryCode] = useState(item.data?.countryCode || "+81");
+
+    // 主要国の国コードリスト
+    const countryCodes = [
+      { code: "+81", name: "日本 (+81)" },
+      { code: "+1", name: "アメリカ/カナダ (+1)" },
+      { code: "+86", name: "中国 (+86)" },
+      { code: "+82", name: "韓国 (+82)" },
+      { code: "+44", name: "イギリス (+44)" },
+      { code: "+33", name: "フランス (+33)" },
+      { code: "+49", name: "ドイツ (+49)" },
+      { code: "+61", name: "オーストラリア (+61)" },
+    ];
+
     content = (
       <>
+        {error && <div className="input-error-message">{error}</div>}
+        {item.data?.enableCountryCode && item.data?.inputType === 'tel' && (
+          <div className="country-code-wrapper">
+            <select
+              className="country-code-select"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+            >
+              {countryCodes.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <textarea
           className={`preview-input-content ${error ? 'has-error' : ''}`}
           style={{
@@ -156,11 +228,11 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.currentTarget.blur();
+              // 注意: ここで直接onItemEventを呼ばない。blur()経由でhandleBlurが呼ばれるため。
             }
           }}
           onClick={(e) => e.stopPropagation()}
         />
-        {error && <div className="input-error-message">{error}</div>}
       </>
     );
   }
@@ -188,16 +260,27 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
         color: item.data.color || '#333333',
-        fontSize: item.data.fontSize ? `${item.data.fontSize}px` : '15px', // ★ 追加: フォントサイズ適用
+        fontSize: item.data.fontSize ? `${item.data.fontSize}px` : '15px',
 
         // 枠線の制御
         border: (item.data.showBorder === false) ? 'none' : undefined,
-        backgroundColor: (item.data.isTransparent) ? 'transparent' : undefined,
+
+        // 背景色: 透明 -> 個別設定
+        // @ts-ignore
+        backgroundColor: (item.data.isTransparent)
+          ? 'transparent'
+          : ((item.style as any)?.backgroundColor || undefined),
+
+        // テーマ変数の適用
+        fontFamily: 'var(--theme-font-family, inherit)',
+        // @ts-ignore
+        borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
+        overflow: 'hidden',
       }}
       onClick={handleClick}
     >
       {content}
-    </div>
+    </div >
   );
 };
 

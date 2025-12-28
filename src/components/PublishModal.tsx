@@ -20,8 +20,10 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [embedCode, setEmbedCode] = useState<string>("");
 
-  const { projectMeta } = useProjectStore((state) => ({
+  const { projectMeta, updateCloudId, saveProject } = useProjectStore((state) => ({
     projectMeta: state.projectMeta,
+    updateCloudId: state.updateCloudId,
+    saveProject: state.saveProject,
   }));
 
   const pages = usePageStore((state) => state.pages);
@@ -39,23 +41,55 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
       let fileBody: Blob | File;
       let fileName = "";
 
-      // ソースのクリーニング (file:// プレフィックスの揺れを吸収)
-      // Windowsの場合 "file:///C:/..." となることがあるため、fetchで扱える形式にする
-      let fetchUrl = assetSrc;
+      // Blob URLやdata URIの場合は、Imageを経由してCanvasで再描画してから取得
+      if (assetSrc.startsWith("blob:") || assetSrc.startsWith("data:")) {
+        fileBody = await new Promise<Blob>((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
 
-      // Electron環境でローカルパス(絶対パス)がそのまま渡ってきた場合の補正
-      if (!assetSrc.startsWith("http") && !assetSrc.startsWith("blob:") && !assetSrc.startsWith("data:")) {
-        if (!assetSrc.startsWith("file://") && !assetSrc.startsWith("engage://")) {
-          // C:/Users/... のようなパスに file:// を付与
-          fetchUrl = `file://${assetSrc}`;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Canvas context not available'));
+              return;
+            }
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Failed to convert canvas to blob'));
+              }
+            }, 'image/png');
+          };
+
+          img.onerror = () => {
+            reject(new Error(`Failed to load image from ${assetSrc.startsWith("blob:") ? "blob URL" : "data URI"}`));
+          };
+
+          img.src = assetSrc;
+        });
+      } else {
+        // file:// や通常のパスの場合
+        let fetchUrl = assetSrc;
+
+        // Electron環境でローカルパス(絶対パス)がそのまま渡ってきた場合の補正
+        if (!assetSrc.startsWith("http")) {
+          if (!assetSrc.startsWith("file://") && !assetSrc.startsWith("engage://")) {
+            // C:/Users/... のようなパスに file:// を付与
+            fetchUrl = `file://${assetSrc}`;
+          }
         }
+
+        // ★ ローカルファイルを fetch で取得 (webSecurity: false なので可能)
+        const response = await fetch(fetchUrl);
+        if (!response.ok) throw new Error(`Failed to load local file: ${fetchUrl}`);
+
+        fileBody = await response.blob();
       }
-
-      // ★ ローカルファイルを fetch で取得 (webSecurity: false なので可能)
-      const response = await fetch(fetchUrl);
-      if (!response.ok) throw new Error(`Failed to load local file: ${fetchUrl}`);
-
-      fileBody = await response.blob();
 
       // 拡張子の判定
       const mimeType = fileBody.type; // image/png など
@@ -100,14 +134,54 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
     setProgress(0);
     setError(null);
 
+    // ★ Local ID check & Auto-Link logic
+    let targetProjectId = projectId;
+
     try {
+      if (projectId.startsWith("local-")) {
+        if (projectMeta?.cloud_id) {
+          targetProjectId = projectMeta.cloud_id;
+        } else {
+          // クラウドプロジェクトが存在しないため、新規作成してリンクする
+          setPublishStep("saving"); // "クラウドへ保存中..." の表示を利用
+
+          const initialData: ProjectData = {
+            projectName: projectMeta?.name || "Untitled",
+            pages: JSON.parse(JSON.stringify(pages)),
+            pageOrder: [...pageOrder],
+            variables: { ...variables },
+          };
+
+          const { data: newProject, error: createError } = await supabase
+            .from('projects')
+            .insert({
+              name: projectMeta?.name || "Untitled",
+              data: initialData
+            })
+            .select('id')
+            .single();
+
+          if (createError) throw createError;
+          if (!newProject) throw new Error("クラウドプロジェクトの作成に失敗しました。");
+
+          targetProjectId = newProject.id;
+
+          // ローカルストアとファイルを更新
+          updateCloudId(targetProjectId);
+          await saveProject(); // cloud_idを永続化
+
+          // ステップ表示を戻す
+          setPublishStep("assets");
+        }
+      }
+
       // 1. 公開用のプロジェクトデータを構築
       const publishData: ProjectData = {
         projectName: projectMeta?.name || "Untitled",
         pages: JSON.parse(JSON.stringify(pages)),
         pageOrder: [...pageOrder],
         variables: { ...variables },
-        cloud_id: projectMeta?.cloud_id,
+        cloud_id: targetProjectId, // 確実にcloud_idを入れる
       };
 
       // 2. アップロード対象のリストアップ
@@ -137,7 +211,8 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
       for (const entry of itemsToProcess) {
         const { item } = entry;
         if (item.data.src) {
-          const newUrl = await uploadAsset(item.data.src, projectId);
+          // Use targetProjectId (cloud ID) for storage path
+          const newUrl = await uploadAsset(item.data.src, targetProjectId);
           item.data.src = newUrl; // URLをSupabaseのものに置換
         }
         processedCount++;
@@ -146,7 +221,8 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
 
       for (const entry of pagesToProcess) {
         const { pageId, bgSrc } = entry;
-        const newUrl = await uploadAsset(bgSrc, projectId);
+        // Use targetProjectId for storage path
+        const newUrl = await uploadAsset(bgSrc, targetProjectId);
         if (publishData.pages[pageId].backgroundImage) {
           publishData.pages[pageId].backgroundImage!.src = newUrl;
         }
@@ -162,7 +238,8 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
       // 本番(Vercel等)に上げた場合はそのURLにする必要があるため、後で環境変数などで調整可能にします。
       // いったん動的に生成されるURLを使用します。
 
-      const publicUrl = `${viewerBaseUrl}?project_id=${projectId}`;
+      // Use targetProjectId for the public URL parameter
+      const publicUrl = `${viewerBaseUrl}?project_id=${targetProjectId}`;
 
       const { error: dbError } = await supabase
         .from("projects")
@@ -172,7 +249,7 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
           published_url: publicUrl,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", projectId);
+        .eq("id", targetProjectId); // Use targetProjectId for the DB update
 
       if (dbError) throw dbError;
 

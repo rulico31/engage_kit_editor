@@ -1,13 +1,15 @@
-// src/components/properties/ItemPropertiesEditor.tsx
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import type { PlacedItemType } from "../../types";
 import { AccordionSection } from "./SharedComponents";
-import { useSelectionStore } from "../../stores/useSelectionStore";
+import { useSelectionStore } from '../../stores/useSelectionStore';
 import { usePageStore } from "../../stores/usePageStore";
+
 import ImageCropModal from "../ImageCropModal";
 // 型定義のために必要ならインポート
 import type { Crop } from 'react-image-crop';
+
+// 型定義の補完（types.tsを変更せずに対応）
+type ItemStyle = NonNullable<PlacedItemType['style']> & { borderRadius?: number | string };
 
 // ★追加: このファイル内でも window.electronAPI を認識できるように型を拡張
 declare global {
@@ -191,7 +193,11 @@ type TabType = 'content' | 'design' | 'settings';
 export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props) => {
   const { item, onItemUpdate } = props;
   const { localRect, handleRectChange, commitRectChange, handleImageUpload, isUploading } = useItemEditorLogic(item, onItemUpdate);
-  const [activeTab, setActiveTab] = useState<TabType>('content');
+  const [activeTab, setActiveTab] = useState<TabType>('content');  // useProjectStoreからテーマ情報を取得
+  /* useProjectStoreフック削除（テーマ参照不要） */
+
+
+  // ローカルステート（トリミングモーダル）
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
 
   const updateTabLabel = useSelectionStore(state => state.updateTabLabel);
@@ -209,7 +215,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
 
   const handleNameChange = (newDisplayName: string) => {
     onItemUpdate(item.id, { displayName: newDisplayName });
-    const displayLabel = newDisplayName ? `${item.name}: ${newDisplayName}` : item.name;
+    const displayLabel = newDisplayName ? item.name + ": " + newDisplayName : item.name;
     updateTabLabel(item.id, displayLabel);
   };
 
@@ -217,17 +223,38 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
     commitHistory(false);
   };
 
-  const handleStyleChange = (category: 'shadow' | 'glow' | 'textShadow' | 'textGlow' | 'backgroundColor', key: string, value: any) => {
-    const currentStyle = item.style || {};
-    let newStyle = { ...currentStyle };
-    if (category === 'backgroundColor') {
-      newStyle.backgroundColor = value;
+  const handleStyleChange = useCallback((key: keyof ItemStyle, subKey: string, value: any, addToHistory = true) => {
+    if (!item) return;
+
+    let newStyle: ItemStyle = { ...item.style };
+
+    // undefined (同期モードへの切り替え) の場合はプロパティを削除する
+    if (value === undefined) {
+      if (subKey) {
+        if (newStyle[key]) {
+          delete (newStyle[key] as any)[subKey];
+          // サブキーがなくなったら親キーも消す判定が必要だが、今回は簡易的に
+        }
+      } else {
+        delete newStyle[key];
+      }
     } else {
-      const currentCategory = (currentStyle as any)[category] || { enabled: false, color: '#000000', x: 0, y: 0, blur: 0, spread: 0 };
-      newStyle = { ...newStyle, [category]: { ...currentCategory, [key]: value } };
+      if (subKey) {
+        // ネストされたプロパティの更新 (shadow, glowなど)
+        newStyle[key] = {
+          ...((newStyle[key] as any) || {}),
+          [subKey]: value
+        };
+      } else {
+        // トップレベルプロパティの更新
+        newStyle[key] = value;
+      }
     }
-    onItemUpdate(item.id, { style: newStyle });
-  };
+
+    onItemUpdate(item.id, { style: newStyle }, { addToHistory });
+  }, [item, onItemUpdate]);
+
+
 
   const handleStyleBlur = () => {
     onItemUpdate(item.id, {}, { addToHistory: true, immediate: true });
@@ -331,13 +358,22 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
     <div className="properties-panel-content" style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: 0 }}>
       {/* タブヘッダー */}
       <div className="prop-tabs-root">
-        <button className={`prop-tab-btn ${activeTab === 'content' ? 'active' : ''}`} onClick={() => setActiveTab('content')}>
+        <button
+          className={`prop-tab-btn ${activeTab === 'content' ? 'active' : ''}`}
+          onClick={() => setActiveTab('content')}
+        >
           コンテンツ
         </button>
-        <button className={`prop-tab-btn ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>
+        <button
+          className={`prop-tab-btn ${activeTab === 'design' ? 'active' : ''}`}
+          onClick={() => setActiveTab('design')}
+        >
           デザイン
         </button>
-        <button className={`prop-tab-btn ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+        <button
+          className={`prop-tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('settings')}
+        >
           設定
         </button>
       </div>
@@ -371,26 +407,29 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                   placeholder="わかりやすい名前を入力（任意）"
                 />
                 <div style={{ fontSize: '10px', color: '#666', marginTop: 4 }}>
-                  この名前はタブやアウトライナーで表示されます
+                  確認画面や送信データで表示される名前です（例: メールアドレス、お名前）
                 </div>
               </div>
             </AccordionSection>
 
-            {/* テキスト/ボタンの内容 */}
-            {(item.name.startsWith("テキスト") || item.name.startsWith("ボタン")) && (
-              <AccordionSection title="テキスト内容" defaultOpen={true}>
-                <div className="prop-group">
-                  <div className="prop-label">{item.name.startsWith("ボタン") ? "ボタンテキスト" : "表示テキスト"}</div>
-                  <textarea
-                    className="prop-textarea"
-                    value={item.data?.text || ""}
-                    onChange={(e) => handleDataChange("text", e.target.value)}
-                    onBlur={handleDataBlur}
-                    rows={4}
-                  />
-                </div>
-              </AccordionSection>
-            )}
+            {/* テキスト/ボタンの内容（テキスト入力欄は除外） */}
+            {(item.name.startsWith("テキスト") || item.name.startsWith("ボタン")) &&
+              !item.name.startsWith("テキスト入力欄") && (
+                <AccordionSection title="テキスト内容" defaultOpen={true}>
+                  <div className="prop-group">
+                    <div className="prop-label">
+                      {item.name.startsWith("ボタン") ? "ボタンテキスト" : "表示テキスト"}
+                    </div>
+                    <textarea
+                      className="prop-textarea"
+                      value={item.data?.text || ""}
+                      onChange={(e) => handleDataChange("text", e.target.value)}
+                      onBlur={handleDataBlur}
+                      rows={4}
+                    />
+                  </div>
+                </AccordionSection>
+              )}
 
             {/* 画像ソース */}
             {item.name.startsWith("画像") && (
@@ -454,6 +493,33 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                     <option value="tel">電話番号</option>
                   </select>
                 </div>
+                <div className="prop-group">
+                  <div className="prop-label">変数名 (Variable Name)</div>
+                  <input
+                    type="text"
+                    className="prop-input"
+                    value={item.data?.variableName || ""}
+                    onChange={(e) => handleDataChange("variableName", e.target.value)}
+                    onBlur={handleDataBlur}
+                    placeholder="例: email, age"
+                  />
+                  <div style={{ fontSize: '10px', color: '#ff6b6b', marginTop: 4 }}>
+                    ※ 同じ変数名は使用しないでください。
+                  </div>
+                </div>
+                {item.data?.inputType === 'email' && (
+                  <div style={{ fontSize: '11px', color: '#888', marginTop: 4, marginBottom: 8 }}>
+                    ℹ️ メールアドレスは@を含む形式でドメインチェックが行われます
+                  </div>
+                )}
+                {item.data?.inputType === 'tel' && (
+                  <CheckboxProp
+                    label="国コード選択を有効にする"
+                    checked={!!item.data?.enableCountryCode}
+                    onChange={(v) => handleDataChange("enableCountryCode", v)}
+                    onBlur={handleDataBlur}
+                  />
+                )}
                 <CheckboxProp
                   label="必須入力にする"
                   checked={!!item.data?.required}
@@ -469,15 +535,16 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
         {activeTab === 'design' && (
           <>
             {/* ... Design Tab Content ... */}
-            <AccordionSection title="塗り・背景" defaultOpen={true}>
+            {/* ... Design Tab Content ... */}
+            <AccordionSection title="塗り・背景・角丸" defaultOpen={true}>
+              {/* 背景色 */}
               <div className="prop-group">
-                <label className="prop-label">背景色 (Background)</label>
+                <div className="prop-label">背景色</div>
                 <div className="prop-color-picker-wrapper">
-                  <input
-                    type="color"
+                  <ThrottledColorInput
                     className="prop-color-picker"
                     value={item.style?.backgroundColor || "#ffffff"}
-                    onChange={(e) => handleStyleChange('backgroundColor', '', e.target.value)}
+                    onChange={(val) => handleStyleChange('backgroundColor', '', val)}
                     onBlur={handleStyleBlur}
                   />
                   <input
@@ -491,6 +558,34 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                   />
                 </div>
               </div>
+
+              {/* 角丸 */}
+              <div className="prop-group" style={{ marginTop: 12 }}>
+                <div className="prop-label">角丸 (Radius)</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="range"
+                    min="0" max="50"
+                    className="prop-range"
+                    style={{ flex: 1 }}
+                    // @ts-ignore
+                    value={typeof (item.style as any)?.borderRadius === 'number' ? (item.style as any).borderRadius : 0}
+                    // @ts-ignore
+                    onChange={(e) => handleStyleChange('borderRadius', '', parseInt(e.target.value))}
+                    onMouseUp={handleStyleBlur}
+                  />
+                  <NumberInput
+                    label=""
+                    // @ts-ignore
+                    value={typeof (item.style as any)?.borderRadius === 'number' ? (item.style as any).borderRadius : 0}
+                    // @ts-ignore
+                    onChange={(v) => handleStyleChange('borderRadius', '', v)}
+                    onBlur={handleStyleBlur}
+                  />
+                </div>
+              </div>
+
+              <div className="prop-separator" />
               <CheckboxProp label="背景を透過しない(不透明)" checked={!item.data?.isTransparent} onChange={(v) => handleDataChange("isTransparent", !v)} onBlur={handleDataBlur} />
             </AccordionSection>
 
@@ -500,11 +595,10 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
                 <div className="prop-group">
                   <label className="prop-label">文字色</label>
                   <div className="prop-color-picker-wrapper">
-                    <input
-                      type="color"
+                    <ThrottledColorInput
                       className="prop-color-picker"
                       value={item.data?.color || "#333333"}
-                      onChange={(e) => handleDataChange("color", e.target.value)}
+                      onChange={(val) => handleDataChange("color", val)}
                       onBlur={handleDataBlur}
                     />
                     <input
@@ -624,15 +718,7 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
               <CheckboxProp label="初期状態で表示する" checked={item.data?.initialVisibility !== false} onChange={(v) => handleDataChange("initialVisibility", v)} onBlur={handleDataBlur} />
             </AccordionSection>
 
-            {item.name.startsWith("テキスト入力欄") && (
-              <AccordionSection title="開発者向け設定 (Variables)">
-                <div className="prop-group">
-                  <div className="prop-label">変数名 (Variable Name)</div>
-                  <input type="text" className="prop-input" value={item.data?.variableName || ""} onChange={(e) => handleDataChange("variableName", e.target.value)} />
-                  <div style={{ fontSize: '10px', color: '#666', marginTop: 4 }}>この値はlogicEngineから参照できます</div>
-                </div>
-              </AccordionSection>
-            )}
+
           </>
         )}
 
@@ -718,11 +804,10 @@ const ColorInput = ({ label, value, onChange, onBlur }: {
   <div className="prop-group-half">
     <div className="prop-label-inline">{label}</div>
     <div className="prop-color-picker-wrapper">
-      <input
-        type="color"
+      <ThrottledColorInput
         className="prop-color-picker-small"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         onBlur={onBlur}
         style={{ width: 24, height: 24, padding: 0, border: 'none' }}
       />
@@ -780,6 +865,55 @@ const FontSizeInput = ({ value, onChange, onBlur }: { value: number, onChange: (
       onChange={handleChange}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
+    />
+  );
+};
+
+// ThrottledColorInput: カラーピッカーの動作を軽量化するためのラッパー
+// requestAnimationFrameを使用して、親への通知（=再描画）を間引く
+const ThrottledColorInput = ({
+  value,
+  onChange,
+  onBlur,
+  className,
+  style
+}: {
+  value: string,
+  onChange: (val: string) => void,
+  onBlur?: () => void,
+  className?: string,
+  style?: React.CSSProperties
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+  const requestRef = useRef<number | null>(null);
+
+  // 親からの値変更を反映 (外部からの変更のみ)
+  // ただし、ドラッグ中はlocalValueが優先されるべきだが、
+  // Reactのサイクル上、useEffectで同期してもonChangeが即座に走れば問題ない
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVal = e.target.value;
+    setLocalValue(newVal);
+
+    if (requestRef.current) return; // 前回のフレーム処理中ならスキップ
+
+    requestRef.current = requestAnimationFrame(() => {
+      onChange(newVal);
+      requestRef.current = null;
+    });
+  };
+
+  return (
+    <input
+      type="color"
+      className={className}
+      style={style}
+      value={localValue}
+      onChange={handleChange}
+      onBlur={onBlur}
     />
   );
 };

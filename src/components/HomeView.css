@@ -2,9 +2,13 @@
 
 .home-view {
   min-height: 100vh;
+  height: 100vh;
+  /* 画面高さで固定し、内部でスクロールさせる */
   background: linear-gradient(135deg, #0f0f14 0%, #1a1a24 50%, #0f0f14 100%);
   position: relative;
   overflow-x: hidden;
+  overflow-y: auto;
+  /* 垂直スクロールを有効化 */
 }
 
 /* Background decoration */
@@ -23,10 +27,9 @@
 .home-container {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
   color: #e4e4e7;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  overflow-y: auto;
+  /* overflow-y: auto; 削除 */
 }
 
 /* ========== Header ========== */
@@ -37,8 +40,23 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: relative;
-  overflow: hidden;
+  position: sticky;
+  /* 固定表示 */
+  top: 0;
+  z-index: 1000;
+  /* コンテンツより上に表示 */
+  transition: all 0.3s ease;
+  /* アニメーション追加 */
+}
+
+.home-header.scrolled {
+  padding: 16px 48px;
+  /* 高さを縮小 */
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
+  /* 半透明化 */
+  backdrop-filter: blur(8px);
+  /* ぼかし効果 */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .home-header::before {
@@ -50,6 +68,7 @@
   bottom: 0;
   background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/></pattern></defs><rect width="100%" height="100%" fill="url(%23grid)"/></svg>');
   opacity: 0.3;
+  pointer-events: none;
 }
 
 .brand-logo {
@@ -63,6 +82,15 @@
   position: relative;
   z-index: 1;
   text-shadow: 0 2px 10px rgba(255, 255, 255, 0.2);
+}
+
+/* ヘッダーの右側ボタングループ */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 .create-project-btn {
@@ -117,6 +145,127 @@
 
 .load-json-btn:active {
   transform: translateY(0);
+}
+
+.google-login-btn,
+.logout-btn {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 12px 28px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.google-login-btn:hover,
+.logout-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.google-login-btn:active,
+.logout-btn:active {
+  transform: translateY(0);
+}
+
+/* 区切り線 */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  margin: 8px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* メールログインフォーム */
+.email-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 250px;
+}
+
+.email-input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: white;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.email-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.email-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.email-login-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 14px;
+}
+
+.email-login-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.email-login-btn:active {
+  transform: translateY(0);
+}
+
+.email-success {
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(76, 175, 80, 0.5);
+  border-radius: 8px;
+  padding: 10px;
+  color: #a5d6a7;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.email-error {
+  background: rgba(244, 67, 54, 0.2);
+  border: 1px solid rgba(244, 67, 54, 0.5);
+  border-radius: 8px;
+  padding: 10px;
+  color: #ef9a9a;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 
@@ -352,7 +501,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 10000;
+  /* ローディングオーバーレイ(9999)より上に表示 */
   animation: fadeIn 0.2s ease;
 }
 
@@ -484,5 +634,88 @@
   .empty-state {
     margin: 24px;
     padding: 60px 24px;
+  }
+}
+
+/* ========== Loading Overlay ========== */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 15, 20, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+  cursor: wait;
+  /* 待機カーソルに変更 */
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.loading-logo {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  background: linear-gradient(to right, #fff 0%, #e0e7ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 4px 20px rgba(102, 126, 234, 0.5);
+  animation: pulse 2s infinite;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  font-size: 16px;
+  color: #a1a1aa;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  animation: fadeIn 0.5s ease 0.2s backwards;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
   }
 }

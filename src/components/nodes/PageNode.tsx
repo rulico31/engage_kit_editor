@@ -55,5 +55,12 @@ export const pageNodeConfig: any = {
       type: "select",
       // 選択肢はエディタ側でページリストに基づいて動的に生成されます
     },
+    {
+      name: "enableValidation",
+      label: "必須入力チェック",
+      type: "checkbox",
+      defaultValue: true,
+      checkboxLabel: "遷移前に必須入力をチェックする"
+    }
   ],
 };

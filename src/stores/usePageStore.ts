@@ -252,12 +252,13 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const newLogics = { ...page.allItemLogics };
 
       if (item.type !== 'group') {
-        // 初期イベントノードを作成
+        // 初期イベントノードを作成（削除不可に設定）
         const initialEventNode = {
           id: `eventNode_${item.id}_init`,
           type: 'eventNode',
           position: { x: 100, y: 100 },
-          data: { label: 'イベント', eventType: 'click' }
+          data: { label: 'イベント', eventType: 'click' },
+          deletable: false  // ★ 削除不可に設定
         };
 
         // このアイテムのロジックグラフを初期化

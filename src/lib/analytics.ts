@@ -44,10 +44,12 @@ export type AnalyticsEventPayload = {
  */
 export const logAnalyticsEvent = async (
   eventType: AnalyticsEventType,
-  payload?: AnalyticsEventPayload
+  payload?: AnalyticsEventPayload,
+  explicitProjectId?: string // ★追加: プロジェクトIDを明示的に指定可能にする
 ): Promise<void> => {
   try {
-    const projectId = useProjectStore.getState().currentProjectId;
+    // 引数で渡されたIDを優先し、なければStoreから取得
+    const projectId = explicitProjectId || useProjectStore.getState().currentProjectId;
 
     // ローカルプロジェクトの場合はSupabaseに送信しない（UUID形式ではないため）
     if (!projectId || projectId.startsWith('local-')) {
@@ -61,9 +63,12 @@ export const logAnalyticsEvent = async (
 
     const timestamp = new Date().toISOString();
 
+    const sessionId = getOrCreateSessionId(); // セッションIDを取得
+
     console.log('[Analytics] Event logged:', {
       eventType,
       projectId,
+      sessionId, // ログにも表示
       payload,
       timestamp
     });
@@ -72,13 +77,18 @@ export const logAnalyticsEvent = async (
       .from('analytics_logs')
       .insert({
         project_id: projectId,
+        session_id: sessionId, // ★追加: 必須カラム
         event_type: eventType,
-        payload: payload || {},
-        timestamp
+        node_id: payload?.nodeId,
+        node_type: payload?.nodeType,
+        metadata: payload?.metadata || {},
+        created_at: timestamp
       });
 
     if (error) {
       console.error('[Analytics] Error logging event:', error);
+    } else {
+      console.log(`[Analytics] Success (${eventType}):`, payload);
     }
   } catch (error) {
     console.error('[Analytics] Unexpected error:', error);

@@ -1,29 +1,19 @@
-// src/logicEngine.ts
-
 import type { Node, Edge } from "reactflow";
-import type {
-  PreviewState,
-  NodeGraph,
-  VariableState,
-  PlacedItemType
-} from "./types";
-import type { AnalyticsEventType } from "./lib/analytics";
+import type { PlacedItemType, VariableState, PreviewState, NodeGraph } from "./types";
+import { submitLeadData } from "./lib/leads";
+import { logAnalyticsEvent } from "./lib/analytics";
+import { useDebugLogStore } from "./stores/useDebugLogStore";
 
-// 実行コンテキスト（外部依存の注入用）
-export interface LogicRuntimeContext {
-  logEvent: (eventType: AnalyticsEventType, payload?: any) => void;
-  submitLead: (variables: Record<string, any>) => Promise<boolean>;
-  fetchApi: (url: string, options: RequestInit) => Promise<any>;
-}
-
-// リスナー管理用の型定義
-export type ResumeListener = () => void;
-export type ActiveListeners = Map<string, ResumeListener[]>;
+export type ActiveListeners = Map<string, Array<() => void>>;
 
 /**
- * ヘルパー: 次のノード群を探してIDの配列を返す (1対多対応)
- * ★修正: ハンドルIDが null/undefined の場合の互換性を考慮
+ * ロジック実行時に外部に依存する処理を注入するためのコンテキスト
  */
+export interface LogicRuntimeContext {
+  logEvent: typeof logAnalyticsEvent;
+  submitLead: typeof submitLeadData;
+  fetchApi: (url: string, options: RequestInit) => Promise<any>;
+}
 const findNextNodes = (srcId: string, handle: string | null, edges: Edge[]): string[] => {
   return edges
     .filter((e) => {
@@ -60,7 +50,8 @@ const processQueue = async (
   getVariables: () => VariableState,
   setVariables: (newVars: VariableState) => void,
   activeListeners: ActiveListeners,
-  context: LogicRuntimeContext
+  context: LogicRuntimeContext,
+  triggerItemId: string | null = null // ★追加: 発火元アイテムID
 ) => {
   const nextQueue: string[] = [];
 
@@ -87,12 +78,16 @@ const processQueue = async (
           currentPreviewState: getPreviewState()
         });
 
-        if (targetItemId) {
-          const currentState = getPreviewState();
-          const targetItemState = currentState[targetItemId];
+        // ★修正: TRIGGER_ITEM の動的解決
+        const resolvedTargetId = targetItemId === 'TRIGGER_ITEM' ? triggerItemId : targetItemId;
 
-          console.log('🎯 ターゲットアイテム状態', {
+        if (resolvedTargetId) {
+          const currentState = getPreviewState();
+          const targetItemState = currentState[resolvedTargetId];
+
+          console.log('🎯 ターゲットアイテム状態 (Resolved)', {
             targetItemId,
+            resolvedTargetId,
             targetItemState,
             exists: !!targetItemState
           });
@@ -105,7 +100,7 @@ const processQueue = async (
             else if (mode === "toggle") newVisibility = !targetItemState.isVisible;
 
             console.log('✨ 表示状態を更新', {
-              targetItemId,
+              targetItemId: resolvedTargetId,
               oldVisibility: targetItemState.isVisible,
               newVisibility,
               mode
@@ -113,11 +108,11 @@ const processQueue = async (
 
             setPreviewState({
               ...currentState,
-              [targetItemId]: { ...targetItemState, isVisible: newVisibility },
+              [resolvedTargetId]: { ...targetItemState, isVisible: newVisibility },
             });
           } else {
             console.warn('⚠️ ターゲットアイテムが見つかりません', {
-              targetItemId,
+              resolvedTargetId,
               availableItems: Object.keys(currentState).filter(k => k !== 'currentPageId' && k !== 'isFinished')
             });
           }
@@ -139,6 +134,9 @@ const processQueue = async (
           comparisonValue
         } = node.data;
 
+        // ★修正: TRIGGER_ITEM の動的解決 (conditionTargetId)
+        const resolvedTargetId = conditionTargetId === 'TRIGGER_ITEM' ? triggerItemId : conditionTargetId;
+
         console.log('🔀 Ifノード実行', {
           nodeId: node.id,
           conditionSource,
@@ -154,7 +152,7 @@ const processQueue = async (
 
         if (conditionSource === 'item') {
           const currentState = getPreviewState();
-          const targetItemState = currentState[conditionTargetId];
+          const targetItemState = resolvedTargetId ? currentState[resolvedTargetId] : undefined;
           if (targetItemState) {
             if (conditionType === "isVisible") {
               conditionResult = targetItemState.isVisible === true;
@@ -212,11 +210,73 @@ const processQueue = async (
 
       // (3) ページ遷移ノード
       else if (node.type === "pageNode") {
-        const { targetPageId } = node.data;
+        const { targetPageId, enableValidation = true } = node.data;
         console.log('📄 ページ遷移ノード実行', {
           nodeId: node.id,
-          targetPageId
+          targetPageId,
+          enableValidation
         });
+
+        // バリデーション実行（デフォルト有効）
+        if (enableValidation) {
+          // 現在のページの必須入力欄を取得
+          const requiredItems = placedItems.filter(item =>
+            item.name.startsWith("テキスト入力欄") &&
+            item.data.required === true
+          );
+
+          if (requiredItems.length > 0) {
+            const currentVars = getVariables();
+            const currentPreviewState = getPreviewState();
+            const newPreviewState = { ...currentPreviewState };
+            let hasError = false;
+            const errors: any[] = [];
+
+            requiredItems.forEach(item => {
+              const varName = item.data.variableName || item.id;
+              const value = String(currentVars[varName] || "").trim();
+
+              if (!value) {
+                hasError = true;
+                errors.push({
+                  id: item.id,
+                  name: item.displayName || item.name,
+                  msg: "必須項目です"
+                });
+
+                // エラー状態を設定（既存の表示状態を保持）
+                newPreviewState[item.id] = {
+                  isVisible: true,  // デフォルト値
+                  opacity: 1,       // デフォルト値
+                  ...newPreviewState[item.id],  // 既存の状態があれば上書き
+                  error: "必須項目です"
+                };
+              } else {
+                // エラーがない場合はエラー状態をクリア
+                if (newPreviewState[item.id]?.error) {
+                  newPreviewState[item.id] = {
+                    isVisible: true,  // デフォルト値
+                    opacity: 1,       // デフォルト値
+                    ...newPreviewState[item.id],
+                    error: undefined
+                  };
+                }
+              }
+            });
+
+            if (hasError) {
+              console.log("🚫 ページ遷移ブロック - 必須入力エラー", errors);
+              setPreviewState(newPreviewState);
+              // ページ遷移をブロック
+              return;
+            }
+
+            // エラー状態のクリアを反映
+            setPreviewState(newPreviewState);
+          }
+        }
+
+        // バリデーションOKまたは無効の場合、ページ遷移を実行
         if (targetPageId) {
           requestPageChange(targetPageId);
           console.log('✅ ページ遷移実行', { targetPageId });
@@ -271,12 +331,15 @@ const processQueue = async (
           relativeOperation = 'multiply'
         } = node.data;
 
-        if (targetItemId) {
+        // ★修正: TRIGGER_ITEM の動的解決
+        const resolvedTargetId = targetItemId === 'TRIGGER_ITEM' ? triggerItemId : targetItemId;
+
+        if (resolvedTargetId) {
           const currentState = getPreviewState();
-          const initialItem = placedItems.find(p => p.id === targetItemId);
+          const initialItem = placedItems.find(p => p.id === resolvedTargetId);
 
           // PreviewState にアイテムが存在する場合のみ実行
-          if (currentState[targetItemId] && initialItem) {
+          if (currentState[resolvedTargetId] && initialItem) {
 
             let cssProperty = '';
             const durationMs = (Number(durationS) + Number(delayS)) * 1000;
@@ -284,7 +347,7 @@ const processQueue = async (
 
             const playAnimation = (remaining: number) => {
               let fromState: any;
-              const currentItemState = getPreviewState()[targetItemId];
+              const currentItemState = getPreviewState()[resolvedTargetId];
 
               if (animationMode === 'relative') {
                 fromState = { ...currentItemState, transition: 'none' };
@@ -339,17 +402,17 @@ const processQueue = async (
               // 1. まず transition: none で開始状態をセット (リセット)
               setPreviewState({
                 ...getPreviewState(),
-                [targetItemId]: fromState,
+                [resolvedTargetId]: fromState,
               });
 
               // 2. わずかに遅らせて transition を有効にし、目標値をセット
               setTimeout(() => {
                 setPreviewState({
                   ...getPreviewState(),
-                  [targetItemId]: {
-                    ...getPreviewState()[targetItemId],
+                  [resolvedTargetId]: {
+                    ...getPreviewState()[resolvedTargetId],
                     ...toState,
-                    transition: `${cssProperty} ${durationS}s ${easing} ${delayS}s`
+                    transition: `${cssProperty} ${durationS}s ${easing} ${delayS} s`
                   },
                 });
               }, 10);
@@ -362,7 +425,7 @@ const processQueue = async (
                 } else {
                   const nextNodeIds = findNextNodes(node.id, null, allEdges);
                   if (nextNodeIds.length > 0) {
-                    processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
+                    processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context, triggerItemId);
                   }
                 }
               }, durationMs + 20); // 少し余裕を持たせる
@@ -391,7 +454,7 @@ const processQueue = async (
           console.log('✅ 遅延完了', { nodeId: node.id, durationS });
           const nextNodeIds = findNextNodes(node.id, null, allEdges);
           if (nextNodeIds.length > 0) {
-            processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
+            processQueue(nextNodeIds, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context, triggerItemId);
           }
         }, Number(durationS) * 1000);
       }
@@ -408,25 +471,29 @@ const processQueue = async (
       // (8) クリック待ちノード
       else if (node.type === "waitForClickNode") {
         const { targetItemId } = node.data;
+        // ★修正: TRIGGER_ITEM の動的解決
+        const resolvedTargetId = targetItemId === 'TRIGGER_ITEM' ? triggerItemId : targetItemId;
+
         console.log('⏸️ クリック待ちノード実行', {
           nodeId: node.id,
-          targetItemId
+          targetItemId: resolvedTargetId
         });
 
-        if (targetItemId) {
+        if (resolvedTargetId) {
           const nextNodeIds = findNextNodes(node.id, null, allEdges);
 
           if (nextNodeIds.length > 0) {
             const resumeFlow = () => {
               processQueue(
                 nextNodeIds,
-                allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context
+                allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context,
+                resolvedTargetId // ★重要: クリック待ち解除後は、解除したアイテムを新たな triggerItem として伝播させる
               );
             };
 
-            const listeners = activeListeners.get(targetItemId) || [];
+            const listeners = activeListeners.get(resolvedTargetId) || [];
             listeners.push(resumeFlow);
-            activeListeners.set(targetItemId, listeners);
+            activeListeners.set(resolvedTargetId, listeners);
           }
         } else {
           pushNext(node.id, null, allEdges, nextQueue);
@@ -470,91 +537,112 @@ const processQueue = async (
         pushNext(node.id, null, allEdges, nextQueue);
       }
 
-      // (11) フォーム送信ノード
-      else if (node.type === "submitFormNode") {
-        const currentVars = getVariables();
-        console.log('📤 フォーム送信ノード実行', {
-          nodeId: node.id,
-          variables: currentVars
-        });
+      // (11) フォーム送信ノード (旧来の場所に位置していたもの - 現在は (5) として定義)
+      // ここにあった重複ブロックは削除
 
-        // ★追加: 送信前バリデーション
-        // プレビュー状態にある入力項目を探し、一つずつ検証する
-        const currentPreviewState = getPreviewState();
+      // (4.5) Confirmation Node (New)
+      else if (node.type === "confirmationNode") {
+        const targetIds = node.data.targetItemIds || [];
         let hasValidationError = false;
-        const validationErrors: Array<{ id: string; name: string; type: string; error: string }> = [];
-        const newPreviewState = { ...currentPreviewState };
+        const validationErrors: Array<{ id: string; name: string; msg: string }> = [];
 
-        // 現在配置されているアイテムを取得するために placedItems を走査
-        placedItems.forEach(item => {
-          // アイテムがテキスト入力欄の場合のみ検証
-          if (item.name.startsWith("テキスト入力欄") && item.data.variableName) {
-            const value = currentVars[item.data.variableName] || "";
-            let errorMsg: string | null = null;
-            const trimmed = String(value).trim();
+        // バリデーション結果を反映するための新しいPreviewState
+        const newPreviewState = { ...getPreviewState() };
 
-            // 1. 必須チェック
-            if (item.data.required && !trimmed) {
-              errorMsg = "必須項目です";
+        // ターゲットアイテム（またはターゲット指定がない場合は全てのテキスト入力欄）をチェック
+        const itemsToCheck = targetIds.length > 0
+          ? placedItems.filter(item => targetIds.includes(item.id))
+          : placedItems.filter(item => item.name.startsWith("テキスト入力欄"));
+
+        itemsToCheck.forEach(item => {
+          // テキスト入力欄以外はスキップ（念のため）
+          if (!item.name.startsWith("テキスト入力欄")) return;
+
+          const variableName = item.data.variableName || item.id;
+          // 変数が紐づいていない場合はinputValueを直接チェック（プレビュー状態から） or 変数マップから
+          const currentVars = getVariables();
+          const value = variableName ? currentVars[variableName] : "";
+
+          const trimmed = String(value || "").trim();
+          let errorMsg: string | null = null;
+
+          // 1. 必須チェック
+          if (item.data.required && !trimmed) {
+            errorMsg = "必須項目です";
+          }
+          // 2. 形式チェック
+          else if (trimmed) {
+            if (item.data.inputType === 'email') {
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!emailRegex.test(trimmed)) errorMsg = "メールアドレスの形式が正しくありません";
+            } else if (item.data.inputType === 'tel') {
+              const telRegex = /^[0-9-]{10,}$/;
+              if (!telRegex.test(trimmed)) errorMsg = "電話番号の形式が正しくありません";
+            } else if (item.data.inputType === 'number') {
+              if (isNaN(Number(trimmed))) errorMsg = "数値を入力してください";
             }
-            // 2. 形式チェック (値がある場合のみ)
-            else if (trimmed) {
-              if (item.data.inputType === 'email') {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(trimmed)) errorMsg = "メールアドレスの形式が正しくありません";
-              } else if (item.data.inputType === 'tel') {
-                const telRegex = /^[0-9-]{10,}$/;
-                if (!telRegex.test(trimmed)) errorMsg = "電話番号の形式が正しくありません";
-              } else if (item.data.inputType === 'number') {
-                if (isNaN(Number(trimmed))) errorMsg = "数値を入力してください";
-              }
-            }
+          }
 
-            if (errorMsg) {
-              hasValidationError = true;
-              // エラーステートを注入
+          if (errorMsg) {
+            hasValidationError = true;
+            // stateにエラー情報を書き込み（既存の表示状態を保持）
+            newPreviewState[item.id] = {
+              isVisible: true,  // デフォルト値
+              opacity: 1,       // デフォルト値
+              ...newPreviewState[item.id],  // 既存の状態があれば上書き
+              error: errorMsg
+            };
+            validationErrors.push({ id: item.id, name: variableName, msg: errorMsg });
+          } else {
+            // エラーがない場合はエラー状態をクリア
+            if (newPreviewState[item.id]?.error) {
               newPreviewState[item.id] = {
+                isVisible: true,  // デフォルト値
+                opacity: 1,       // デフォルト値
                 ...newPreviewState[item.id],
-                error: errorMsg
+                error: undefined
               };
-
-              // ログ用オブジェクトに追加
-              validationErrors.push({
-                id: item.id,
-                name: item.data.variableName,
-                type: item.data.inputType || 'text',
-                error: errorMsg
-              });
             }
           }
         });
 
         if (hasValidationError) {
-          console.warn("🚫 バリデーションエラーのため送信を中断します");
+          console.log("🚫 Validation failed at confirmation node", validationErrors);
           setPreviewState(newPreviewState);
-          // エラーパスへ遷移 (または遷移せずに留まるか、設計次第だがここではエラーパスへ)
-          context.logEvent('logic_branch', {
-            nodeId: node.id,
-            nodeType: node.type,
-            metadata: {
-              result: 'validation_error',
-              errors: validationErrors, // 詳細ログ
-              errorCount: validationErrors.length
-            }
-          });
-          // バリデーションエラー時は "error" パスに進むのが自然
-          pushNext(node.id, "error", allEdges, nextQueue);
-          continue;
+          // alert()はUXを阻害するため削除。画面上の赤字エラー表示で通知する。
+          return;
         }
 
+        // バリデーションOK -> 確認画面表示
+        console.log('✅ Validation OK. Showing confirmation modal.');
+        const currentVars = getVariables();
+
+        setPreviewState({
+          ...newPreviewState, // エラークリア状態も反映
+          confirmationModal: {
+            isOpen: true,
+            nodeId: node.id,
+            variables: currentVars,
+            headerText: node.data.headerText,
+            noticeText: node.data.noticeText,
+            targetItemIds: targetIds,
+            backPageId: node.data.backPageId, // 戻る先ページIDを追加
+            isSubmitConfirmation: false
+          }
+        });
+        return;
+      }
+
+      // (5) Submit Form Node
+      else if (node.type === "submitFormNode") {
         try {
+          const currentVars = getVariables();
           const success = await context.submitLead(currentVars);
           const resultPath = success ? "success" : "error";
 
-          // 成功ログにも送信された変数の概要（あるいは検証成功したこと）を含める
           const submittedFieldTypes = placedItems
-            .filter(i => i.name.startsWith("テキスト入力欄") && i.data.variableName)
-            .map(i => ({ name: i.data.variableName, type: i.data.inputType || 'text' }));
+            .filter(i => i.name.startsWith("テキスト入力欄"))
+            .map(i => ({ name: i.data.variableName || i.id, type: i.data.inputType || 'text' }));
 
           context.logEvent('logic_branch', {
             nodeId: node.id,
@@ -566,24 +654,23 @@ const processQueue = async (
           });
 
           pushNext(node.id, resultPath, allEdges, nextQueue);
-        } catch (e) {
-          console.error("Form submission error:", e);
-          // 送信失敗ログ
+        } catch (error) {
+          console.error("Submit failed:", error);
           context.logEvent('logic_branch', {
             nodeId: node.id,
             nodeType: node.type,
             metadata: {
               result: 'error',
-              error: String(e)
+              error: String(error)
             }
           });
           pushNext(node.id, "error", allEdges, nextQueue);
         }
       }
 
-      // (12) 外部APIノード
+      // (6) External API Node
       else if (node.type === "externalApiNode") {
-        const { url, method = "GET", variableName } = node.data;
+        const { url, method = "POST", variableName } = node.data;
         console.log('🌐 外部APIノード実行', {
           nodeId: node.id,
           url,
@@ -592,12 +679,45 @@ const processQueue = async (
         });
 
         if (!url) {
+          useDebugLogStore.getState().addLog({
+            level: 'error',
+            message: `❌ API URL未設定`,
+            details: { nodeId: node.id }
+          });
           pushNext(node.id, "error", allEdges, nextQueue);
           continue;
         }
 
         try {
-          const responseData = await context.fetchApi(url, { method });
+          const currentVars = getVariables();
+          const options: any = { method };
+
+          // GET/HEAD以外ならbodyに全変数をJSONで付与
+          if (method !== 'GET' && method !== 'HEAD') {
+            options.headers = { 'Content-Type': 'application/json' };
+            options.body = JSON.stringify(currentVars);
+          }
+
+          // 送信ログ
+          useDebugLogStore.getState().addLog({
+            level: 'info',
+            message: `🌐 API送信: ${method} ${url} `,
+            details: {
+              url,
+              method,
+              body: options.body ? JSON.parse(options.body) : undefined,
+              headers: options.headers
+            }
+          });
+
+          const responseData = await context.fetchApi(url, options);
+
+          // 成功ログ
+          useDebugLogStore.getState().addLog({
+            level: 'success',
+            message: `✅ API成功: ${url} `,
+            details: { responseData }
+          });
 
           if (variableName) {
             const currentVars = getVariables();
@@ -611,8 +731,21 @@ const processQueue = async (
           });
 
           pushNext(node.id, "success", allEdges, nextQueue);
-        } catch (e) {
+        } catch (e: any) {
           console.error("API fetch error:", e);
+
+          // エラーログ
+          useDebugLogStore.getState().addLog({
+            level: 'error',
+            message: `❌ API失敗: ${url} `,
+            details: {
+              url,
+              method,
+              error: e.message || String(e),
+              stack: e.stack
+            }
+          });
+
           context.logEvent('node_execution', {
             nodeId: node.id,
             nodeType: node.type,
@@ -621,8 +754,9 @@ const processQueue = async (
           pushNext(node.id, "error", allEdges, nextQueue);
         }
       }
+
     } catch (error: any) {
-      console.error(`❌ Node execution error [${node.id}]:`, error);
+      console.error(`❌ Node execution error[${node.id}]: `, error);
       context.logEvent('error', {
         nodeId: node.id,
         nodeType: node.type,
@@ -631,13 +765,75 @@ const processQueue = async (
           stack: error?.stack
         }
       });
-      // エラーが発生しても、他のノードの実行やアプリケーション全体を止めない
-      // 必要に応じて "error" ハンドルへの遷移を試みるなどの拡張が可能
     }
   }
 
   if (nextQueue.length > 0) {
-    await processQueue(nextQueue, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
+    if (nextQueue.length > 0) {
+      await processQueue(nextQueue, allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context, triggerItemId);
+    }
+  }
+};
+
+/**
+ * 確認画面の結果を処理する関数
+ */
+export const onConfirmationResult = (
+  nodeId: string,
+  result: 'back' | 'confirm',
+  currentPageGraph: NodeGraph,
+  placedItems: PlacedItemType[],
+  getPreviewState: () => PreviewState,
+  setPreviewState: (newState: PreviewState) => void,
+  requestPageChange: (pageId: string) => void,
+  getVariables: () => VariableState,
+  setVariables: (newVars: VariableState) => void,
+  activeListeners: ActiveListeners,
+  context: LogicRuntimeContext
+) => {
+  console.log('📋 確認画面の結果を処理', {
+    nodeId,
+    result
+  });
+
+  // モーダルを閉じる
+  const currentState = getPreviewState();
+  setPreviewState({
+    ...currentState,
+    confirmationModal: {
+      ...currentState.confirmationModal!,
+      isOpen: false
+    }
+  });
+
+  context.logEvent('logic_branch', {
+    nodeId,
+    nodeType: 'confirmationNode',
+    metadata: {
+      result,
+      action: result === 'confirm' ? 'confirmed' : 'back'
+    }
+  });
+
+  // 次のノードに進む
+  const { nodes, edges } = currentPageGraph;
+  const nextNodeIds = findNextNodes(nodeId, result, edges);
+
+  if (nextNodeIds.length > 0) {
+    processQueue(
+      nextNodeIds,
+      nodes,
+      edges,
+      placedItems,
+      getPreviewState,
+      setPreviewState,
+      requestPageChange,
+      getVariables,
+      setVariables,
+      activeListeners,
+      context,
+      null
+    );
   }
 };
 
@@ -711,7 +907,9 @@ export const triggerEvent = (
     });
 
     if (initialQueue.length > 0) {
-      processQueue(initialQueue, nodes, edges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context);
+      if (initialQueue.length > 0) {
+        processQueue(initialQueue, nodes, edges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context, targetItemId);
+      }
     }
   }
 };

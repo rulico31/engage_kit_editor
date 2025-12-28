@@ -80,12 +80,7 @@
 }
 
 .accordion-icon.is-open {
-  transform: rotate(0deg);
-}
-
-/* Adjust accordion icon: defaults to Down */
-.accordion-icon.is-open {
-  transform: rotate(0deg);
+  transform: rotate(90deg);
 }
 
 .accordion-content {

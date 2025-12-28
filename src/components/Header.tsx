@@ -3,6 +3,7 @@ import "./Header.css";
 import type { ViewMode } from "../types";
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePageStore } from "../stores/usePageStore";
+import { useAuthStore } from "../stores/useAuthStore";
 
 interface HeaderProps {
   projectName: string;
@@ -97,6 +98,8 @@ const Header: React.FC<HeaderProps> = ({
     canRedo: state.canRedo
   }));
 
+  const { isAnonymous } = useAuthStore(); // ゲスト状態取得
+
   const isMobileView = useEditorSettingsStore((state) => state.isMobileView);
   const setIsMobileView = useEditorSettingsStore((state) => state.setIsMobileView);
 
@@ -107,7 +110,14 @@ const Header: React.FC<HeaderProps> = ({
         <button className="icon-button-ghost" onClick={onGoHome} title="ホームに戻る">
           <IconHome />
         </button>
-        <div className="project-title">{projectName || "名称未設定プロジェクト"}</div>
+        <div className="project-title-group">
+          <div className="project-title">{projectName || "名称未設定プロジェクト"}</div>
+          {isAnonymous && (
+            <div className="guest-badge" title="アカウント未連携：データは一時的なものです。公開時に連携してください。">
+              ゲスト編集中
+            </div>
+          )}
+        </div>
 
         <div className="history-controls-group">
           <button

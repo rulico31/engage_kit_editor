@@ -2,7 +2,6 @@ import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import { Send, CheckCircle2, AlertCircle } from "lucide-react";
 import "./SubmitFormNode.css";
-import type { PropertyConfig } from "../../types";
 
 const SubmitFormNode: React.FC<NodeProps> = ({ isConnectable }) => {
     return (
@@ -56,7 +55,10 @@ export default memo(SubmitFormNode);
 export const submitFormNodeConfig: any = {
     title: "フォーム送信設定",
     properties: [
-        // 必要に応じて送信先URL設定などを追加可能
-        // 現状はデフォルトの送信機能を使用
+        // 確認画面機能は独立したConfirmationNodeに移行したため削除
+        // {
+        //   name: "enableConfirmation",
+        //   ...
+        // }
     ],
 };

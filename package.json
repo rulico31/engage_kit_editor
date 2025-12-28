@@ -9,7 +9,9 @@
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:viewer": "tsc && vite build --config vite.config.viewer.ts"
+    "build:viewer": "tsc && vite build --config vite.config.viewer.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.84.0",
@@ -34,15 +36,18 @@
     "@types/react-resizable": "^3.0.8",
     "@types/react-window": "^1.8.8",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/ui": "^4.0.16",
     "electron": "^39.2.7",
     "electron-builder": "^26.0.12",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
     "globals": "^16.4.0",
+    "jsdom": "^27.4.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.45.0",
     "vite": "^7.1.7",
-    "vite-plugin-electron": "^0.29.0"
+    "vite-plugin-electron": "^0.29.0",
+    "vitest": "^4.0.16"
   }
 }

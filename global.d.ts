@@ -12,15 +12,16 @@ declare global {
             /**
              * プロジェクトデータをローカルファイル(.engage)として保存します。
              * @param data 保存するプロジェクトデータのJSON文字列
-             * @returns 保存が成功した場合は true、失敗またはキャンセルの場合は false を返す Promise
+             * @param filePath (Optional) 上書き保存先のパス。指定がない場合は「名前を付けて保存」ダイアログが表示されます。
+             * @returns 保存結果オブジェクト { success, filePath, error }
              */
-            saveProjectFile: (data: string) => Promise<boolean>;
+            saveProjectFile: (data: string, filePath?: string) => Promise<{ success: boolean; filePath?: string; error?: string }>;
 
             /**
              * ローカルファイル(.engage)を開くダイアログを表示し、内容を読み込みます。
-             * @returns 読み込んだファイルのJSON文字列、キャンセル時は null を返す Promise
+             * @returns 読み込んだデータとパスオブジェクト { data, filePath }、キャンセル時は null を返す Promise
              */
-            openProjectFile: () => Promise<string | null>;
+            openProjectFile: () => Promise<{ data: string; filePath: string } | null>;
 
             /**
              * ローカルの画像ファイルを選択するダイアログを表示します。

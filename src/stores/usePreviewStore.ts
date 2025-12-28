@@ -6,7 +6,8 @@ import type {
   VariableState,
 
 } from '../types';
-import { triggerEvent, type ActiveListeners, type LogicRuntimeContext } from '../logicEngine';
+import { type ActiveListeners, type LogicRuntimeContext } from '../logicEngine';
+import { triggerEvent } from '../logic/triggerEvent'; // ★ 新しいLogicEngine実装を使用
 import { usePageStore } from './usePageStore';
 import { logAnalyticsEvent } from '../lib/analytics';
 import { submitLeadData } from '../lib/leads';
@@ -22,7 +23,15 @@ const runtimeContext: LogicRuntimeContext = {
     if (!response.ok) {
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
-    return response.json();
+
+    // Content-Typeをチェックして適切に処理
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    } else {
+      // JSON以外（HTML、テキストなど）はテキストとして返す
+      return response.text();
+    }
   },
 };
 

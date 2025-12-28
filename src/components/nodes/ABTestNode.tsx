@@ -2,7 +2,6 @@ import React from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 import { Scale, FlaskConical } from "lucide-react";
 import "./ABTestNode.css";
-import type { PropertyConfig } from "../../types";
 
 // memo化を外して、dataの変更(比率変更)に対して敏感に反応するように修正
 const ABTestNode: React.FC<NodeProps> = ({ data, isConnectable }) => {

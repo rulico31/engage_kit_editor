@@ -10,12 +10,14 @@ import { usePageStore } from "../stores/usePageStore";
 import { useSelectionStore } from "../stores/useSelectionStore";
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePreviewStore } from "../stores/usePreviewStore";
+import { useProjectStore } from "../stores/useProjectStore";
 
 // Components & Hooks
 import { ArtboardItem } from "./artboard/ArtboardItem";
 import { Comment } from "./artboard/Comment";
 import { ContextMenu } from "./artboard/ContextMenu";
 import { useArtboardLogic, snapToGrid } from "./artboard/useArtboardLogic";
+import ConfirmationModal from "./ConfirmationModal";
 
 const Artboard: React.FC = () => {
   // ストアデータの取得
@@ -46,12 +48,48 @@ const Artboard: React.FC = () => {
     isMobileView: state.isMobileView,
   }));
 
-  const { previewState, variables, onItemEvent, onVariableChange } = usePreviewStore(state => ({
+  const { previewState, variables, onItemEvent, onVariableChange, initPreview, stopPreview } = usePreviewStore(state => ({
     previewState: state.previewState,
     variables: state.variables,
     onItemEvent: state.handleItemEvent,
     onVariableChange: state.handleVariableChangeFromItem,
+    initPreview: state.initPreview,
+    stopPreview: state.stopPreview,
   }));
+
+  // プレビューモードの切り替えを監視して状態をリセット
+  React.useEffect(() => {
+    if (isPreviewing) {
+      initPreview();
+    } else {
+      stopPreview();
+    }
+  }, [isPreviewing, initPreview, stopPreview]);
+
+  // テーマ設定の取得
+  const { projectMeta } = useProjectStore(state => ({ projectMeta: state.projectMeta }));
+  const theme = projectMeta?.data?.theme;
+
+  // テーマ変数のCSSプロパティ生成
+  const themeStyles = useMemo(() => {
+    // デフォルト値
+    const defaults = {
+      fontFamily: 'system-ui',
+      accentColor: '#3b82f6',
+      backgroundColor: '#ffffff',
+      borderRadius: 8
+    };
+
+    // テーマがあればマージ
+    const current = { ...defaults, ...theme };
+
+    return {
+      '--theme-font-family': current.fontFamily,
+      '--theme-accent-color': current.accentColor,
+      '--theme-background-color': current.backgroundColor,
+      '--theme-border-radius': `${current.borderRadius}px`,
+    } as React.CSSProperties;
+  }, [theme]);
 
   const artboardRef = useRef<HTMLDivElement>(null);
 
@@ -296,7 +334,7 @@ const Artboard: React.FC = () => {
       <div
         ref={artboardRef}
         className={`artboard ${isOver ? "is-over" : ""}`}
-        style={{ transform: `scale(${zoomLevel})`, margin: 0, ...backgroundStyle, width: `${artboardWidth}px`, height: `${artboardHeight}px` }}
+        style={{ transform: `scale(${zoomLevel})`, margin: 0, ...backgroundStyle, ...themeStyles, width: `${artboardWidth}px`, height: `${artboardHeight}px` }}
         onClick={handleArtboardBackgroundClick}
       >
         {showGridOverlay && <div className="artboard-grid-overlay" style={gridStyle} />}
@@ -369,6 +407,9 @@ const Artboard: React.FC = () => {
           onClose={() => setContextMenu(null)}
         />
       )}
+
+      {/* プレビューモード時に確認モーダルを表示 */}
+      {isPreviewing && <ConfirmationModal />}
     </div>
   );
 };

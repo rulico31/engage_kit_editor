@@ -1,12 +1,12 @@
 // src/utils/cropImage.ts
 
 /**
- * 画像を指定された領域で切り抜き、新しいBlob URLとして返す
- * * @param imageSrc 元画像のURL
+ * 画像を指定された領域で切り抜き、Data URI (Base64)として返す
+ * @param imageSrc 元画像のURL
  * @param pixelCrop 切り抜く領域（ピクセル座標）
  * ※重要: この座標は元画像の自然サイズ（naturalWidth/naturalHeight）に対する座標である必要があります。
  * 表示サイズではなく、実際の画像サイズに対する座標を渡してください。
- * @returns 切り抜かれた画像のBlob URL
+ * @returns 切り抜かれた画像のData URI (data:image/png;base64,...)
  */
 export async function getCroppedImg(
     imageSrc: string,
@@ -68,17 +68,10 @@ export async function getCroppedImg(
                 pixelCrop.height
             );
 
-            // CanvasをBlobに変換
-            canvas.toBlob((blob) => {
-                if (!blob) {
-                    reject(new Error('Canvas is empty'));
-                    return;
-                }
-
-                // Blob URLを生成
-                const croppedImageUrl = URL.createObjectURL(blob);
-                resolve(croppedImageUrl);
-            }, 'image/png');
+            // CanvasをData URI (Base64)に変換
+            // ★ 修正: Blob URLではなくData URIを使用（公開時にBlobが失われる問題を回避）
+            const croppedImageUrl = canvas.toDataURL('image/png');
+            resolve(croppedImageUrl);
         };
 
         image.onerror = () => {

@@ -68,6 +68,9 @@ export const fetchProjectStats = async (projectId: string) => {
     .eq('project_id', projectId)
     .eq('event_type', 'page_view');
 
+  // Debug log
+  console.log('[Dashboard] PV Stats raw:', { pvCount, pvError });
+
   if (pvError) console.error('Error fetching PV:', pvError);
 
   // 2. リードデータの取得 (leads)
@@ -85,6 +88,8 @@ export const fetchProjectStats = async (projectId: string) => {
     .select('*')
     .eq('project_id', projectId)
     .order('date', { ascending: true });
+
+  console.log('[Dashboard] Daily Stats raw:', { dailyStats, dailyError });
 
   if (dailyError) console.error('Error fetching daily stats:', dailyError);
 

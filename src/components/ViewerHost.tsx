@@ -17,10 +17,7 @@ interface ViewerHostProps {
 
 // ★ Phase 4: Watermark Component
 const PoweredByBadge: React.FC = () => (
-  <a
-    href="https://engagekit.io" // LPへのリンク（仮）
-    target="_blank"
-    rel="noopener noreferrer"
+  <div
     style={{
       position: 'fixed',
       bottom: '12px',
@@ -33,20 +30,19 @@ const PoweredByBadge: React.FC = () => (
       display: 'flex',
       alignItems: 'center',
       gap: '6px',
-      textDecoration: 'none',
       zIndex: 9999,
       fontSize: '11px',
       color: '#444',
       fontFamily: 'sans-serif',
       transition: 'opacity 0.2s',
-      border: '1px solid rgba(0,0,0,0.05)'
+      border: '1px solid rgba(0,0,0,0.05)',
+      userSelect: 'none',
+      pointerEvents: 'none' // クリックを透過させる
     }}
-    onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
-    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
   >
     <span style={{ fontWeight: 500 }}>Powered by</span>
     <span style={{ fontWeight: 700, color: '#3b82f6' }}>EngageKit</span>
-  </a>
+  </div>
 );
 
 const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
@@ -54,6 +50,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showWatermark] = useState(true);
+  // 二重送信防止（Strict Mode対策）
+  const hasLogged = React.useRef(false);
 
   const initPreview = usePreviewStore(state => state.initPreview);
   const loadFromData = usePageStore(state => state.loadFromData);
@@ -79,10 +77,10 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         useProjectStore.setState({ currentProjectId: projectId });
 
         // 1. データベースからデータを取得
-        // ★修正: 'published_data' を取得するように変更 (Phase 2)
+        // ★修正: 'published_content' を取得するように変更 (published_data -> published_content)
         const { data, error } = await supabase
           .from("projects")
-          .select("published_data, is_published")
+          .select("published_content, is_published")
           .eq("id", projectId)
           .single();
 
@@ -91,26 +89,26 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
         // 公開状態かつ公開データがある場合のみ表示
         // 下書きデータ ('data') へのフォールバックは廃止 (Safe Integrity)
-        if (!data.is_published || !data.published_data) {
+        if (!data.is_published || !data.published_content) {
           throw new Error("このプロジェクトは現在公開されていません。");
         }
 
-        const projectData = data.published_data as ProjectData;
+        const projectData = data.published_content as ProjectData;
 
         // ★ テーマをCSS変数として適用
         if (projectData.theme) {
           const root = document.documentElement;
           if (projectData.theme.fontFamily) {
-            root.style.setProperty('--viewer-font-family', projectData.theme.fontFamily);
+            root.style.setProperty('--theme-font-family', projectData.theme.fontFamily);
           }
           if (projectData.theme.accentColor) {
-            root.style.setProperty('--viewer-accent-color', projectData.theme.accentColor);
+            root.style.setProperty('--theme-accent-color', projectData.theme.accentColor);
           }
           if (projectData.theme.backgroundColor) {
-            root.style.setProperty('--viewer-bg-color', projectData.theme.backgroundColor);
+            root.style.setProperty('--theme-background-color', projectData.theme.backgroundColor);
           }
           if (projectData.theme.borderRadius !== undefined) {
-            root.style.setProperty('--viewer-border-radius', `${projectData.theme.borderRadius}px`);
+            root.style.setProperty('--theme-border-radius', `${projectData.theme.borderRadius}px`);
           }
         }
 
@@ -123,9 +121,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         setTimeout(() => {
           initPreview();
           setIsLoaded(true);
+
           logAnalyticsEvent('page_view', {
             metadata: { referrer: document.referrer }
-          });
+          }, projectId); // ★修正: プロジェクトIDを明示的に渡す
+
         }, 50);
 
       } catch (err: any) {
@@ -134,8 +134,9 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
       }
     };
 
-    if (projectId) {
+    if (projectId && !hasLogged.current) {
       fetchAndInit();
+      hasLogged.current = true;
     }
   }, [projectId, loadFromData, initPreview]);
 

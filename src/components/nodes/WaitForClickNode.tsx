@@ -3,7 +3,6 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import { MousePointerClick, Target } from "lucide-react";
 import { usePageStore } from "../../stores/usePageStore"; // 名前解決用にストアを追加
 import "./WaitForClickNode.css";
-import type { PropertyConfig } from "../../types";
 
 const WaitForClickNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
   // ストアからアイテムリストを取得して、IDから名前を引けるようにする

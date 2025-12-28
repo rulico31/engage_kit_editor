@@ -4,6 +4,18 @@ import "../Artboard.css";
 import { ResizeHandles } from "./ResizeHandles";
 import { useSelectionStore } from "../../stores/useSelectionStore";
 
+// 国コードリスト（PreviewItemと共通）
+const COUNTRY_CODES = [
+  { code: "+81", name: "日本 (+81)" },
+  { code: "+1", name: "アメリカ/カナダ (+1)" },
+  { code: "+86", name: "中国 (+86)" },
+  { code: "+82", name: "韓国 (+82)" },
+  { code: "+44", name: "イギリス (+44)" },
+  { code: "+33", name: "フランス (+33)" },
+  { code: "+49", name: "ドイツ (+49)" },
+  { code: "+61", name: "オーストラリア (+61)" },
+];
+
 interface ArtboardItemProps {
   item: PlacedItemType;
   renderChildren: (parentId: string) => React.ReactNode;
@@ -68,12 +80,18 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     height: isAutoHeight ? 'auto' : height,
     minHeight: height,
     display: isGroup ? 'block' : 'flex',
+    // テーマ変数の適用
+    fontFamily: 'var(--theme-font-family, inherit)',
+    // @ts-ignore - 個別のborderRadius設定を使用
+    borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
+    overflow: 'hidden',
   };
 
   // 背景色（isTransparentがtrueの場合は強制的にtransparent）
   if (item.data?.isTransparent === true) {
     containerStyle.backgroundColor = 'transparent';
   } else if (item.style?.backgroundColor) {
+    // 個別に背景色が設定されている場合
     containerStyle.backgroundColor = item.style.backgroundColor;
   }
 
@@ -136,10 +154,13 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   }
 
   // 入力値の同期処理
-  const variableName = item.data?.variableName || "";
+  // 変数名が設定されていない場合はitem.idをデフォルトの変数名として使用する
+  const variableName = item.data?.variableName || item.id;
   const externalValue = variables[variableName] || "";
   const [inputValue, setInputValue] = useState(externalValue);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [countryCode, setCountryCode] = useState(item.data?.countryCode || "+81");
 
   useEffect(() => {
     if (isPreviewing) {
@@ -148,8 +169,69 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       }
     } else {
       setInputValue("");
+      setError(null);
     }
   }, [externalValue, isPreviewing]);
+
+  // バリデーション関数（PreviewItemと同じロジック）
+  const validate = (val: string) => {
+    if (!isPreviewing) return true; // 編集モード時はバリデーションしない
+
+    let newError: string | null = null;
+    const trimmed = val ? val.trim() : "";
+
+    // 1. 必須チェック
+    if (item.data.required && !trimmed) {
+      newError = "必須項目です";
+    }
+    // 2. 入力タイプ別チェック
+    else if (trimmed) {
+      if (item.data.inputType === 'email') {
+        // メールアドレスの形式チェック（ドメインチェック強化）
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmed)) {
+          newError = "メールアドレスの形式が正しくありません";
+        } else {
+          // ドメイン部分の検証
+          const domain = trimmed.split('@')[1];
+          if (!domain || domain.length < 3 || !domain.includes('.')) {
+            newError = "有効なドメイン名を含むメールアドレスを入力してください";
+          }
+        }
+      } else if (item.data.inputType === 'tel') {
+        // 電話番号の検証（国コード対応）
+        if (item.data.enableCountryCode) {
+          // 国コード選択が有効な場合は数字のみ許可（ハイフンは任意）
+          const telRegex = /^[0-9\-\s]{8,}$/;
+          if (!telRegex.test(trimmed)) {
+            newError = "電話番号は8桁以上の数字で入力してください";
+          }
+        } else {
+          // 国コード選択が無効な場合は通常の電話番号形式
+          const telRegex = /^[0-9\-]{10,}$/;
+          if (!telRegex.test(trimmed)) {
+            newError = "電話番号の形式が正しくありません";
+          }
+        }
+      } else if (item.data.inputType === 'number') {
+        if (isNaN(Number(trimmed))) {
+          newError = "数値を入力してください";
+        }
+      }
+    }
+
+    setError(newError);
+    return newError === null;
+  };
+
+  const handleBlur = () => {
+    if (isPreviewing) {
+      const isValid = validate(inputValue);
+      if (isValid) {
+        onItemEvent("onInputComplete", item.id);
+      }
+    }
+  };
 
   // イベントハンドラ
   const handleClick = (e: React.MouseEvent) => {
@@ -218,9 +300,25 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
 
     content = (
       <div className="item-input-content">
+        {isPreviewing && error && <div className="input-error-message">{error}</div>}
+        {isPreviewing && item.data?.enableCountryCode && item.data?.inputType === 'tel' && (
+          <div className="country-code-wrapper">
+            <select
+              className="country-code-select"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+            >
+              {COUNTRY_CODES.map((country) => (
+                <option key={country.code} value={country.code}>
+                  {country.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <textarea
           ref={textareaRef}
-          className="artboard-item-textarea"
+          className={`artboard-item-textarea ${isPreviewing && error ? 'has-error' : ''}`}
           style={{
             ...textStyle,
             // @ts-ignore - CSS変数の設定
@@ -233,15 +331,17 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
             if (isPreviewing) {
               setInputValue(e.target.value);
               onVariableChange(variableName, e.target.value);
+              // 入力中にエラーをクリア
+              if (error) validate(e.target.value);
             }
           }}
           onKeyDown={(e) => {
             if (isPreviewing && e.key === "Enter") {
               e.currentTarget.blur();
-              onItemEvent("onInputComplete", item.id);
+              // blurイベントでhandleBlurが呼ばれるため、ここでは呼び出さない
             }
           }}
-          onBlur={() => { if (isPreviewing) onItemEvent("onInputComplete", item.id); }}
+          onBlur={handleBlur}
           onClick={(e) => {
             if (!isPreviewing) {
               e.stopPropagation();

@@ -291,12 +291,7 @@ export const PagePropertiesEditor: React.FC<PagePropertiesEditorProps> = ({ page
                 </div>
             </AccordionSection>
 
-            {/* Placeholder for future Grid settings */}
-            <AccordionSection title="グリッド設定" defaultOpen={false}>
-                <div className="placeholder-text" style={{ margin: 0, padding: 10 }}>
-                    グリッド設定は現在開発中です
-                </div>
-            </AccordionSection>
+
 
             {/* 画像トリミングモーダル */}
             {page.backgroundImage?.src && (

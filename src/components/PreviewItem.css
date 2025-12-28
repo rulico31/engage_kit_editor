@@ -101,13 +101,41 @@
   background-color: #fef2f2;
 }
 
+/* ★ 更新: エラーメッセージを上に表示 */
 .input-error-message {
   color: #ef4444;
   font-size: 11px;
-  padding: 2px 8px 6px 8px;
+  padding: 6px 8px 2px 8px;
   text-align: left;
   font-weight: 600;
   animation: fadeIn 0.3s ease;
+  order: -1;
+  /* フレックスボックスで最初に表示 */
+}
+
+/* ★ 追加: 国コード選択UI */
+.country-code-wrapper {
+  padding: 8px 8px 4px 8px;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.country-code-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background-color: #ffffff;
+  font-size: 13px;
+  color: #374151;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.country-code-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 @keyframes fadeIn {

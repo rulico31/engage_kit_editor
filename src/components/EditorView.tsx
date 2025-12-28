@@ -12,9 +12,12 @@ import "./EditorView.css";
 import "./GridPopover.css";
 import EmbedModal from "./EmbedModal";
 import { ProjectSettingsModal } from "./ProjectSettingsModal";
+import AuthLinkModal from "./Auth/AuthLinkModal"; // 追加
 
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
+import { useAuthStore } from "../stores/useAuthStore"; // 追加
 import { useProjectStore } from "../stores/useProjectStore";
+import { useTabSync } from "../hooks/useTabSync";
 
 interface EditorViewProps {
   projectName: string;
@@ -88,6 +91,13 @@ const EditorView: React.FC<EditorViewProps> = ({
   const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
+  // 認証関連
+  const { user, isAnonymous } = useAuthStore();
+  const [isAuthLinkModalOpen, setIsAuthLinkModalOpen] = useState(false);
+
+  // タブの自動同期（削除時のクローズ、Undo時の復元）
+  useTabSync();
+
   const handleSave = async () => {
     try {
       const success = await saveProject();
@@ -98,6 +108,17 @@ const EditorView: React.FC<EditorViewProps> = ({
     } catch (e) {
       console.error(e);
       alert("保存に失敗しました");
+    }
+  };
+
+  // 公開・集計のアクションハンドラ（認証ガード付き）
+  const handleProtectedAction = (action: () => void) => {
+    if (user && isAnonymous) {
+      // 匿名ユーザーなら連携モーダルを表示
+      setIsAuthLinkModalOpen(true);
+    } else {
+      // 既に正規ユーザーならそのまま実行
+      action();
     }
   };
 
@@ -199,7 +220,8 @@ const EditorView: React.FC<EditorViewProps> = ({
         onEnterFullscreen={handleEnterFullscreen}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        onPublish={onPublish}
+        onPublish={() => handleProtectedAction(onPublish)}
+        // onPublish={onPublish}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
 
@@ -316,6 +338,13 @@ const EditorView: React.FC<EditorViewProps> = ({
         <div style={{ position: 'absolute', top: 50, right: 100, zIndex: 9999 }}>
           <GridPopover />
         </div>
+      )}
+
+      {/* アカウント連携モーダル */}
+      {isAuthLinkModalOpen && (
+        <AuthLinkModal
+          onClose={() => setIsAuthLinkModalOpen(false)}
+        />
       )}
     </div>
   );
