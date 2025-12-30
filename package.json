@@ -6,7 +6,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc && vite build && vite build --config vite.config.viewer.ts && electron-builder",
     "lint": "eslint .",
     "preview": "vite preview",
     "build:viewer": "tsc && vite build --config vite.config.viewer.ts",
@@ -49,5 +49,18 @@
     "vite": "^7.1.7",
     "vite-plugin-electron": "^0.29.0",
     "vitest": "^4.0.16"
+  },
+  "build": {
+    "appId": "com.engage-kit.editor",
+    "productName": "engage-kit-editor",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    }
   }
 }

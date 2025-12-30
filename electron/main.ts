@@ -112,11 +112,35 @@ function createWindow() {
     });
 
     if (isDev) {
+        console.log('[Main] 開発モード: Dev Serverから読み込みます')
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL as string)
         mainWindow.webContents.openDevTools()
     } else {
-        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+        console.log('[Main] 本番モード: ビルド済みファイルから読み込みます')
+        // パッケージング後は __dirname が resources/app.asar/dist-electron になるため
+        // index.htmlは dist-electron から見て ../index.html にある
+        const indexPath = path.join(__dirname, '../index.html')
+        console.log('[Main] __dirname:', __dirname)
+        console.log('[Main] index.htmlのパス:', indexPath)
+        mainWindow.loadFile(indexPath)
+        // ★デバッグ用：本番ビルドでも開発者ツールを開く
+        mainWindow.webContents.openDevTools()
     }
+
+    // ★ページ読み込み完了時のログ
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('[Main] ページの読み込みが完了しました')
+    })
+
+    // ★ページ読み込み失敗時のログ
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+        console.error('[Main] ページの読み込みに失敗:', errorCode, errorDescription)
+    })
+
+    // ★コンソールメッセージをメインプロセスにも表示
+    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+        console.log(`[Renderer Console] ${message}`)
+    })
 }
 
 app.whenReady().then(() => {
