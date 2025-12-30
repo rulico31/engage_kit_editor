@@ -144,7 +144,7 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
       });
       dynamicOptions = [
         { label: "-- アイテムを選択 --", value: "" },
-        { label: "⚡ Trigger Item (発火したアイテム)", value: "TRIGGER_ITEM" },
+
         ...validItems.map(item => ({ label: item.data.text || item.name, value: item.id })),
       ];
     } else if (name === "targetPageId" || name === "backPageId") {

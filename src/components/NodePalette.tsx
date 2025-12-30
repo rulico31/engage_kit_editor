@@ -14,7 +14,7 @@ interface NodeTypeDefinition {
 
 const nodeTypes: NodeTypeDefinition[] = [
     // イベント
-    { type: 'waitForClickNode', label: 'クリック待機', icon: '⏸️', category: 'event', description: 'クリックを待機' },
+    { type: 'eventNode', label: 'イベント', icon: '⚡', category: 'event', description: 'イベントトリガー (クリック等)' },
 
     // アクション
     { type: 'actionNode', label: '表示切替', icon: '👁️', category: 'action', description: '表示・非表示の切替' },

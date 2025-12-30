@@ -138,6 +138,9 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
       initialPS[item.id] = { isVisible, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
 
+    // Refも更新（triggerEventがこちらを参照するため重要）
+    previewStateRef.current = initialPS;
+
     set({
       previewState: initialPS,
     });

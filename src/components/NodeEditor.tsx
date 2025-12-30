@@ -31,7 +31,7 @@ import PageNode from './nodes/PageNode';
 import AnimateNode from './nodes/AnimateNode';
 import DelayNode from './nodes/DelayNode';
 import SetVariableNode from './nodes/SetVariableNode';
-import WaitForClickNode from './nodes/WaitForClickNode';
+
 import ExternalApiNode from './nodes/ExternalApiNode';
 import ABTestNode from './nodes/ABTestNode';
 import CommentNode from './nodes/CommentNode';
@@ -50,7 +50,7 @@ const nodeTypes: NodeTypes = {
   animateNode: AnimateNode,
   delayNode: DelayNode,
   setVariableNode: SetVariableNode,
-  waitForClickNode: WaitForClickNode,
+
   externalApiNode: ExternalApiNode,
   abTestNode: ABTestNode,
   commentNode: CommentNode,
@@ -172,7 +172,7 @@ const NodeEditorContent: React.FC = () => {
         'animateNode': 'アニメーション',
         'delayNode': '遅延',
         'setVariableNode': '変数設定',
-        'waitForClickNode': 'クリック待機',
+
         'externalApiNode': '外部API',
         'abTestNode': 'A/Bテスト',
         'commentNode': 'コメント',
@@ -191,16 +191,6 @@ const NodeEditorContent: React.FC = () => {
             return { ...baseData, mode: 'toggle' };
           case 'eventNode':
             return { ...baseData, eventType: 'click' };
-          case 'ifNode':
-            return { ...baseData, conditionSource: 'item', conditionType: 'isVisible', comparison: '==', comparisonType: 'string' };
-          case 'animateNode':
-            return { ...baseData, animType: 'opacity', value: '1', durationS: '0.5', delayS: '0', easing: 'ease', animationMode: 'absolute' };
-          case 'delayNode':
-            return { ...baseData, durationS: '1.0' };
-          case 'pageNode':
-            return { ...baseData, enableValidation: true };
-          case 'waitForClickNode':
-            return { ...baseData };
           case 'externalApiNode':
             return { ...baseData, method: 'POST' };
           case 'abTestNode':
@@ -270,15 +260,8 @@ const NodeEditorContent: React.FC = () => {
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     selectItem(node.id, 'node', node.data.label || 'ノード');
-
-    // WaitForClickノードが選択された場合、ターゲットアイテムをハイライト
-    if (node.type === 'waitForClickNode') {
-      const targetIds = node.data.targetItemIds || (node.data.targetItemId ? [node.data.targetItemId] : []);
-      useSelectionStore.getState().setHighlightedItems(targetIds);
-    } else {
-      // 他のノードが選択された場合はハイライトをクリア
-      useSelectionStore.getState().clearHighlightedItems();
-    }
+    // 他のノードが選択された場合はハイライトをクリア
+    useSelectionStore.getState().clearHighlightedItems();
   }, [selectItem]);
 
   const onPaneClick = useCallback(() => {

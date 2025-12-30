@@ -9,7 +9,7 @@ import { IfExecutor } from "./executors/IfExecutor";
 import { PageExecutor } from "./executors/PageExecutor";
 import { SetVariableExecutor } from "./executors/SetVariableExecutor";
 import { DelayExecutor } from "./executors/DelayExecutor";
-import { WaitForClickExecutor } from "./executors/WaitForClickExecutor";
+
 import { ABTestExecutor } from "./executors/ABTestExecutor";
 import { SubmitFormExecutor, ExternalApiExecutor } from "./executors/NetworkExecutor";
 
@@ -29,14 +29,14 @@ export class LogicEngine {
         this.executors.set("pageNode", new PageExecutor());
         this.executors.set("setVariableNode", new SetVariableExecutor());
         this.executors.set("delayNode", new DelayExecutor());
-        this.executors.set("waitForClickNode", new WaitForClickExecutor());
+
         this.executors.set("abTestNode", new ABTestExecutor());
         this.executors.set("submitFormNode", new SubmitFormExecutor());
         this.executors.set("externalApiNode", new ExternalApiExecutor());
 
         // Legacy/passthrough nodes
         this.executors.set("eventNode", {
-            async execute(node, context, state) {
+            async execute(node, _context, state) {
                 console.log('🎯 イベントノード通過', {
                     nodeId: node.id,
                     eventType: node.data.eventType
@@ -67,6 +67,13 @@ export class LogicEngine {
         triggerItemId: string | null = null
     ): Promise<void> {
         const nextQueue: string[] = [];
+
+        console.log('🔄 LogicEngine: executeQueue', {
+            queueSize: executionQueue.length,
+            placedItemsCount: placedItems?.length,
+            triggerItemId,
+            placedItems: JSON.stringify(placedItems?.map(i => ({ id: i.id, name: i.name })))
+        });
 
         for (const nodeId of executionQueue) {
             const node = allNodes.find((n) => n.id === nodeId);

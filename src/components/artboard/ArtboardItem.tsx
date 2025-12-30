@@ -84,7 +84,8 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     fontFamily: 'var(--theme-font-family, inherit)',
     // @ts-ignore - 個別のborderRadius設定を使用
     borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
-    overflow: 'hidden',
+    // 選択時はリサイズハンドルを表示するためoverflowをvisibleに、それ以外はhidden
+    overflow: (isSelected && !isPreviewing) ? 'visible' : 'hidden',
   };
 
   // 背景色（isTransparentがtrueの場合は強制的にtransparent）

@@ -63,7 +63,7 @@ export class SubmitFormExecutor implements NodeExecutor<SubmitFormNodeData> {
 
 /**
  * Executor for ExternalAPI nodes
- * Calls external webhooks/APIs with current variables
+ * Calls external webhooks/APIs with current variables via Supabase Edge Function proxy
  */
 export class ExternalApiExecutor implements NodeExecutor<ExternalApiNodeData> {
     async execute(
@@ -73,7 +73,7 @@ export class ExternalApiExecutor implements NodeExecutor<ExternalApiNodeData> {
     ): Promise<ExecutionResult> {
         const { url, method = "POST", variableName } = node.data;
 
-        console.log('🌐 外部APIノード実行', {
+        console.log('🌐 外部APIノード実行 (Edge Function経由)', {
             nodeId: node.id,
             url,
             method,
@@ -89,18 +89,49 @@ export class ExternalApiExecutor implements NodeExecutor<ExternalApiNodeData> {
 
         try {
             const currentVars = state.getVariables();
-            const options: RequestInit = { method };
 
+            // Edge Functionを経由して外部APIにリクエスト
+            // これによりCORS制限を回避
+            const { supabase } = await import('../../lib/supabaseClient');
+
+            const requestBody: any = {
+                url,
+                method,
+                headers: {}
+            };
+
+            // GET/HEAD以外の場合はボディを追加
             if (method !== 'GET' && method !== 'HEAD') {
-                options.headers = { 'Content-Type': 'application/json' };
-                options.body = JSON.stringify(currentVars);
+                requestBody.headers['Content-Type'] = 'application/json';
+                requestBody.body = currentVars;
             }
 
-            const responseData = await context.fetchApi(url, options);
+            console.log('📡 Edge Functionに送信', requestBody);
 
-            if (variableName) {
+            const { data, error } = await supabase.functions.invoke('external-api-proxy', {
+                body: requestBody
+            });
+
+            if (error) {
+                throw new Error(`Edge Function error: ${error.message}`);
+            }
+
+            console.log('✅ Edge Functionからのレスポンス', data);
+
+            // レスポンスを変数に保存
+            if (variableName && data) {
                 const currentVars = state.getVariables();
-                state.setVariables({ ...currentVars, [variableName]: responseData });
+                // dataが文字列の場合はJSONパースを試みる
+                let parsedData = data;
+                if (typeof data === 'string') {
+                    try {
+                        parsedData = JSON.parse(data);
+                    } catch (e) {
+                        // パースできない場合はそのまま使用
+                        parsedData = data;
+                    }
+                }
+                state.setVariables({ ...currentVars, [variableName]: parsedData });
             }
 
             context.logEvent('node_execution', {
@@ -113,7 +144,7 @@ export class ExternalApiExecutor implements NodeExecutor<ExternalApiNodeData> {
                 nextNodes: findNextNodes(node.id, "success", state.allEdges)
             };
         } catch (e) {
-            console.error("API fetch error:", e);
+            console.error("API fetch error (Edge Function):", e);
             context.logEvent('node_execution', {
                 nodeId: node.id,
                 nodeType: node.type,

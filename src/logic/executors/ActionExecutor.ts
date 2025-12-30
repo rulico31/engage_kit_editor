@@ -14,7 +14,7 @@ interface ActionNodeData {
 export class ActionExecutor implements NodeExecutor<ActionNodeData> {
     async execute(
         node: Node<ActionNodeData>,
-        context: LogicRuntimeContext,
+        _context: LogicRuntimeContext,
         state: RuntimeState
     ): Promise<ExecutionResult> {
         const { targetItemId, mode } = node.data;
@@ -23,7 +23,10 @@ export class ActionExecutor implements NodeExecutor<ActionNodeData> {
             nodeId: node.id,
             targetItemId,
             mode,
-            currentPreviewState: state.getPreviewState()
+            currentPreviewState: state.getPreviewState(),
+            allVariables: state.getVariables(),
+            triggerItemId: state.triggerItemId,
+            availableItemIds: Object.keys(state.getPreviewState())
         });
 
         // Resolve TRIGGER_ITEM placeholder
@@ -60,7 +63,8 @@ export class ActionExecutor implements NodeExecutor<ActionNodeData> {
             } else {
                 console.warn('⚠️ ターゲットアイテムが見つかりません', {
                     resolvedTargetId,
-                    availableItems: Object.keys(currentState).filter(k => k !== 'currentPageId' && k !== 'isFinished')
+                    availableItems: JSON.stringify(Object.keys(currentState).filter(k => k !== 'currentPageId' && k !== 'isFinished')),
+                    allItemIds: JSON.stringify(Object.keys(currentState))
                 });
             }
         } else {
