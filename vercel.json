@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run build:web",
   "rewrites": [
     {
       "source": "/viewer.html",
