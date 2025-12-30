@@ -1,14 +1,12 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/viewer.html",
       "destination": "/viewer/viewer.html"
     },
     {
-      "source": "/viewer",
-      "destination": "/viewer/viewer.html"
+      "source": "/",
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -18,6 +16,23 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=3600, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors * https: http: file:"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
         }
       ]
     }
