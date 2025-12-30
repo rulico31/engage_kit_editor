@@ -1,29 +1,11 @@
 {
-  "buildCommand": "npm run build:web",
   "rewrites": [
     {
-      "source": "/viewer.html",
-      "destination": "/viewer/viewer.html"
-    },
-    {
-      "source": "/viewer",
-      "destination": "/viewer/viewer.html"
-    },
-    {
-      "source": "/",
-      "destination": "/index.html"
+      "source": "/(.*)",
+      "destination": "/viewer.html"
     }
   ],
   "headers": [
-    {
-      "source": "/viewer/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        }
-      ]
-    },
     {
       "source": "/(.*)",
       "headers": [
