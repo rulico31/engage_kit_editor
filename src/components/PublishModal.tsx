@@ -99,27 +99,51 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
 
       // Supabase Storageへのアップロード
       const filePath = `${projectId}/${fileName}`;
-      const { error } = await supabase.storage
+
+      console.log('📤 ストレージアップロード開始:', {
+        filePath,
+        fileSize: fileBody.size,
+        mimeType: fileBody.type
+      });
+
+      const { data, error } = await supabase.storage
         .from("project-assets")
         .upload(filePath, fileBody, {
           cacheControl: "3600",
           upsert: false,
+          contentType: fileBody.type || 'image/png',
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ ストレージアップロードエラー:', {
+          error,
+          filePath,
+          errorMessage: error.message,
+          errorDetails: error
+        });
+        throw error;
+      }
+
+      console.log('✅ ストレージアップロード成功:', { filePath, data });
 
       // Public URLの取得
       const { data: publicUrlData } = supabase.storage
         .from("project-assets")
         .getPublicUrl(filePath);
 
+      console.log('🔗 Public URL取得:', publicUrlData.publicUrl);
+
       return publicUrlData.publicUrl;
 
-    } catch (e) {
-      console.error("Asset upload failed:", e, assetSrc);
-      // エラー時は元のパスを返して、少なくともリンク切れ状態で公開処理を続行させるか、エラーにするか
-      // ここでは安全のため元のパスを返します
-      return assetSrc;
+    } catch (e: any) {
+      console.error("❌ Asset upload failed:", {
+        error: e,
+        message: e?.message,
+        assetSrc: assetSrc.substring(0, 100) + '...',
+        stack: e?.stack
+      });
+      // エラーを投げて公開を中断
+      throw new Error(`画像のアップロードに失敗しました: ${e?.message || e}`);
     }
   };
 

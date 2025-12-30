@@ -4,18 +4,16 @@ import electron from 'vite-plugin-electron'
 import { resolve } from 'path'
 
 export default defineConfig({
-  // ★★★ ここが最重要！これがないと真っ白になります ★★★
-  base: './', 
-  
+  // ★これがないと動きません
+  base: './',
+
   plugins: [
     react(),
     electron([
       {
-        // Main process のエントリポイント
         entry: 'electron/main.ts',
       },
       {
-        // Preload script のエントリポイント
         entry: 'electron/preload.ts',
         onstart(options) {
           options.reload()
@@ -24,11 +22,12 @@ export default defineConfig({
     ]),
   ],
   build: {
-    // ビューワーとエディタを同時にビルドするための設定
+    outDir: 'dist',
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        viewer: resolve(__dirname, 'viewer.html'), 
+        viewer: resolve(__dirname, 'viewer.html'),
       },
     },
   },

@@ -99,11 +99,11 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   // ボックスシャドウ (Shadow & Glow)
   const boxShadows: string[] = [];
   if (item.style?.shadow?.enabled) {
-    const { x, y, blur, color } = item.style.shadow;
+    const { x = 0, y = 0, blur = 0, color = '#000000' } = item.style.shadow;
     boxShadows.push(`${x}px ${y}px ${blur}px ${color}`);
   }
   if (item.style?.glow?.enabled) {
-    const { blur, spread, color } = item.style.glow;
+    const { blur = 0, spread = 0, color = '#ffffff' } = item.style.glow;
     boxShadows.push(`0 0 ${blur}px ${spread}px ${color}`);
   }
   if (boxShadows.length > 0) {
@@ -143,11 +143,11 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   // テキストシャドウ (Shadow & Glow)
   const textShadows: string[] = [];
   if (item.style?.textShadow?.enabled) {
-    const { x, y, blur, color } = item.style.textShadow;
+    const { x = 0, y = 0, blur = 0, color = '#000000' } = item.style.textShadow;
     textShadows.push(`${x}px ${y}px ${blur}px ${color}`);
   }
   if (item.style?.textGlow?.enabled) {
-    const { blur, color } = item.style.textGlow;
+    const { blur = 0, color = '#ffffff' } = item.style.textGlow;
     textShadows.push(`0 0 ${blur}px ${color}`);
   }
   if (textShadows.length > 0) {

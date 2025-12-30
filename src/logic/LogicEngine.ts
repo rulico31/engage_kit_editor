@@ -9,6 +9,7 @@ import { IfExecutor } from "./executors/IfExecutor";
 import { PageExecutor } from "./executors/PageExecutor";
 import { SetVariableExecutor } from "./executors/SetVariableExecutor";
 import { DelayExecutor } from "./executors/DelayExecutor";
+import { AnimateExecutor } from "./executors/AnimateExecutor";
 
 import { ABTestExecutor } from "./executors/ABTestExecutor";
 import { SubmitFormExecutor, ExternalApiExecutor } from "./executors/NetworkExecutor";
@@ -29,6 +30,7 @@ export class LogicEngine {
         this.executors.set("pageNode", new PageExecutor());
         this.executors.set("setVariableNode", new SetVariableExecutor());
         this.executors.set("delayNode", new DelayExecutor());
+        this.executors.set("animateNode", new AnimateExecutor());
 
         this.executors.set("abTestNode", new ABTestExecutor());
         this.executors.set("submitFormNode", new SubmitFormExecutor());

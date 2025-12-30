@@ -412,7 +412,7 @@ const processQueue = async (
                   [resolvedTargetId]: {
                     ...getPreviewState()[resolvedTargetId],
                     ...toState,
-                    transition: `${cssProperty} ${durationS}s ${easing} ${delayS} s`
+                    transition: `${cssProperty} ${durationS}s ${easing} ${delayS}s`
                   },
                 });
               }, 10);
