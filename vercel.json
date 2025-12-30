@@ -1,10 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/viewer.html",
-      "destination": "/viewer/viewer.html"
-    },
-    {
       "source": "/",
       "destination": "/index.html"
     }
