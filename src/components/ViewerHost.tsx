@@ -53,6 +53,9 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   // 二重送信防止（Strict Mode対策）
   const hasLogged = React.useRef(false);
 
+  // ★ レスポンシブ対応: スケール状態
+  const [scale, setScale] = useState(1);
+
   const initPreview = usePreviewStore(state => state.initPreview);
   const loadFromData = usePageStore(state => state.loadFromData);
 
@@ -149,6 +152,24 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // ★ レスポンシブ対応: 画面幅に応じたスケール計算
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const targetWidth = 800; // コンテンツの基準幅
+
+      if (width < targetWidth) {
+        setScale(width / targetWidth);
+      } else {
+        setScale(1);
+      }
+    };
+
+    handleResize(); // 初回実行
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   if (error) {
     return (
       <div style={{
@@ -199,19 +220,32 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
       <div style={{
         width: "100%",
         height: "100%",
-        position: "relative"
+        position: "relative",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-start",
+        overflow: "auto"
       }}>
-        <ViewerErrorBoundary>
-          <PreviewHost
-            placedItems={placedItems}
-            previewState={previewState}
-            setPreviewState={setPreviewState}
-            allItemLogics={allItemLogics}
-            isMobile={isMobile}
-          />
-        </ViewerErrorBoundary>
+        {/* ★ レスポンシブ対応: transform: scale() でコンテンツを縮小 */}
+        <div style={{
+          transform: `scale(${scale})`,
+          transformOrigin: "top center",
+          width: "100%",
+          height: "100%",
+          position: "relative"
+        }}>
+          <ViewerErrorBoundary>
+            <PreviewHost
+              placedItems={placedItems}
+              previewState={previewState}
+              setPreviewState={setPreviewState}
+              allItemLogics={allItemLogics}
+              isMobile={isMobile}
+            />
+          </ViewerErrorBoundary>
 
-        {showWatermark && <PoweredByBadge />}
+          {showWatermark && <PoweredByBadge />}
+        </div>
       </div>
     </div>
   );
