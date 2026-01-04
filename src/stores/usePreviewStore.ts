@@ -43,16 +43,18 @@ interface PreviewStoreState {
   activeListeners: ActiveListeners;
 
   // --- Actions ---
-  initPreview: () => void;
+  initPreview: (isMobileOverride?: boolean) => void;
   stopPreview: () => void;
 
   setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void;
   setVariables: (newVars: VariableState | ((prev: VariableState) => VariableState)) => void;
 
-  handlePageChangeRequest: (targetPageId: string) => void;
+  // ページ遷移リクエスト処理
+  handlePageChangeRequest: (pageId: string) => void;
   handleVariableChangeFromItem: (variableName: string, value: any) => void;
   handleItemEvent: (eventName: string, itemId: string) => void;
-  updateLayoutForViewMode: (isMobile: boolean) => void; // ★ 追加
+  // ビューモード切り替え時にレイアウトを即座に更新するアクション
+  updateLayoutForViewMode: (isMobile: boolean) => void;
 }
 
 // プレビュー状態はZustandの外部でRefとして保持する
@@ -67,16 +69,35 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
   // --- Actions ---
 
-  initPreview: () => {
-    const { pages, selectedPageId } = usePageStore.getState();
-    const isMobileView = useEditorSettingsStore.getState().isMobileView; // ★ モバイル判定取得
-    const currentPage = pages[selectedPageId!];
-    if (!currentPage) return;
+  initPreview: (isMobileOverride?: boolean) => {
+    const pageId = usePageStore.getState().selectedPageId;
+    if (!pageId) return;
 
-    const initialPS: PreviewState = { currentPageId: selectedPageId || '', isFinished: false };
-    currentPage.placedItems.forEach(item => {
+    const page = usePageStore.getState().pages[pageId];
+    if (!page) return; // Ensure page exists
+    const items = page.placedItems;
+    const initialPS: PreviewState = { currentPageId: pageId, isFinished: false }; // Use PreviewState type
+
+    // ★ 修正: 引数で指定があればそれを優先、なければエディタ設定を使う
+    // ViewerHostからは閲覧環境に合わせて true/false が渡される
+    const isMobileView = isMobileOverride !== undefined
+      ? isMobileOverride
+      : useEditorSettingsStore.getState().isMobileView;
+
+    items.forEach(item => {
       // 初期表示設定を反映 (未設定の場合は true)
-      const isVisible = item.data.initialVisibility !== false;
+      let isVisible = item.data.initialVisibility !== false;
+
+      // 表示・非表示の判定 (deviceVisibility)
+      // モバイルビューなら mobile隠しがtrueでないかチェック
+      // PCビューなら pc隠しがtrueでないかチェック
+      if (item.deviceVisibility) {
+        if (isMobileView) {
+          if (item.deviceVisibility.hideOnMobile) isVisible = false;
+        } else {
+          if (item.deviceVisibility.hideOnDesktop) isVisible = false;
+        }
+      }
 
       // モバイルビューの場合はモバイル座標を初期値にする
       const initialX = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;

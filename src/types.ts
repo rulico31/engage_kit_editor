@@ -24,6 +24,12 @@ export interface PlacedItemType {
   mobileWidth?: number;
   mobileHeight?: number;
 
+  // Device Visibility
+  deviceVisibility?: {
+    hideOnMobile?: boolean;
+    hideOnDesktop?: boolean;
+  };
+
   style?: {
     shadow?: { enabled: boolean; color: string; x: number; y: number; blur: number };
     glow?: { enabled: boolean; color: string; blur: number; spread: number };
