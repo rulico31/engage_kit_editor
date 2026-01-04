@@ -122,16 +122,14 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
         loadFromData(projectData);
 
-        setTimeout(() => {
-          // ★ ミニチュア方式: PC座標のみで初期化
-          initPreview();
-          setIsLoaded(true);
+        // ★ 修正: setTimeoutを削除し、直後にinitPreviewを呼び出す
+        // Zustandのset()は同期的なので、loadFromData完了後すぐにinitPreviewを呼べる
+        initPreview();
+        setIsLoaded(true);
 
-          logAnalyticsEvent('page_view', {
-            metadata: { referrer: document.referrer }
-          }, projectId); // ★修正: プロジェクトIDを明示的に渡す
-
-        }, 50);
+        logAnalyticsEvent('page_view', {
+          metadata: { referrer: document.referrer }
+        }, projectId);
 
       } catch (err: any) {
         console.error(err);
