@@ -10,7 +10,6 @@ import type { ProjectData } from "../types";
 import "./Artboard.css";
 import { logAnalyticsEvent } from "../lib/analytics";
 import { ViewerErrorBoundary } from "./ViewerErrorBoundary";
-import { ensureMobileLayout } from "../lib/layoutUtils"; // ★ 追加
 
 
 interface ViewerHostProps {
@@ -55,10 +54,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   // 二重送信防止（Strict Mode対策）
   const hasLogged = React.useRef(false);
 
-  // ★ レスポンシブ対応: スケール状態とアートボードサイズ
+  // ★ レスポンシブ対応: スケール状態
   const [scale, setScale] = useState(1);
-  const [artboardWidth, setArtboardWidth] = useState(1000); // デフォルトはデスクトップ
-  const [artboardHeight, setArtboardHeight] = useState(700);
 
   const initPreview = usePreviewStore(state => state.initPreview);
   const loadFromData = usePageStore(state => state.loadFromData);
@@ -102,26 +99,6 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
         const projectData = data.published_content as ProjectData;
 
-        // ★ 追加: モバイルレイアウト情報の自動補完
-        // 古いデータや、スマホ調整せずに公開されたデータ救済のため、
-        // ロード時に mobileX 等が欠落しているアイテムに対して自動計算を行う
-        if (projectData.pages) {
-          Object.keys(projectData.pages).forEach(pageId => {
-            const page = projectData.pages[pageId];
-            if (page.placedItems && Array.isArray(page.placedItems)) {
-              page.placedItems = page.placedItems.map(item => ensureMobileLayout(item));
-            }
-          });
-        }
-
-        // ★ デバイスタイプに応じたアートボードサイズを設定
-        // Artboard.tsx (L323-324) と同じ値を使用
-        const isMobileProject = projectData.deviceType === 'mobile';
-        const width = isMobileProject ? 375 : 1000;
-        const height = isMobileProject ? 667 : 700;
-        setArtboardWidth(width);
-        setArtboardHeight(height);
-
         // ★ テーマをCSS変数として適用
         if (projectData.theme) {
           const root = document.documentElement;
@@ -146,15 +123,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         loadFromData(projectData);
 
         setTimeout(() => {
-          // ★ 修正: 画面幅を確認して、モバイルならモバイルモードでプレビューを初期化する
-          // これにより、PC用プロジェクトでもスマホで見ればモバイル座標が適用される
-          const isMobileEnvironment = window.innerWidth <= 480;
-
-          // isMobileステートもこのタイミングで更新しておく（useEffectを待たない）
-          setIsMobile(isMobileEnvironment);
-
-          initPreview(isMobileEnvironment);
-
+          // ★ ミニチュア方式: PC座標のみで初期化
+          initPreview();
           setIsLoaded(true);
 
           logAnalyticsEvent('page_view', {
@@ -184,63 +154,22 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // ★ レスポンシブ対応: 画面幅に応じたスケール計算（高さは無視）
-  // プロジェクトのデバイスタイプに応じたアートボードサイズを使用
+  // ★ ミニチュア方式: シンプルなグローバルスケーリング
   useEffect(() => {
     const handleResize = () => {
       const viewportWidth = window.innerWidth;
-      // ★ 修正: スマホで見ている時は、プロジェクト設定に関わらずモバイル幅(375)を基準にする
-      // これをしないと、PC用(1000px)の画用紙にモバイル配置(375px用)が描画され、さらに縮小されて豆粒になる
-      const targetWidth = isMobile ? 375 : artboardWidth;
-
-      // 幅のみを考慮してスケールを採用（高さはスクロールで対応）
-      const scaleX = viewportWidth / targetWidth;
-
-      // PCでもモバイルでも、画面幅よりコンテンツ幅が大きい場合は縮小する
-      // ただし、モバイルデバイスでPCサイトを見る場合などは、極端に小さくならないように最小値を設ける手もあるが
-      // 基本的には「幅ピッタリ」に合わせるのがレスポンシブの基本
-      const newScale = Math.min(scaleX, 1); // 最大1倍（拡大しない）
-
+      // 常に1000pxを基準にスケール計算
+      const newScale = Math.min(viewportWidth / 1000, 1);
       setScale(newScale);
     };
 
-    handleResize(); // 初回実行
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [artboardWidth, isMobile]); // isMobileを依存配列に追加
+  }, []);
 
-  // ★ コンテンツの高さを計算 (スクロール量を正しく確保するため)
-  const contentHeight = React.useMemo(() => {
-    // 基準となるアートボード高さ（スマホなら667、PCなら設定値）
-    const baseHeight = isMobile ? 667 : artboardHeight;
-
-    if (placedItems.length === 0) return baseHeight;
-
-    // 現在のアートボード幅が狭い（モバイル）の場合は、モバイル用座標で高さを計算すべき
-    // ただし、PreviewHost側でどうレンダリングされるかに依存する。
-    // ここでは簡易的に、"モバイル用プロジェクト"ならモバイル座標、そうでなければPC座標を見る
-    // もしくは、scale < 1 の時はモバイル座標を見る？
-    // いや、EngageKitのデータ構造上、PreviewHost内で isMobile プロップによって座標が切り替わる。
-    // ViewerHost側でもそれに合わせる必要がある。
-
-    // 現在の isMobile ステート（画面幅依存）を使用
-    // スマホで見ているならモバイル座標、PCならPC座標を使用して高さを計算
-    const shouldUseMobileProps = isMobile;
-
-    let maxY = 0;
-    placedItems.forEach(item => {
-      const y = (shouldUseMobileProps && item.mobileY !== undefined) ? item.mobileY : item.y;
-      const h = (shouldUseMobileProps && item.mobileHeight !== undefined) ? item.mobileHeight : item.height;
-
-      // Visibilityチェックも入れるべきだが、非表示アイテムがレイアウトのスペースを取る場合もあるので
-      // いったんは全アイテム対象で計算
-      if (y + h > maxY) maxY = y + h;
-    });
-
-    // 余白を少し持たせる (+50px)
-    // ただし、最低でも設定されたアートボードの高さは確保する
-    return Math.max(baseHeight, maxY + 50);
-  }, [placedItems, artboardHeight, isMobile]);
+  // ★ ミニチュア方式: 固定の画用紙高さ
+  const contentHeight = 700;
 
   if (error) {
     return (
@@ -292,8 +221,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     textSizeAdjust: '100%',
   };
 
-  // 実際に描画するコンテナの幅
-  const renderWidth = isMobile ? 375 : artboardWidth;
+  // ★ ミニチュア方式: 常に1000px
+  const renderWidth = 1000;
 
   return (
     <div style={backgroundStyle}>

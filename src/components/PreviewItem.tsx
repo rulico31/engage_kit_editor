@@ -17,16 +17,15 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   item,
   previewState,
   setPreviewState,
-  isMobile = false,
 }) => {
   const { id, name } = item;
   const itemState = previewState[id];
 
-  // モバイル表示時の座標・サイズ
-  const x = isMobile && item.mobileX !== undefined ? item.mobileX : itemState?.x ?? item.x;
-  const y = isMobile && item.mobileY !== undefined ? item.mobileY : itemState?.y ?? item.y;
-  const width = isMobile && item.mobileWidth !== undefined ? item.mobileWidth : item.width;
-  const height = isMobile && item.mobileHeight !== undefined ? item.mobileHeight : item.height;
+  // ★ ミニチュア方式: 常にPC座標・サイズのみ使用
+  const x = itemState?.x ?? item.x;
+  const y = itemState?.y ?? item.y;
+  const width = item.width;
+  const height = item.height;
 
   const onItemEvent = usePreviewStore(state => state.handleItemEvent);
   const onVariableChange = usePreviewStore(state => state.handleVariableChangeFromItem);

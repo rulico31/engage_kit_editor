@@ -9,7 +9,6 @@ import type {
 import { type ActiveListeners, type LogicRuntimeContext } from '../logicEngine';
 import { triggerEvent } from '../logic/triggerEvent'; // ★ 新しいLogicEngine実装を使用
 import { usePageStore } from './usePageStore';
-import { useEditorSettingsStore } from './useEditorSettingsStore';
 import { logAnalyticsEvent } from '../lib/analytics';
 import { submitLeadData } from '../lib/leads';
 
@@ -43,7 +42,7 @@ interface PreviewStoreState {
   activeListeners: ActiveListeners;
 
   // --- Actions ---
-  initPreview: (isMobileOverride?: boolean) => void;
+  initPreview: () => void;
   stopPreview: () => void;
 
   setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void;
@@ -53,8 +52,6 @@ interface PreviewStoreState {
   handlePageChangeRequest: (pageId: string) => void;
   handleVariableChangeFromItem: (variableName: string, value: any) => void;
   handleItemEvent: (eventName: string, itemId: string) => void;
-  // ビューモード切り替え時にレイアウトを即座に更新するアクション
-  updateLayoutForViewMode: (isMobile: boolean) => void;
 }
 
 // プレビュー状態はZustandの外部でRefとして保持する
@@ -69,39 +66,22 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
   // --- Actions ---
 
-  initPreview: (isMobileOverride?: boolean) => {
+  initPreview: () => {
     const pageId = usePageStore.getState().selectedPageId;
     if (!pageId) return;
 
     const page = usePageStore.getState().pages[pageId];
-    if (!page) return; // Ensure page exists
+    if (!page) return;
     const items = page.placedItems;
-    const initialPS: PreviewState = { currentPageId: pageId, isFinished: false }; // Use PreviewState type
-
-    // ★ 修正: 引数で指定があればそれを優先、なければエディタ設定を使う
-    // ViewerHostからは閲覧環境に合わせて true/false が渡される
-    const isMobileView = isMobileOverride !== undefined
-      ? isMobileOverride
-      : useEditorSettingsStore.getState().isMobileView;
+    const initialPS: PreviewState = { currentPageId: pageId, isFinished: false };
 
     items.forEach(item => {
       // 初期表示設定を反映 (未設定の場合は true)
       let isVisible = item.data.initialVisibility !== false;
 
-      // 表示・非表示の判定 (deviceVisibility)
-      // モバイルビューなら mobile隠しがtrueでないかチェック
-      // PCビューなら pc隠しがtrueでないかチェック
-      if (item.deviceVisibility) {
-        if (isMobileView) {
-          if (item.deviceVisibility.hideOnMobile) isVisible = false;
-        } else {
-          if (item.deviceVisibility.hideOnDesktop) isVisible = false;
-        }
-      }
-
-      // モバイルビューの場合はモバイル座標を初期値にする
-      const initialX = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
-      const initialY = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
+      // ★ ミニチュア方式: 常にPC座標のみ使用
+      const initialX = item.x;
+      const initialY = item.y;
 
       initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
@@ -148,7 +128,6 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
   handlePageChangeRequest: (targetPageId) => {
     const { pages } = usePageStore.getState();
-    const isMobileView = useEditorSettingsStore.getState().isMobileView; // ★ モバイル判定取得
     const targetPageData = pages[targetPageId];
 
     if (!targetPageData) {
@@ -164,9 +143,9 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     targetPageData.placedItems.forEach(item => {
       const isVisible = item.data.initialVisibility !== false;
 
-      // モバイルビューの場合はモバイル座標を初期値にする
-      const initialX = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
-      const initialY = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
+      // ★ ミニチュア方式: 常にPC座標のみ使用
+      const initialX = item.x;
+      const initialY = item.y;
 
       initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
@@ -213,35 +192,5 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
         );
       }
     });
-  },
-
-  updateLayoutForViewMode: (isMobile: boolean) => {
-    const { pages, selectedPageId } = usePageStore.getState();
-    const currentPage = pages[selectedPageId!];
-    if (!currentPage) return;
-
-    // 現在のプレビュー状態をベースにする
-    const currentPS = previewStateRef.current;
-    if (!currentPS || !currentPS.currentPageId) return;
-
-    const newPS = { ...currentPS };
-
-    // 現在のページのアイテム座標をビューモードに合わせて更新
-    // (isVisibleやopacityなどの動的な状態は維持される)
-    currentPage.placedItems.forEach(item => {
-      if (newPS[item.id]) {
-        const x = isMobile && item.mobileX !== undefined ? item.mobileX : item.x;
-        const y = isMobile && item.mobileY !== undefined ? item.mobileY : item.y;
-
-        newPS[item.id] = {
-          ...newPS[item.id],
-          x,
-          y
-        };
-      }
-    });
-
-    previewStateRef.current = newPS;
-    set({ previewState: newPS });
   },
 }));
