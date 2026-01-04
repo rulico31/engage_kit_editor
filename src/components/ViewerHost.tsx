@@ -1,6 +1,4 @@
-// src/components/ViewerHost.tsx
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { usePreviewStore } from "../stores/usePreviewStore";
 import { usePageStore } from "../stores/usePageStore";
@@ -11,12 +9,11 @@ import "./Artboard.css";
 import { logAnalyticsEvent } from "../lib/analytics";
 import { ViewerErrorBoundary } from "./ViewerErrorBoundary";
 
-
 interface ViewerHostProps {
   projectId: string;
 }
 
-// ★ Phase 4: Watermark Component
+// PoweredByBadge: 無料プランなどで表示する透かし
 const PoweredByBadge: React.FC = () => (
   <div
     style={{
@@ -38,7 +35,7 @@ const PoweredByBadge: React.FC = () => (
       transition: 'opacity 0.2s',
       border: '1px solid rgba(0,0,0,0.05)',
       userSelect: 'none',
-      pointerEvents: 'none' // クリックを透過させる
+      pointerEvents: 'none'
     }}
   >
     <span style={{ fontWeight: 500 }}>Powered by</span>
@@ -49,12 +46,13 @@ const PoweredByBadge: React.FC = () => (
 const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
   const [showWatermark] = useState(true);
-  // 二重送信防止（Strict Mode対策）
-  const hasLogged = React.useRef(false);
+  const hasLogged = useRef(false);
 
-  // ★ レスポンシブ対応: スケール状態
+  // ★ PC基準の固定サイズ (このサイズを基準にスマホ用に縮小します)
+  const FIXED_WIDTH = 1000;
+  const FIXED_HEIGHT = 700;
+
   const [scale, setScale] = useState(1);
 
   const initPreview = usePreviewStore(state => state.initPreview);
@@ -80,8 +78,6 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
       try {
         useProjectStore.setState({ currentProjectId: projectId });
 
-        // 1. データベースからデータを取得
-        // ★修正: 'published_content' を取得するように変更 (published_data -> published_content)
         const { data, error } = await supabase
           .from("projects")
           .select("published_content, is_published")
@@ -91,45 +87,30 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         if (error) throw error;
         if (!data) throw new Error("プロジェクトが見つかりません");
 
-        // 公開状態かつ公開データがある場合のみ表示
-        // 下書きデータ ('data') へのフォールバックは廃止 (Safe Integrity)
         if (!data.is_published || !data.published_content) {
           throw new Error("このプロジェクトは現在公開されていません。");
         }
 
         const projectData = data.published_content as ProjectData;
 
-        // ★ テーマをCSS変数として適用
+        // テーマ適用
         if (projectData.theme) {
           const root = document.documentElement;
-          if (projectData.theme.fontFamily) {
-            root.style.setProperty('--theme-font-family', projectData.theme.fontFamily);
-          }
-          if (projectData.theme.accentColor) {
-            root.style.setProperty('--theme-accent-color', projectData.theme.accentColor);
-          }
-          if (projectData.theme.backgroundColor) {
-            root.style.setProperty('--theme-background-color', projectData.theme.backgroundColor);
-          }
-          if (projectData.theme.borderRadius !== undefined) {
-            root.style.setProperty('--theme-border-radius', `${projectData.theme.borderRadius}px`);
-          }
-        }
-
-        if (!projectData) {
-          throw new Error("表示できるコンテンツがありません");
+          if (projectData.theme.fontFamily) root.style.setProperty('--theme-font-family', projectData.theme.fontFamily);
+          if (projectData.theme.accentColor) root.style.setProperty('--theme-accent-color', projectData.theme.accentColor);
+          if (projectData.theme.backgroundColor) root.style.setProperty('--theme-background-color', projectData.theme.backgroundColor);
+          if (projectData.theme.borderRadius !== undefined) root.style.setProperty('--theme-border-radius', `${projectData.theme.borderRadius}px`);
         }
 
         loadFromData(projectData);
 
-        // ★ 修正: setTimeoutを削除し、直後にinitPreviewを呼び出す
-        // Zustandのset()は同期的なので、loadFromData完了後すぐにinitPreviewを呼べる
-        initPreview();
-        setIsLoaded(true);
-
-        logAnalyticsEvent('page_view', {
-          metadata: { referrer: document.referrer }
-        }, projectId);
+        setTimeout(() => {
+          initPreview();
+          setIsLoaded(true);
+          logAnalyticsEvent('page_view', {
+            metadata: { referrer: document.referrer }
+          }, projectId);
+        }, 50);
 
       } catch (err: any) {
         console.error(err);
@@ -143,21 +124,12 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     }
   }, [projectId, loadFromData, initPreview]);
 
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 480);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // ★ ミニチュア方式: シンプルなグローバルスケーリング
+  // ★ スケール計算ロジック (幅合わせミニチュア化)
   useEffect(() => {
     const handleResize = () => {
       const viewportWidth = window.innerWidth;
-      // 常に1000pxを基準にスケール計算
-      const newScale = Math.min(viewportWidth / 1000, 1);
+      // 画面幅 ÷ 1000px で縮小率を決定 (最大1倍)
+      const newScale = Math.min(viewportWidth / FIXED_WIDTH, 1);
       setScale(newScale);
     };
 
@@ -166,21 +138,9 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ★ ミニチュア方式: 固定の画用紙高さ
-  const contentHeight = 700;
-
   if (error) {
     return (
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        color: "#ff6b6b",
-        backgroundColor: "#111",
-        flexDirection: "column",
-        gap: "1rem"
-      }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", color: "#ff6b6b", backgroundColor: "#111", flexDirection: "column", gap: "1rem" }}>
         <p>{error}</p>
         <p style={{ fontSize: "0.8rem", color: "#666" }}>Project ID: {projectId}</p>
       </div>
@@ -188,73 +148,66 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   }
 
   if (!isLoaded) {
-    return (
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        color: "#888",
-        backgroundColor: "#111"
-      }}>
-        Loading content...
-      </div>
-    );
+    return <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", color: "#888", backgroundColor: "#111" }}>Loading...</div>;
   }
 
   const backgroundStyle: React.CSSProperties = {
     backgroundColor: backgroundColor || "#ffffff",
     width: "100vw",
-    minHeight: "100vh", // height: 100vh だとスクロールできない場合がある
-    overflowX: "hidden", // 横スクロールは禁止
-    overflowY: "auto",   // 縦スクロールは許可
+    height: "100vh",
+    overflowX: "hidden",
+    overflowY: "auto",
     position: "relative",
     backgroundImage: backgroundImage?.src ? `url(${backgroundImage.src})` : undefined,
     backgroundSize: backgroundImage?.displayMode === 'tile' ? 'auto' : (backgroundImage?.displayMode || 'cover'),
     backgroundPosition: backgroundImage?.position || 'center center',
     backgroundRepeat: backgroundImage?.displayMode === 'tile' ? 'repeat' : 'no-repeat',
-
-    // ★ 文字サイズ自動膨張の禁止
-    WebkitTextSizeAdjust: '100%',
-    textSizeAdjust: '100%',
   };
 
-  // ★ ミニチュア方式: 常に1000px
-  const renderWidth = 1000;
+  // ★ 縮小後の実質的な高さを計算
+  const wrapperHeight = FIXED_HEIGHT * scale;
 
   return (
     <div style={backgroundStyle}>
       <div style={{
         width: "100%",
-        // height: "100%", // これを指定すると親の100vhに制限されてしまう
-        minHeight: "100%", // コンテンツに合わせて伸びるように
+        minHeight: "100%",
         position: "relative",
         display: "flex",
         justifyContent: "center",
-        alignItems: "flex-start", // 上詰め配置 (centerだと上下に余白ができる)
-        // overflow: "auto" // 親でスクロール制御するのでここは不要
+        alignItems: "flex-start",
+        paddingTop: "20px",
+        paddingBottom: "40px"
       }}>
-        {/* ★ レスポンシブ対応: transform: scale() でコンテンツを縮小 */}
+        {/* コンテンツラッパー: 縮小後のサイズを確保して余白を消す */}
         <div style={{
-          width: `${renderWidth}px`,
-          height: `${contentHeight}px`, // ★ 計算したコンテンツ高さを適用
-          transform: `scale(${scale})`,
-          transformOrigin: "top center", // ★ 上詰め基準で縮小
+          width: `${FIXED_WIDTH * scale}px`,
+          height: `${wrapperHeight}px`,
           position: "relative",
-          marginBottom: '50px' // 下部に少し余白
+          overflow: "hidden"
         }}>
-
-          <ViewerErrorBoundary>
-            <PreviewHost
-              placedItems={placedItems}
-              previewState={previewState}
-              setPreviewState={setPreviewState}
-              allItemLogics={allItemLogics}
-              isMobile={isMobile}
-            />
-          </ViewerErrorBoundary>
-
-          {showWatermark && <PoweredByBadge />}
+          {/* 中身: scaleで縮小し、左上基準(top left)で配置 */}
+          <div style={{
+            width: `${FIXED_WIDTH}px`,
+            height: `${FIXED_HEIGHT}px`,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+            position: "absolute",
+            top: 0,
+            left: 0
+          }}>
+            <ViewerErrorBoundary>
+              {/* isMobile={false} に固定してPCレイアウトを維持 */}
+              <PreviewHost
+                placedItems={placedItems}
+                previewState={previewState}
+                setPreviewState={setPreviewState}
+                allItemLogics={allItemLogics}
+                isMobile={false}
+              />
+            </ViewerErrorBoundary>
+            {showWatermark && <PoweredByBadge />}
+          </div>
         </div>
       </div>
     </div>
