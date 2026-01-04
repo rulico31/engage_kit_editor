@@ -3,6 +3,7 @@ import "./Header.css";
 import type { ViewMode } from "../types";
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePageStore } from "../stores/usePageStore";
+import { usePreviewStore } from "../stores/usePreviewStore";
 import { useAuthStore } from "../stores/useAuthStore";
 
 interface HeaderProps {
@@ -160,14 +161,36 @@ const Header: React.FC<HeaderProps> = ({
         <div className="device-switcher-group">
           <button
             className={`device-switch-btn ${!isMobileView ? 'active' : ''}`}
-            onClick={() => setIsMobileView(false)}
+            onClick={() => {
+              // PCモードへ切り替え
+              if (!isMobileView) return; // 既にPCなら何もしない
+              setIsMobileView(false);
+
+              if (isPreviewing) {
+                usePreviewStore.getState().updateLayoutForViewMode(false);
+              }
+            }}
             title="PCモード"
           >
             <IconDesktop />
           </button>
           <button
             className={`device-switch-btn ${isMobileView ? 'active' : ''}`}
-            onClick={() => setIsMobileView(true)}
+            onClick={() => {
+              // モバイルモードへ切り替え
+              if (isMobileView) return; // 既にモバイルなら何もしない
+
+              // 1. レイアウト自動計算（未設定アイテムのみ）
+              usePageStore.getState().syncMobileLayouts();
+
+              // 2. ビュー切り替え
+              setIsMobileView(true);
+
+              // 3. プレビュー中はレイアウト更新
+              if (isPreviewing) {
+                usePreviewStore.getState().updateLayoutForViewMode(true);
+              }
+            }}
             title="モバイルモード"
           >
             <IconMobile />
@@ -199,7 +222,7 @@ const Header: React.FC<HeaderProps> = ({
           公開
         </button>
       </div>
-    </header>
+    </header >
   );
 };
 

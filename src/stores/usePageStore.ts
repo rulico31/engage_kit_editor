@@ -12,6 +12,7 @@ import {
 } from 'reactflow';
 import type { PlacedItemType, NodeGraph, ProjectData, CommentType, PageData } from '../types';
 import { useSelectionStore } from './useSelectionStore';
+import { ensureMobileLayout } from '../lib/layoutUtils';
 
 // Undo/Redo履歴の最大数
 const MAX_HISTORY = 20;
@@ -94,6 +95,7 @@ interface PageStoreState {
   // データロード
   loadFromData: (data: ProjectData) => void;
   resetState: () => void; // 追加: 完全リセット用
+  syncMobileLayouts: () => void; // ★ 追加: モバイルレイアウト同期用
 }
 
 export const usePageStore = create<PageStoreState>((set, get) => ({
@@ -239,6 +241,38 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       canUndo: false,
       canRedo: false,
     });
+  },
+
+  syncMobileLayouts: () => {
+    set(state => {
+      const pageId = state.selectedPageId;
+      if (!pageId) return state;
+
+      const page = state.pages[pageId];
+      if (!page) return state;
+
+      const newItems = page.placedItems.map(item => ensureMobileLayout(item));
+
+      // 変更があるか確認（ディープチェックはコストが高いので、ここでは簡易的に常に更新オブジェクトを作成）
+      // 厳密には、何かが変わった場合のみ更新すべきだが、ensureMobileLayoutは常に新しいオブジェクトを返す可能性がある
+      // 実装を最適化するなら、ensureMobileLayout内で変更不要なら元の参照を返すようにするべきだが、
+      // ここではわかりやすさ優先で更新する。
+
+      return {
+        pages: {
+          ...state.pages,
+          [pageId]: {
+            ...page,
+            placedItems: newItems
+          }
+        }
+      };
+    });
+    // 履歴には追加しないでおくか、追加するか？
+    // ユーザー操作の結果として行われるので追加したほうが自然かもしれないが、
+    // ビュー切り替えのたびに追加されるとundoが汚れる。
+    // 今回は「自動調整」なのでhistoryには入れない、または変更があった場合のみ入れる等の制御が理想。
+    // いったんhistory追加はスキップする（明示的な操作ではないため）。
   },
 
   // --- アイテム操作 ---

@@ -64,13 +64,11 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   // 入力系アイテムの自動高さ調整除外設定
   const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン"));
 
-  // モバイル表示時の座標・サイズ (相対配置ロジック)
-  const mobileScale = 375 / 1000;
-
-  const x = isMobileView ? item.x * mobileScale : item.x;
-  const y = isMobileView ? item.y * mobileScale : item.y;
-  const width = isMobileView ? item.width * mobileScale : item.width;
-  const height = isMobileView ? item.height * mobileScale : item.height;
+  // モバイル用の座標・サイズ（未設定時はデスクトップ値を使用）
+  const x = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
+  const y = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
+  const width = isMobileView && item.mobileWidth !== undefined ? item.mobileWidth : item.width;
+  const height = isMobileView && item.mobileHeight !== undefined ? item.mobileHeight : item.height;
 
   // --- スタイルの分離 ---
 
@@ -132,10 +130,9 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     containerStyle.display = 'none';
   }
 
-  // 2. テキストコンテンツ用スタイル (色、フォントサイズ、テキストシャドウ)
   const textStyle: React.CSSProperties = {
     color: item.data?.color || '#333333',
-    fontSize: `${(item.data?.fontSize || 15) * (isMobileView ? mobileScale : 1)}px`,
+    fontSize: `${item.data?.fontSize || 15}px`,
     width: '100%', // 親に合わせる
     height: '100%',
   };

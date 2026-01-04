@@ -9,6 +9,7 @@ import type {
 import { type ActiveListeners, type LogicRuntimeContext } from '../logicEngine';
 import { triggerEvent } from '../logic/triggerEvent'; // ★ 新しいLogicEngine実装を使用
 import { usePageStore } from './usePageStore';
+import { useEditorSettingsStore } from './useEditorSettingsStore';
 import { logAnalyticsEvent } from '../lib/analytics';
 import { submitLeadData } from '../lib/leads';
 
@@ -51,6 +52,7 @@ interface PreviewStoreState {
   handlePageChangeRequest: (targetPageId: string) => void;
   handleVariableChangeFromItem: (variableName: string, value: any) => void;
   handleItemEvent: (eventName: string, itemId: string) => void;
+  updateLayoutForViewMode: (isMobile: boolean) => void; // ★ 追加
 }
 
 // プレビュー状態はZustandの外部でRefとして保持する
@@ -67,16 +69,20 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
   initPreview: () => {
     const { pages, selectedPageId } = usePageStore.getState();
+    const isMobileView = useEditorSettingsStore.getState().isMobileView; // ★ モバイル判定取得
     const currentPage = pages[selectedPageId!];
     if (!currentPage) return;
-
-
 
     const initialPS: PreviewState = { currentPageId: selectedPageId || '', isFinished: false };
     currentPage.placedItems.forEach(item => {
       // 初期表示設定を反映 (未設定の場合は true)
       const isVisible = item.data.initialVisibility !== false;
-      initialPS[item.id] = { isVisible, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
+
+      // モバイルビューの場合はモバイル座標を初期値にする
+      const initialX = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
+      const initialY = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
+
+      initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
 
     // 2. Refを初期化
@@ -121,6 +127,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
   handlePageChangeRequest: (targetPageId) => {
     const { pages } = usePageStore.getState();
+    const isMobileView = useEditorSettingsStore.getState().isMobileView; // ★ モバイル判定取得
     const targetPageData = pages[targetPageId];
 
     if (!targetPageData) {
@@ -135,7 +142,12 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     const initialPS: PreviewState = { currentPageId: targetPageId, isFinished: false };
     targetPageData.placedItems.forEach(item => {
       const isVisible = item.data.initialVisibility !== false;
-      initialPS[item.id] = { isVisible, x: item.x, y: item.y, opacity: 1, scale: 1, rotation: 0, transition: null };
+
+      // モバイルビューの場合はモバイル座標を初期値にする
+      const initialX = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
+      const initialY = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
+
+      initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
 
     // Refも更新（triggerEventがこちらを参照するため重要）
@@ -180,5 +192,35 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
         );
       }
     });
+  },
+
+  updateLayoutForViewMode: (isMobile: boolean) => {
+    const { pages, selectedPageId } = usePageStore.getState();
+    const currentPage = pages[selectedPageId!];
+    if (!currentPage) return;
+
+    // 現在のプレビュー状態をベースにする
+    const currentPS = previewStateRef.current;
+    if (!currentPS || !currentPS.currentPageId) return;
+
+    const newPS = { ...currentPS };
+
+    // 現在のページのアイテム座標をビューモードに合わせて更新
+    // (isVisibleやopacityなどの動的な状態は維持される)
+    currentPage.placedItems.forEach(item => {
+      if (newPS[item.id]) {
+        const x = isMobile && item.mobileX !== undefined ? item.mobileX : item.x;
+        const y = isMobile && item.mobileY !== undefined ? item.mobileY : item.y;
+
+        newPS[item.id] = {
+          ...newPS[item.id],
+          x,
+          y
+        };
+      }
+    });
+
+    previewStateRef.current = newPS;
+    set({ previewState: newPS });
   },
 }));

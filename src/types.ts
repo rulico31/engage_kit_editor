@@ -95,6 +95,7 @@ export interface ProjectData {
   cloud_id?: string; // ★追加: クラウド同期用のID (UUID)
   theme?: ThemeConfig; // ★追加: テーマ設定
   dataRetentionPeriod?: 'forever' | '1year' | '3months';
+  deviceType?: 'mobile' | 'desktop'; // ★追加: デバイスタイプ
 }
 
 export interface PageInfo {

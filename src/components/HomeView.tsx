@@ -119,10 +119,69 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
     if (!projectToDelete) return;
 
     try {
+      const projectId = projectToDelete.id;
+
+      // 1. analytics_logsテーブルから関連データを削除
+      const { error: analyticsError } = await supabase
+        .from("analytics_logs")
+        .delete()
+        .eq("project_id", projectId);
+
+      if (analyticsError) {
+        console.error("Analytics logs deletion error:", analyticsError);
+        // エラーでも続行（データがない場合もあるため）
+      }
+
+      // 2. leadsテーブルから関連データを削除
+      const { error: leadsError } = await supabase
+        .from("leads")
+        .delete()
+        .eq("project_id", projectId);
+
+      if (leadsError) {
+        console.error("Leads deletion error:", leadsError);
+        // エラーでも続行
+      }
+
+      // 3. Storageからファイルを削除
+      // プロジェクトフォルダ配下のすべてのファイルを削除
+      try {
+        // フォルダ内のファイル一覧を取得
+        const { data: fileList, error: listError } = await supabase
+          .storage
+          .from("project-assets")
+          .list(projectId);
+
+        if (listError) {
+          console.error("Storage file list error:", listError);
+          // エラーでも続行（ファイルがない場合もあるため）
+        } else if (fileList && fileList.length > 0) {
+          // ファイルパスの配列を作成
+          const filePaths = fileList.map(file => `${projectId}/${file.name}`);
+
+          // 一括削除
+          const { error: removeError } = await supabase
+            .storage
+            .from("project-assets")
+            .remove(filePaths);
+
+          if (removeError) {
+            console.error("Storage files deletion error:", removeError);
+            // エラーでも続行
+          } else {
+            console.log(`✅ Storageファイル削除成功: ${filePaths.length}件`);
+          }
+        }
+      } catch (storageErr) {
+        console.error("Storage deletion error:", storageErr);
+        // エラーでも続行
+      }
+
+      // 4. プロジェクト本体を削除
       const { data, error } = await supabase
         .from("projects")
         .delete()
-        .eq("id", projectToDelete.id)
+        .eq("id", projectId)
         .select();
 
       if (error) throw error;
@@ -137,9 +196,12 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
       }
 
       // UI更新
-      setProjects(projects.filter((p) => p.id !== projectToDelete.id));
+      setProjects(projects.filter((p) => p.id !== projectId));
       setIsDeleteModalOpen(false);
       setProjectToDelete(null);
+
+      // 成功メッセージ
+      console.log("✅ プロジェクトと関連データを完全に削除しました");
     } catch (err) {
       console.error("Error deleting project:", err);
       alert("プロジェクトの削除に失敗しました");

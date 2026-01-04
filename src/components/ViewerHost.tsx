@@ -53,8 +53,10 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   // 二重送信防止（Strict Mode対策）
   const hasLogged = React.useRef(false);
 
-  // ★ レスポンシブ対応: スケール状態
+  // ★ レスポンシブ対応: スケール状態とアートボードサイズ
   const [scale, setScale] = useState(1);
+  const [artboardWidth, setArtboardWidth] = useState(1000); // デフォルトはデスクトップ
+  const [artboardHeight, setArtboardHeight] = useState(700);
 
   const initPreview = usePreviewStore(state => state.initPreview);
   const loadFromData = usePageStore(state => state.loadFromData);
@@ -97,6 +99,14 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         }
 
         const projectData = data.published_content as ProjectData;
+
+        // ★ デバイスタイプに応じたアートボードサイズを設定
+        // Artboard.tsx (L323-324) と同じ値を使用
+        const isMobileProject = projectData.deviceType === 'mobile';
+        const width = isMobileProject ? 375 : 1000;
+        const height = isMobileProject ? 667 : 700;
+        setArtboardWidth(width);
+        setArtboardHeight(height);
 
         // ★ テーマをCSS変数として適用
         if (projectData.theme) {
@@ -152,23 +162,28 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // ★ レスポンシブ対応: 画面幅に応じたスケール計算
+  // ★ レスポンシブ対応: 画面幅と高さに応じたスケール計算
+  // プロジェクトのデバイスタイプに応じたアートボードサイズを使用
   useEffect(() => {
     const handleResize = () => {
-      const width = window.innerWidth;
-      const targetWidth = 800; // コンテンツの基準幅
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const targetWidth = artboardWidth; // プロジェクトのアートボード幅を使用
+      const targetHeight = artboardHeight; // プロジェクトのアートボード高さを使用
 
-      if (width < targetWidth) {
-        setScale(width / targetWidth);
-      } else {
-        setScale(1);
-      }
+      // 幅と高さの両方を考慮して、小さい方のスケールを採用（アートボード全体が収まるように）
+      const scaleX = viewportWidth / targetWidth;
+      const scaleY = viewportHeight / targetHeight;
+      const newScale = Math.min(scaleX, scaleY, 1); // 最大1倍（拡大しない）
+
+      setScale(newScale);
     };
 
     handleResize(); // 初回実行
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [artboardWidth, artboardHeight]); // artboardWidthとartboardHeightを依存配列に追加
+
 
   if (error) {
     return (
@@ -228,12 +243,13 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
       }}>
         {/* ★ レスポンシブ対応: transform: scale() でコンテンツを縮小 */}
         <div style={{
+          width: `${artboardWidth}px`,
+          height: `${artboardHeight}px`,
           transform: `scale(${scale})`,
-          transformOrigin: "top center",
-          width: "100%",
-          height: "100%",
+          transformOrigin: "center center",
           position: "relative"
         }}>
+
           <ViewerErrorBoundary>
             <PreviewHost
               placedItems={placedItems}

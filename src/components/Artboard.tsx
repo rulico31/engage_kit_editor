@@ -201,14 +201,39 @@ const Artboard: React.FC = () => {
 
       // 新規追加
       const newItemId = `${item.type}-${Date.now()}`;
+
+      const pcWidth = (item.type === ItemTypes.TEXT || item.type === ItemTypes.BUTTON || item.type === ItemTypes.BOX) ? 200 : 100;
+      const pcHeight = (item.type === ItemTypes.TEXT || item.type === ItemTypes.BUTTON || item.type === ItemTypes.BOX) ? 50 : 100;
+
+      // モバイルレイアウト計算
+      const mobileScaleRatio = 375 / 1000;
+      const mobileWidth = Math.max(20, Math.round(pcWidth * mobileScaleRatio));
+      const mobileHeight = Math.max(20, Math.round(pcHeight * mobileScaleRatio));
+
+      // X座標もスケーリング（ただし最大幅を超えないように）
+      let mobileX = Math.round(snappedX * mobileScaleRatio);
+      if (mobileX + mobileWidth > 375) {
+        mobileX = 375 - mobileWidth;
+      }
+      if (mobileX < 0) mobileX = 0;
+
+      const mobileY = Math.round(snappedY * mobileScaleRatio);
+
       addItem({
         id: newItemId,
         name: item.label || item.type || "Item",
         type: item.type,
         x: snappedX,
         y: snappedY,
-        width: (item.type === ItemTypes.TEXT || item.type === ItemTypes.BUTTON || item.type === ItemTypes.BOX) ? 200 : 100,
-        height: (item.type === ItemTypes.TEXT || item.type === ItemTypes.BUTTON || item.type === ItemTypes.BOX) ? 50 : 100,
+        width: pcWidth,
+        height: pcHeight,
+
+        // モバイル用プロパティを初期設定
+        mobileX,
+        mobileY,
+        mobileWidth,
+        mobileHeight,
+
         data: {
           text: item.label || "New Item",
         },
@@ -326,7 +351,12 @@ const Artboard: React.FC = () => {
   return (
     <div
       className="artboard-wrapper"
-      style={{ width: `${artboardWidth * zoomLevel}px`, height: `${artboardHeight * zoomLevel}px`, margin: "20px auto", position: "relative" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        overflow: "auto"
+      }}
       onContextMenu={(e) => { e.preventDefault(); if (!isPreviewing) setContextMenu({ visible: true, x: e.clientX, y: e.clientY }); }}
     >
 
@@ -334,7 +364,14 @@ const Artboard: React.FC = () => {
       <div
         ref={artboardRef}
         className={`artboard ${isOver ? "is-over" : ""}`}
-        style={{ transform: `scale(${zoomLevel})`, margin: 0, ...backgroundStyle, ...themeStyles, width: `${artboardWidth}px`, height: `${artboardHeight}px` }}
+        style={{
+          transform: `scale(${zoomLevel})`,
+          margin: "20px auto",
+          ...backgroundStyle,
+          ...themeStyles,
+          width: `${artboardWidth}px`,
+          height: `${artboardHeight}px`
+        }}
         onClick={handleArtboardBackgroundClick}
       >
         {showGridOverlay && <div className="artboard-grid-overlay" style={gridStyle} />}

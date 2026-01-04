@@ -90,6 +90,15 @@
   position: relative;
 }
 
+/* プレビュー時: アートボード全体を中央に表示し、画面に収まるように調整 */
+.editor-container.is-previewing .canvas-viewport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+
 .preview-viewport {
   flex: 1;
   background-color: #111;

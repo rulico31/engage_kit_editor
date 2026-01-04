@@ -98,19 +98,29 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     const dx = mouseXInArtboard - dragStartPos.current.x;
     const dy = mouseYInArtboard - dragStartPos.current.y;
 
-    // モバイルビューの場合は、移動量をPC座標系に逆変換する
     const isMobileView = useEditorSettingsStore.getState().isMobileView;
-    const mobileScale = 375 / 1000;
 
-    const finalDx = isMobileView ? dx / mobileScale : dx;
-
-    const updates = Object.entries(dragStartItemStates.current).map(([id, startState]) => ({
-      id,
-      props: {
-        x: snapToGrid(startState.x + finalDx, gridSize),
-        y: snapToGrid(startState.y + dy, gridSize)
+    const updates = Object.entries(dragStartItemStates.current).map(([id, startState]) => {
+      if (isMobileView) {
+        // モバイルビューでは mobileX, mobileY を更新
+        return {
+          id,
+          props: {
+            mobileX: snapToGrid(startState.x + dx, gridSize),
+            mobileY: snapToGrid(startState.y + dy, gridSize)
+          }
+        };
+      } else {
+        // デスクトップビューでは x, y を更新
+        return {
+          id,
+          props: {
+            x: snapToGrid(startState.x + dx, gridSize),
+            y: snapToGrid(startState.y + dy, gridSize)
+          }
+        };
       }
-    }));
+    });
 
     if (updates.length > 0) {
       updateItems(updates, true);
@@ -164,9 +174,15 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
       y: (e.clientY - artboardRect.top) / zoomLevel
     };
 
+    const isMobileView = useEditorSettingsStore.getState().isMobileView;
     const initialStates: Record<string, { x: number, y: number }> = {};
     placedItems.forEach(p => {
-      if (validTargets.has(p.id)) initialStates[p.id] = { x: p.x, y: p.y };
+      if (validTargets.has(p.id)) {
+        // モバイルビューの場合は mobileX/mobileY を、未設定なら x/y をフォールバック
+        const x = isMobileView && p.mobileX !== undefined ? p.mobileX : p.x;
+        const y = isMobileView && p.mobileY !== undefined ? p.mobileY : p.y;
+        initialStates[p.id] = { x, y };
+      }
     });
     dragStartItemStates.current = initialStates;
 

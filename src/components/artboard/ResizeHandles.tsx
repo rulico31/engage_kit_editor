@@ -1,5 +1,6 @@
 import React, { useCallback } from "react";
 import type { PlacedItemType } from "../../types";
+import { useEditorSettingsStore } from "../../stores/useEditorSettingsStore";
 
 interface ResizeHandlesProps {
     item: PlacedItemType;
@@ -24,12 +25,15 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
             e.preventDefault();
             onResizeStart();
 
+            const isMobileView = useEditorSettingsStore.getState().isMobileView;
+
             const startX = e.clientX;
             const startY = e.clientY;
-            const startItemX = item.x;
-            const startItemY = item.y;
-            const startWidth = item.width;
-            const startHeight = item.height;
+            // モバイルビューの場合はmobileX/mobileYを、未設定ならx/yをフォールバック
+            const startItemX = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
+            const startItemY = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
+            const startWidth = isMobileView && item.mobileWidth !== undefined ? item.mobileWidth : item.width;
+            const startHeight = isMobileView && item.mobileHeight !== undefined ? item.mobileHeight : item.height;
 
             const onMouseMove = (moveEvent: MouseEvent) => {
                 const deltaX = (moveEvent.clientX - startX) / zoomLevel;
@@ -79,12 +83,22 @@ export const ResizeHandles: React.FC<ResizeHandlesProps> = ({
                     }
                 }
 
-                onResize({
-                    x: newX,
-                    y: newY,
-                    width: newWidth,
-                    height: newHeight,
-                });
+                // モバイルビューではmobileX/mobileY/mobileWidth/mobileHeightを更新
+                if (isMobileView) {
+                    onResize({
+                        mobileX: newX,
+                        mobileY: newY,
+                        mobileWidth: newWidth,
+                        mobileHeight: newHeight,
+                    });
+                } else {
+                    onResize({
+                        x: newX,
+                        y: newY,
+                        width: newWidth,
+                        height: newHeight,
+                    });
+                }
             };
 
             const onMouseUp = () => {

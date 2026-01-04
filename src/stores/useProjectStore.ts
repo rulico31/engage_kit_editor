@@ -7,6 +7,7 @@ import type { ValidationResult } from '../lib/ValidationService';
 import { DataMinifier } from '../lib/DataMinifier';
 import { useToastStore } from './useToastStore';
 import type { ThemeConfig } from '../types';
+import { useEditorSettingsStore } from './useEditorSettingsStore'; // ★追加: デバイスタイプ取得用
 
 // =========================================================
 // Electron APIの型定義（安全のためローカルでも定義）
@@ -204,6 +205,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     const pageState = usePageStore.getState();
+    const editorSettings = useEditorSettingsStore.getState(); // ★追加: エディタ設定を取得
     const projectDataToSave: ProjectData = {
       projectName: projectMeta?.name || "無題",
       pages: pageState.pages,
@@ -212,6 +214,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       cloud_id: projectMeta?.cloud_id,
       theme: projectMeta?.data?.theme,
       dataRetentionPeriod: projectMeta?.data?.dataRetentionPeriod,
+      deviceType: editorSettings.isMobileView ? 'mobile' : 'desktop', // ★追加: デバイスタイプを保存
       ...dataOverrides // ★ここで上書きデータをマージ
     };
 
