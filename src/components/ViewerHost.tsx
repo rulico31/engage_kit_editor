@@ -13,7 +13,6 @@ interface ViewerHostProps {
   projectId: string;
 }
 
-// ★ Phase 4: Watermark Component
 const PoweredByBadge: React.FC = () => (
   <div
     style={{
@@ -50,7 +49,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   const hasLogged = useRef(false);
 
-  // ★ PC基準の固定幅 (高さは可変にするため削除)
+  // PC基準の固定幅
   const FIXED_WIDTH = 1000;
 
   const [scale, setScale] = useState(1);
@@ -73,16 +72,16 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     setPreviewState: state.setPreviewState,
   }));
 
-  // ★ 追加: コンテンツの「本当の高さ」を自動計算
+  // コンテンツの「本当の高さ」を自動計算
   const contentHeight = useMemo(() => {
     if (!placedItems || placedItems.length === 0) return 700; // アイテムがない時のデフォルト
 
     // すべてのアイテムの中で「一番下のY座標」を探す
     const bottomY = Math.max(...placedItems.map(item => item.y + item.height));
 
-    // 少し余白(50px)を持たせる。ただし最低700pxは確保したい場合は Math.max(700, ...) にする
-    // 今回は「余白を消したい」ので、コンテンツピッタリ + 余白20px 程度にする
-    return Math.max(bottomY + 20, 100);
+    // 余白バッファを完全に削除 (bottomYのみ)
+    // 最低でも100pxは確保
+    return Math.max(bottomY, 100);
   }, [placedItems]);
 
   useEffect(() => {
@@ -136,7 +135,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     }
   }, [projectId, loadFromData, initPreview]);
 
-  // ★ スケール計算ロジック
+  // スケール計算ロジック
   useEffect(() => {
     const handleResize = () => {
       const viewportWidth = window.innerWidth;
@@ -148,6 +147,19 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // 計算した高さをスケールに合わせて適用
+  const wrapperHeight = contentHeight * scale;
+
+  // iframeの高さを自動調整するためのメッセージ送信
+  useEffect(() => {
+    if (wrapperHeight > 0) {
+      window.parent.postMessage({
+        type: 'ENGAGE_KIT_RESIZE',
+        height: wrapperHeight
+      }, '*');
+    }
+  }, [wrapperHeight]);
 
   if (error) {
     return (
@@ -195,22 +207,17 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     backgroundRepeat: backgroundImage?.displayMode === 'tile' ? 'repeat' : 'no-repeat',
   };
 
-  // ★ 計算した高さをスケールに合わせて適用
-  const wrapperHeight = contentHeight * scale;
-
   return (
     <div style={backgroundStyle}>
       <div style={{
         width: "100%",
-        // minHeight: "100%" を削除し、コンテンツの高さに任せる。
-        // ただし画面より小さい時に上詰めになりすぎないよう、flex配置は維持。
         minHeight: "100%",
         position: "relative",
         display: "flex",
         justifyContent: "center",
-        alignItems: "flex-start", // 上寄せ
-        paddingTop: "20px",
-        paddingBottom: "40px"
+        alignItems: "flex-start",
+        paddingTop: "0px", // 余白削除
+        paddingBottom: "0px" // 余白削除
       }}>
 
         {/* コンテンツラッパー: 自動計算された高さを使用 */}
@@ -219,14 +226,12 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
           height: `${wrapperHeight}px`,
           position: "relative",
           overflow: "hidden",
-          // 影をつけてカードっぽくすると、余白が気にならなくなる（オプション）
-          // boxShadow: "0 4px 20px rgba(0,0,0,0.1)" 
         }}>
 
           {/* 中身: 自動計算された contentHeight を使用 */}
           <div style={{
             width: `${FIXED_WIDTH}px`,
-            height: `${contentHeight}px`, // ★ ここも可変に
+            height: `${contentHeight}px`,
             transform: `scale(${scale})`,
             transformOrigin: "top left",
             position: "absolute",

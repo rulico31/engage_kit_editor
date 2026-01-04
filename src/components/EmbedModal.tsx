@@ -8,13 +8,25 @@ interface EmbedModalProps {
 
 const EmbedModal: React.FC<EmbedModalProps> = ({ projectId, onClose }) => {
     const viewerUrl = `https://viewer.engage-kit.com/v/${projectId}`;
+
+    // 高さ自動調整スクリプトを含む埋め込みコード
     const embedCode = `<iframe
+  id="engage-kit-frame-${projectId}"
   src="${viewerUrl}"
   width="100%"
-  height="600"
-  frameborder="0"
-  allow="camera; microphone; fullscreen"
-></iframe>`;
+  style="border: none; overflow: hidden; width: 100%;"
+  scrolling="no"
+></iframe>
+<script>
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'ENGAGE_KIT_RESIZE') {
+    var frame = document.getElementById('engage-kit-frame-${projectId}');
+    if (frame) {
+      frame.style.height = e.data.height + 'px';
+    }
+  }
+});
+</script>`;
 
     const [copied, setCopied] = useState(false);
 
