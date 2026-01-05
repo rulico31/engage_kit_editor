@@ -1,5 +1,6 @@
 // electron/main.ts
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
 import * as fs from 'fs/promises'
@@ -107,15 +108,15 @@ function createWindow() {
         mainWindow.webContents.openDevTools()
     } else {
         console.log('[Main] 本番モード: ビルド済みファイルから読み込みます')
-        
+
         // ★★★ ここが修正ポイント！ ★★★
         // 修正前: path.join(__dirname, '../index.html') 
         // 修正後: distフォルダの中を見るように変更
-        const indexPath = path.join(__dirname, '../dist/index.html') 
+        const indexPath = path.join(__dirname, '../dist/index.html')
 
         console.log('[Main] __dirname:', __dirname)
         console.log('[Main] index.htmlのパス:', indexPath)
-        
+
         mainWindow.loadFile(indexPath)
     }
 
@@ -139,4 +140,69 @@ app.whenReady().then(() => {
     });
 
     createWindow();
+
+    // Auto-updater setup (Windows only)
+    if (!isDev && process.platform === 'win32') {
+        console.log('[AutoUpdater] 自動アップデート機能を初期化します');
+
+        // Configure auto-updater
+        autoUpdater.autoDownload = false;
+        autoUpdater.autoInstallOnAppQuit = true;
+
+        // Event listeners
+        autoUpdater.on('checking-for-update', () => {
+            console.log('[AutoUpdater] アップデートを確認中...');
+        });
+
+        autoUpdater.on('update-available', (info) => {
+            console.log('[AutoUpdater] 新しいバージョンが見つかりました:', info.version);
+            dialog.showMessageBox(mainWindow!, {
+                type: 'info',
+                title: 'アップデート利用可能',
+                message: `新しいバージョン ${info.version} が利用可能です。`,
+                buttons: ['ダウンロード', '後で'],
+                defaultId: 0
+            }).then((result) => {
+                if (result.response === 0) {
+                    autoUpdater.downloadUpdate();
+                }
+            });
+        });
+
+        autoUpdater.on('update-not-available', () => {
+            console.log('[AutoUpdater] 最新版を使用しています');
+        });
+
+        autoUpdater.on('error', (err) => {
+            console.error('[AutoUpdater] エラーが発生しました:', err);
+        });
+
+        autoUpdater.on('download-progress', (progressObj) => {
+            console.log(`[AutoUpdater] ダウンロード中: ${progressObj.percent.toFixed(2)}%`);
+        });
+
+        autoUpdater.on('update-downloaded', (info) => {
+            console.log('[AutoUpdater] アップデートのダウンロードが完了しました:', info.version);
+            dialog.showMessageBox(mainWindow!, {
+                type: 'info',
+                title: 'アップデート準備完了',
+                message: `バージョン ${info.version} のダウンロードが完了しました。アプリを再起動してインストールしますか？`,
+                buttons: ['今すぐ再起動', '次回起動時'],
+                defaultId: 0
+            }).then((result) => {
+                if (result.response === 0) {
+                    autoUpdater.quitAndInstall();
+                }
+            });
+        });
+
+        // Check for updates on startup (with delay)
+        setTimeout(() => {
+            autoUpdater.checkForUpdates();
+        }, 3000);
+    } else if (isDev) {
+        console.log('[AutoUpdater] 開発モードのため、アップデートチェックをスキップします');
+    } else {
+        console.log('[AutoUpdater] このプラットフォームでは自動アップデートはサポートされていません');
+    }
 })

@@ -1,7 +1,7 @@
 {
   "name": "engage-kit-editor",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.1",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.84.0",
+    "electron-updater": "^6.6.2",
     "lucide-react": "^0.561.0",
     "react": "^19.1.1",
     "react-dnd": "^16.0.1",
@@ -62,6 +63,22 @@
     "directories": {
       "output": "dist",
       "buildResources": "build"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "rulico31",
+        "repo": "engage-kit-editor"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
