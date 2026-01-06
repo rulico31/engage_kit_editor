@@ -8,6 +8,8 @@ import type { ProjectData } from "../types";
 import "./Artboard.css";
 import { logAnalyticsEvent } from "../lib/analytics";
 import { ViewerErrorBoundary } from "./ViewerErrorBoundary";
+import { initializeUTMTracking } from "../lib/UTMTracker";
+import { initializeDeviceTracking } from "../lib/DeviceDetector";
 
 interface ViewerHostProps {
   projectId: string;
@@ -83,6 +85,19 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     // 最低でも100pxは確保
     return Math.max(bottomY, 100);
   }, [placedItems]);
+
+  // UTMパラメータとデバイス情報の初期化
+  useEffect(() => {
+    // UTMパラメータ取得・保存（初回アクセス時のみ）
+    const utmData = initializeUTMTracking();
+    if (utmData) {
+      console.log('📊 UTM Parameters captured:', utmData);
+    }
+
+    // デバイス情報取得・保存
+    const deviceInfo = initializeDeviceTracking();
+    console.log('📱 Device Info captured:', deviceInfo);
+  }, []); // 1回のみ実行
 
   useEffect(() => {
     const fetchAndInit = async () => {

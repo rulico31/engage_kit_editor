@@ -68,6 +68,7 @@
   background-color: #007acc;
   color: white;
 }
+
 .login-button.email:hover {
   background-color: #008be6;
 }
@@ -106,8 +107,22 @@
   justify-content: center;
   gap: 10px;
 }
+
 .login-button.google:hover {
   background-color: #f0f0f0;
+}
+
+.login-button.microsoft {
+  background-color: #0078d4;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.login-button.microsoft:hover {
+  background-color: #005a9e;
 }
 
 .alert-message {

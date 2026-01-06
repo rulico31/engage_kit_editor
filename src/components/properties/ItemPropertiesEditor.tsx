@@ -11,17 +11,6 @@ import type { Crop } from 'react-image-crop';
 // 型定義の補完（types.tsを変更せずに対応）
 type ItemStyle = NonNullable<PlacedItemType['style']> & { borderRadius?: number | string };
 
-// ★追加: このファイル内でも window.electronAPI を認識できるように型を拡張
-declare global {
-  interface Window {
-    electronAPI?: {
-      saveProjectFile: (data: string) => Promise<boolean>;
-      openProjectFile: () => Promise<string | null>;
-      selectImageFile: () => Promise<string | null>;
-    };
-  }
-}
-
 interface ItemPropertiesEditorProps {
   item: PlacedItemType;
   onItemUpdate: (id: string, updates: Partial<PlacedItemType> | { data: any }, options?: { addToHistory?: boolean; immediate?: boolean }) => void;

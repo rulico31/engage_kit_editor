@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import ConfirmModal from "./ConfirmModal";
 import { TemplateSelectionModal } from "./TemplateSelectionModal";
 import { useAuthStore } from "../stores/useAuthStore";
+import { AccountMenu } from "./Auth/AccountMenu";
 
 interface HomeViewProps {
   onCreateProject: (name: string, initialData?: any) => void;
@@ -39,12 +40,9 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
 
   // ユーザー情報を取得
   const user = useAuthStore(state => state.user);
-  const isAnonymous = useAuthStore(state => state.isAnonymous);
 
-  // メールログイン用のstate
-  const [emailInput, setEmailInput] = useState('');
-  const [emailSent, setEmailSent] = useState(false);
-  const [emailError, setEmailError] = useState('');
+  // アカウントメニューの状態
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchProjects();
@@ -106,6 +104,12 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
 
   // プロジェクトクリック時のハンドラ
   const handleProjectClick = (projectId: string) => {
+    // ログインチェック
+    if (!user) {
+      alert('プロジェクトを開くには、GoogleまたはMicrosoftアカウントでログインしてください。');
+      return;
+    }
+
     setIsProjectLoading(true); // ローディング開始
     // 少し遅延させて視覚的なフィードバックを確実にする（UX向上）
     // 実際の読み込みはonOpenProject内で行われる
@@ -216,30 +220,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
     return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
   };
 
-  // メールログイン処理
-  const handleEmailLogin = async () => {
-    if (!emailInput.trim()) {
-      setEmailError('メールアドレスを入力してください');
-      return;
-    }
 
-    // 簡単なメールアドレス検証
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailInput)) {
-      setEmailError('有効なメールアドレスを入力してください');
-      return;
-    }
-
-    try {
-      await useAuthStore.getState().signInWithEmail(emailInput);
-      setEmailSent(true);
-      setEmailError('');
-      setEmailInput('');
-    } catch (error: any) {
-      setEmailError(error.message || 'メール送信に失敗しました');
-      setEmailSent(false);
-    }
-  };
 
   // リネーム開始
   const handleRenameStart = (e: React.MouseEvent, project: Project) => {
@@ -303,18 +284,38 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
           <div className="header-actions">
             {/* JSONから読み込みボタン */}
             {onLoadFromJSON && (
-              <button className="load-json-btn" onClick={onLoadFromJSON}>
+              <button
+                className="load-json-btn"
+                onClick={() => {
+                  if (!user) {
+                    alert('プロジェクトを開くには、GoogleまたはMicrosoftアカウントでログインしてください。');
+                    return;
+                  }
+                  onLoadFromJSON();
+                }}
+                title={!user ? 'ログインが必要です' : 'JSONファイルから読み込み'}
+              >
                 📂 JSONから読み込み
               </button>
             )}
 
             {/* 新規プロジェクトボタン */}
-            <button className="create-project-btn" onClick={() => setIsCreateModalOpen(true)}>
+            <button
+              className="create-project-btn"
+              onClick={() => {
+                if (!user) {
+                  alert('プロジェクトを作成するには、GoogleまたはMicrosoftアカウントでログインしてください。');
+                  return;
+                }
+                setIsCreateModalOpen(true);
+              }}
+              title={!user ? 'ログインが必要です' : '新規プロジェクトを作成'}
+            >
               + 新規プロジェクト
             </button>
 
-            {/* 認証ボタン（Googleログイン or ログアウト） */}
-            {!user || isAnonymous ? (
+            {/* 認証ボタン（Google/Microsoftログイン or ログアウト） */}
+            {!user ? (
               <>
                 <button
                   className="google-login-btn"
@@ -331,62 +332,63 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
                   Googleでログイン
                 </button>
 
-                {/* 区切り線 */}
-                <div className="auth-divider">
-                  <span>または</span>
-                </div>
-
-                {/* メールログインフォーム */}
-                <div className="email-login-form">
-                  <input
-                    type="email"
-                    placeholder="メールアドレスを入力"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    className="email-input"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleEmailLogin();
-                      }
-                    }}
-                  />
-                  <button
-                    className="email-login-btn"
-                    onClick={handleEmailLogin}
-                  >
-                    ログインリンクを送信
-                  </button>
-
-                  {emailSent && (
-                    <div className="email-success">
-                      📧 メールを送信しました。受信箱を確認してください。
-                    </div>
-                  )}
-
-                  {emailError && (
-                    <div className="email-error">
-                      ⚠️ {emailError}
-                    </div>
-                  )}
-                </div>
+                <button
+                  className="microsoft-login-btn"
+                  onClick={() => {
+                    useAuthStore.getState().signInWithMicrosoft();
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+                    <rect width="9" height="9" fill="white" />
+                    <rect x="11" width="9" height="9" fill="white" />
+                    <rect y="11" width="9" height="9" fill="white" />
+                    <rect x="11" y="11" width="9" height="9" fill="white" />
+                  </svg>
+                  Microsoftでログイン
+                </button>
               </>
             ) : (
-              <button
-                className="logout-btn"
-                onClick={async () => {
-                  if (confirm('ログアウトしますか？')) {
-                    await useAuthStore.getState().signOut();
-                    window.location.reload();
-                  }
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                ログアウト
-              </button>
+              <>
+                {/* ユーザー情報表示 */}
+                <div
+                  className="user-info-display clickable"
+                  onClick={() => setIsAccountMenuOpen(true)}
+                  title="アカウントを切り替える"
+                >
+                  {user.user_metadata?.avatar_url && (
+                    <img
+                      src={user.user_metadata.avatar_url}
+                      alt="User avatar"
+                      className="user-avatar-home"
+                    />
+                  )}
+                  <span className="user-name-home">
+                    {user.user_metadata?.name || user.email || 'ユーザー'}
+                  </span>
+                  {/* ドロップダウンアイコン */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}>
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </div>
+
+                {/* ログアウトボタン */}
+                <button
+                  className="logout-btn"
+                  onClick={async () => {
+                    if (confirm('ログアウトしますか？')) {
+                      await useAuthStore.getState().signOut();
+                      window.location.reload();
+                    }
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  ログアウト
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -398,7 +400,15 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
           ) : projects.length === 0 ? (
             <div className="empty-state">
               <p>プロジェクトがまだありません</p>
-              <button onClick={() => setIsCreateModalOpen(true)}>最初のプロジェクトを作成</button>
+              <button onClick={() => {
+                if (!user) {
+                  alert('プロジェクトを作成するには、GoogleまたはMicrosoftアカウントでログインしてください。');
+                  return;
+                }
+                setIsCreateModalOpen(true);
+              }}>
+                最初のプロジェクトを作成
+              </button>
             </div>
           ) : (
             projects.map((project) => (
@@ -505,6 +515,14 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
           <TemplateSelectionModal
             onClose={() => setIsTemplateModalOpen(false)}
             onSelectTemplate={handleTemplateSelect}
+          />
+        )}
+
+        {/* アカウント切り替えメニュー */}
+        {isAccountMenuOpen && user && (
+          <AccountMenu
+            user={user}
+            onClose={() => setIsAccountMenuOpen(false)}
           />
         )}
 

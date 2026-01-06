@@ -1,0 +1,151 @@
+/* AccountMenu.css */
+
+.account-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding: 80px 60px;
+}
+
+.account-menu {
+    background: linear-gradient(135deg, #27272a 0%, #1f1f22 100%);
+    border-radius: 16px;
+    padding: 8px;
+    min-width: 320px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.account-menu-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    margin-bottom: 8px;
+}
+
+.account-menu-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.account-menu-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.account-menu-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-menu-email {
+    font-size: 13px;
+    color: #a1a1aa;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+.account-menu-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 8px 0;
+}
+
+.account-menu-section {
+    padding: 8px;
+}
+
+.account-menu-section-title {
+    font-size: 12px;
+    color: #a1a1aa;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+}
+
+.account-menu-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 6px;
+}
+
+.account-menu-button:last-child {
+    margin-bottom: 0;
+}
+
+.account-menu-button.google {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e4e4e7;
+}
+
+.account-menu-button.google:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.account-menu-button.microsoft {
+    background: rgba(0, 120, 212, 0.2);
+    color: #93c5fd;
+}
+
+.account-menu-button.microsoft:hover:not(:disabled) {
+    background: rgba(0, 120, 212, 0.3);
+}
+
+.account-menu-button.logout {
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    margin-top: 8px;
+}
+
+.account-menu-button.logout:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.account-menu-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

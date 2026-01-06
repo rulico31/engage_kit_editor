@@ -2,6 +2,8 @@
 
 import { supabase } from './supabaseClient';
 import { useProjectStore } from '../stores/useProjectStore';
+import { getStoredUTMData } from './UTMTracker';
+import { getStoredDeviceInfo } from './DeviceDetector';
 
 // セッションIDのキー
 const SESSION_KEY = 'engage_kit_session_id';
@@ -27,6 +29,8 @@ export type AnalyticsEventType =
   | 'node_execution'  // ノード実行 (ステップ進行・完了率・離脱率の基礎)
   | 'logic_branch'    // ロジック分岐 (Ifノードの結果など)
   | 'interaction'     // ユーザー操作 (クリックなど)
+  | 'score_change'    // エンゲージメントスコア変更
+  | 'backtracking'    // バックトラッキング（戻る操作）
   | 'error';          // ランタイムエラー
 
 /**
@@ -73,6 +77,10 @@ export const logAnalyticsEvent = async (
       timestamp
     });
 
+    // UTMとデバイス情報をsessionStorageから取得
+    const utmData = getStoredUTMData();
+    const deviceInfo = getStoredDeviceInfo();
+
     const { error } = await supabase
       .from('analytics_logs')
       .insert({
@@ -82,6 +90,8 @@ export const logAnalyticsEvent = async (
         node_id: payload?.nodeId,
         node_type: payload?.nodeType,
         metadata: payload?.metadata || {},
+        utm_data: utmData,        // UTMパラメータ
+        device_info: deviceInfo,  // デバイス情報
         created_at: timestamp
       });
 

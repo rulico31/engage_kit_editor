@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import HomeView from "./components/HomeView";
 import EditorView from "./components/EditorView";
 import ViewerHost from "./components/ViewerHost";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 import PublishModal from "./components/PublishModal";
 import { useProjectStore } from "./stores/useProjectStore";
@@ -43,7 +44,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const initAuth = async () => {
       const authStore = useAuthStore.getState();
-      await authStore.initializeAuth();
+      authStore.initialize();
 
       // 認証されていなければ匿名ログイン
       // ★ 一時的に無効化：Googleアカウントでログインするため
@@ -71,7 +72,7 @@ const App: React.FC = () => {
       } else {
       */
       if (useAuthStore.getState().user) {
-        console.log("✅ User found:", useAuthStore.getState().user?.id, "IsAnonymous:", useAuthStore.getState().isAnonymous);
+        console.log("✅ User found:", useAuthStore.getState().user?.id);
 
         // OAuth認証から戻ってきた場合、保存されたプロジェクトIDを復元
         const savedProjectId = sessionStorage.getItem('auth_return_project_id');
@@ -213,8 +214,10 @@ const App: React.FC = () => {
   };
 
   const handleLoadFromJSON = async () => {
-    await loadProject(); // 引数なしで呼び出すとローカルファイル選択ダイアログが開く
-    setCurrentRoute("editor");
+    // Webアプリではローカルファイルからの読み込みは非対応
+    alert('Webアプリではローカルファイルからの読み込みには対応していません。プロジェクト一覧から既存のプロジェクトを開くか、新規作成してください。');
+    // await loadProject(); // 引数なしで呼び出すとローカルファイル選択ダイアログが開く
+    // setCurrentRoute("editor");
   };
 
   const handleGoHome = () => {
@@ -268,23 +271,25 @@ const App: React.FC = () => {
       )}
 
       {currentRoute === "editor" && (
-        <>
-          <EditorView
-            projectName={projectMeta?.name || ""}
-            onGoHome={handleGoHome}
-            onPublish={handlePublish}
+        <ProtectedRoute onRedirect={handleGoHome}>
+          <>
+            <EditorView
+              projectName={projectMeta?.name || ""}
+              onGoHome={handleGoHome}
+              onPublish={handlePublish}
 
-          />
-
-
-
-          {isPublishModalOpen && (
-            <PublishModal
-              projectId={currentProjectId}
-              onClose={() => setIsPublishModalOpen(false)}
             />
-          )}
-        </>
+
+
+
+            {isPublishModalOpen && (
+              <PublishModal
+                projectId={currentProjectId}
+                onClose={() => setIsPublishModalOpen(false)}
+              />
+            )}
+          </>
+        </ProtectedRoute>
       )}
 
       {currentRoute === "viewer" && viewerProjectId && (

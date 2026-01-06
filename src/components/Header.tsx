@@ -99,10 +99,21 @@ const Header: React.FC<HeaderProps> = ({
     canRedo: state.canRedo
   }));
 
-  const { isAnonymous } = useAuthStore(); // ゲスト状態取得
+  const { user, signOut } = useAuthStore();
 
   const isMobileView = useEditorSettingsStore((state) => state.isMobileView);
   const setIsMobileView = useEditorSettingsStore((state) => state.setIsMobileView);
+
+  // デバッグ: userの状態を確認
+  console.log('Header - user:', user);
+
+  // ログアウト処理
+  const handleLogout = async () => {
+    if (confirm('ログアウトしますか？')) {
+      await signOut();
+      onGoHome(); // ホームに戻る
+    }
+  };
 
   return (
     <header className="editor-header">
@@ -113,11 +124,6 @@ const Header: React.FC<HeaderProps> = ({
         </button>
         <div className="project-title-group">
           <div className="project-title">{projectName || "名称未設定プロジェクト"}</div>
-          {isAnonymous && (
-            <div className="guest-badge" title="アカウント未連携：データは一時的なものです。公開時に連携してください。">
-              ゲスト編集中
-            </div>
-          )}
         </div>
 
         <div className="history-controls-group">
@@ -221,6 +227,36 @@ const Header: React.FC<HeaderProps> = ({
         <button className="publish-button" onClick={onPublish}>
           公開
         </button>
+
+        {/* ユーザー情報とログアウト */}
+        {user && (
+          <>
+            <div className="separator" />
+            <div className="user-info">
+              {user.user_metadata?.avatar_url && (
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt="User avatar"
+                  className="user-avatar"
+                />
+              )}
+              <span className="user-name">
+                {user.user_metadata?.name || user.email || 'ユーザー'}
+              </span>
+            </div>
+            <button
+              className="icon-button-ghost logout-button"
+              onClick={handleLogout}
+              title="ログアウト"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
     </header >
   );

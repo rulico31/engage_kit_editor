@@ -148,6 +148,7 @@
 }
 
 .google-login-btn,
+.microsoft-login-btn,
 .logout-btn {
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
@@ -168,6 +169,7 @@
 }
 
 .google-login-btn:hover,
+.microsoft-login-btn:hover,
 .logout-btn:hover {
   background: rgba(255, 255, 255, 0.3);
   border-color: rgba(255, 255, 255, 0.5);
@@ -176,6 +178,7 @@
 }
 
 .google-login-btn:active,
+.microsoft-login-btn:active,
 .logout-btn:active {
   transform: translateY(0);
 }
@@ -266,6 +269,71 @@
   color: #ef9a9a;
   font-size: 13px;
   line-height: 1.4;
+}
+
+/* ユーザー情報表示（ホーム画面） */
+.user-info-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  transition: all 0.3s;
+}
+
+.user-info-display.clickable {
+  cursor: pointer;
+}
+
+.user-info-display.clickable:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.user-avatar-home {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.user-name-home {
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout-btn {
+  background: rgba(239, 68, 68, 0.2);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fef2f2;
+  transform: translateY(-2px);
 }
 
 

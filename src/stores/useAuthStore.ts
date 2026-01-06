@@ -1,139 +1,100 @@
-// src/stores/useAuthStore.ts
+import { create } from 'zustand';
+import type { User } from '@supabase/supabase-js';
+import { authService } from '../lib/AuthService';
+import { useToastStore } from './useToastStore';
 
-import create from 'zustand';
-import { supabase } from '../lib/supabaseClient';
-import type { User, Session } from '@supabase/supabase-js';
-
-interface AuthStoreState {
+interface AuthState {
   user: User | null;
-  session: Session | null;
   isLoading: boolean;
+  isInitialized: boolean;
 
-  // --- Actions ---
-  initializeAuth: () => Promise<void>;
-  signInAnonymously: () => Promise<void>;
+  // Actions
+  initialize: () => void;
   signInWithGoogle: () => Promise<void>;
-  signInWithEmail: (email: string) => Promise<void>;
-  linkWithGoogle: () => Promise<void>; // アカウント連携用
+  signInWithMicrosoft: () => Promise<void>;
+  switchAccount: (provider: 'google' | 'microsoft') => Promise<void>;
   signOut: () => Promise<void>;
-
-  // --- Getters ---
-  isAnonymous: boolean;
+  setUser: (user: User | null) => void;
 }
 
-export const useAuthStore = create<AuthStoreState>((set) => ({
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  session: null,
-  isLoading: true,
-  isAnonymous: false,
+  isLoading: false,
+  isInitialized: false,
 
-  initializeAuth: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user ?? null;
-    set({
-      session,
-      user,
-      isAnonymous: user?.is_anonymous ?? false,
-      isLoading: false
+  // 認証状態の初期化
+  initialize: () => {
+    // セッションの取得
+    authService.getSession().then((session) => {
+      set({ user: session?.user ?? null, isInitialized: true });
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      const user = session?.user ?? null;
-      set({
-        session,
-        user,
-        isAnonymous: user?.is_anonymous ?? false,
-        isLoading: false
-      });
+    // 認証状態の変化を監視
+    authService.onAuthStateChange((user) => {
+      set({ user });
     });
   },
 
-  signInAnonymously: async () => {
-    const { error } = await supabase.auth.signInAnonymously();
-    if (error) {
-      console.error("Anonymous login error:", error.message);
-      // alert("ゲストログインに失敗しました"); // 自動ログインなのでアラートは出さない方が良いかも
-    }
-  },
-
+  // Googleサインイン
   signInWithGoogle: async () => {
-    // ★ 修正: redirectTo オプションを追加して、ログイン後の戻り先を明示
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin, // http://localhost:5173 に戻る
-      },
-    });
-    if (error) {
-      console.error("Google login error:", error.message);
-      alert("Googleログインに失敗しました: " + error.message);
+    set({ isLoading: true });
+    try {
+      await authService.signInWithGoogle();
+      // OAuth リダイレクトが発生するため、ここでのユーザー設定は不要
+    } catch (error: any) {
+      console.error('Google sign in failed:', error);
+      useToastStore.getState().addToast('Googleログインに失敗しました', 'error');
+      set({ isLoading: false });
     }
   },
 
-  linkWithGoogle: async () => {
-    // OAuth認証前の状態をセッションストレージに保存
-    // プロジェクトIDを保存（グローバルストアから取得）
-    if (typeof window !== 'undefined') {
-      const projectStore = (window as any).__PROJECT_STORE__;
-      if (projectStore?.currentProjectId) {
-        sessionStorage.setItem('auth_return_project_id', projectStore.currentProjectId);
-        console.log("💾 プロジェクトID保存:", projectStore.currentProjectId);
+  // Microsoftサインイン
+  signInWithMicrosoft: async () => {
+    set({ isLoading: true });
+    try {
+      await authService.signInWithMicrosoft();
+      // OAuth リダイレクトが発生するため、ここでのユーザー設定は不要
+    } catch (error: any) {
+      console.error('Microsoft sign in failed:', error);
+      useToastStore.getState().addToast('Microsoftログインに失敗しました', 'error');
+      set({ isLoading: false });
+    }
+  },
+
+  // アカウント切り替え（別のアカウントでログイン）
+  switchAccount: async (provider: 'google' | 'microsoft') => {
+    set({ isLoading: true });
+    try {
+      // 現在のセッションをログアウト
+      await authService.signOut();
+
+      // アカウント選択を強制してログイン
+      if (provider === 'google') {
+        await authService.signInWithGoogle(true);
+      } else {
+        await authService.signInWithMicrosoft(true);
       }
-    }
-
-    console.log("🔗 Google連携を開始します...");
-
-    // ★ 重要: 既存アカウント衝突時のエラーハンドリングは呼び出し元で行う前提
-    const result = await supabase.auth.linkIdentity({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin, // ルートに戻す
-      }
-    });
-
-    // 詳細なデバッグログ
-    console.log("📊 linkIdentity結果:", result);
-    console.log("エラー:", result.error);
-    console.log("データ:", result.data);
-
-    if (result.error) {
-      console.error("❌ Link identity error:", result.error);
-      throw result.error;
-    }
-
-    // エラーがない場合でも、dataの内容を確認
-    if (!result.data?.url) {
-      console.warn("⚠️ リダイレクトURLが取得できませんでした。Supabaseの設定を確認してください。");
-      console.warn("返り値:", JSON.stringify(result, null, 2));
-      throw new Error("Google認証URLを取得できませんでした。Supabaseの設定（Googleプロバイダー、Manual Linking）を確認してください。");
-    }
-
-    console.log("✅ リダイレクト準備完了:", result.data.url);
-
-    // デバッグ用alert
-    alert("これからGoogleの認証ページにリダイレクトします。OKを押すと遷移します。\n\nURL: " + result.data.url);
-
-    // 手動でGoogle認証ページにリダイレクト
-    window.location.href = result.data.url;
-  },
-
-  signInWithEmail: async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin,
-      },
-    });
-    if (error) {
-      console.error("Email login error:", error.message);
-      throw error;
+    } catch (error: any) {
+      console.error('Account switch failed:', error);
+      useToastStore.getState().addToast('アカウント切り替えに失敗しました', 'error');
+      set({ isLoading: false });
     }
   },
 
+  // サインアウト
   signOut: async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error("Sign out error:", error.message);
+    set({ isLoading: true });
+    try {
+      await authService.signOut();
+      set({ user: null, isLoading: false });
+      useToastStore.getState().addToast('ログアウトしました', 'info');
+    } catch (error: any) {
+      console.error('Sign out failed:', error);
+      useToastStore.getState().addToast('ログアウトに失敗しました', 'error');
+      set({ isLoading: false });
     }
   },
+
+  // ユーザー設定（内部使用）
+  setUser: (user) => set({ user }),
 }));
