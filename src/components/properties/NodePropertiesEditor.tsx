@@ -14,7 +14,6 @@ import { eventNodeConfig } from "../nodes/EventNode";
 import { ifNodeConfig } from "../nodes/IfNode";
 import { pageNodeConfig } from "../nodes/PageNode";
 import { setVariableNodeConfig } from "../nodes/SetVariableNode";
-import { waitForClickNodeConfig } from "../nodes/WaitForClickNode";
 import { submitDataNodeConfig } from "../nodes/SubmitDataNode";
 import { submitFormNodeConfig } from "../nodes/SubmitFormNode"; // 追加
 import { externalApiNodeConfig } from "../nodes/ExternalApiNode";
@@ -29,7 +28,6 @@ const nodeConfigMap: Record<string, any> = {
   "ifNode": ifNodeConfig,
   "pageNode": pageNodeConfig,
   "setVariableNode": setVariableNodeConfig,
-  "waitForClickNode": waitForClickNodeConfig,
   "submitDataNode": submitDataNodeConfig,
   "submitFormNode": submitFormNodeConfig, // 追加
   "externalApiNode": externalApiNodeConfig,
@@ -81,6 +79,16 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
 
   const isInputItem = parentItem?.name.startsWith("テキスト入力欄") || false;
   const isImageItem = parentItem?.name.startsWith("画像") || false;
+
+  // ★ visibleWhen条件のチェック
+  if (propConfig.visibleWhen) {
+    const shouldShow = Object.entries(propConfig.visibleWhen).every(([key, expectedValue]) => {
+      return node.data[key] === expectedValue;
+    });
+    if (!shouldShow) {
+      return null; // 条件を満たさない場合は何も表示しない
+    }
+  }
 
   const { name, label, type, defaultValue, step, min } = propConfig;
   const value = node.data[name] ?? defaultValue;

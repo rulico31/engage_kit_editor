@@ -1,7 +1,7 @@
 // src/lib/ValidationService.ts
 
 import type { ProjectData, NodeGraph } from '../types';
-import type { Node, Edge } from 'reactflow';
+
 
 export interface ValidationIssue {
     type: 'error' | 'warning';
@@ -136,7 +136,7 @@ export class ValidationService {
     private static findBrokenLinks(
         nodeGraph: NodeGraph,
         projectData: ProjectData,
-        currentPageId: string
+        _currentPageId: string
     ): Array<{ nodeId: string; message: string }> {
         const issues: Array<{ nodeId: string; message: string }> = [];
         const { nodes } = nodeGraph;
@@ -162,8 +162,8 @@ export class ValidationService {
                 }
             }
 
-            // アクション/条件/アニメーション/クリック待ちノード
-            if (['actionNode', 'ifNode', 'animateNode', 'waitForClickNode'].includes(node.type || '')) {
+            // アクション/条件/アニメーションノード
+            if (['actionNode', 'ifNode', 'animateNode'].includes(node.type || '')) {
                 const targetItemId = node.data.targetItemId;
                 if (targetItemId && !allItemIds.has(targetItemId)) {
                     issues.push({
@@ -238,9 +238,9 @@ export class ValidationService {
         // 1. 自動実行ノードのみを対象としたサブグラフを作成
         // ユーザー介入が必要なノード（waitForClickNodeや、開始点であるeventNode）は
         // ループを止めるストッパーになるため、これらを含まないループのみを検出する。
-        const autoNodes = nodes.filter(n => {
+        const autoNodes = nodes.filter(() => {
             // ストッパーとなるノードタイプ
-            if (n.type === 'waitForClickNode') return false;
+
 
             // アニメーションノードで「完了を待つ」場合はストッパーになり得るが、
             // 現状は安全側に倒してwait: trueでもストッパー扱いしない（自動で進むため）

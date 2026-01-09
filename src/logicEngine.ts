@@ -468,37 +468,7 @@ const processQueue = async (
         pushNext(node.id, null, allEdges, nextQueue);
       }
 
-      // (8) クリック待ちノード
-      else if (node.type === "waitForClickNode") {
-        const { targetItemId } = node.data;
-        // ★修正: TRIGGER_ITEM の動的解決
-        const resolvedTargetId = targetItemId === 'TRIGGER_ITEM' ? triggerItemId : targetItemId;
 
-        console.log('⏸️ クリック待ちノード実行', {
-          nodeId: node.id,
-          targetItemId: resolvedTargetId
-        });
-
-        if (resolvedTargetId) {
-          const nextNodeIds = findNextNodes(node.id, null, allEdges);
-
-          if (nextNodeIds.length > 0) {
-            const resumeFlow = () => {
-              processQueue(
-                nextNodeIds,
-                allNodes, allEdges, placedItems, getPreviewState, setPreviewState, requestPageChange, getVariables, setVariables, activeListeners, context,
-                resolvedTargetId // ★重要: クリック待ち解除後は、解除したアイテムを新たな triggerItem として伝播させる
-              );
-            };
-
-            const listeners = activeListeners.get(resolvedTargetId) || [];
-            listeners.push(resumeFlow);
-            activeListeners.set(resolvedTargetId, listeners);
-          }
-        } else {
-          pushNext(node.id, null, allEdges, nextQueue);
-        }
-      }
 
       // (10) A/Bテストノード
       else if (node.type === "abTestNode") {

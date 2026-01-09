@@ -144,6 +144,8 @@ export interface PropertyConfig {
   checkboxLabel?: string; // チェックボックスの横に表示するテキスト
   // 条件付き表示: 関数形式またはオブジェクト形式 { name: string, value: any }
   condition?: ((data: any) => boolean) | { name: string; value: any };
+  // 表示条件: 他のフィールドの値に応じて表示を切り替え (例: { operationMode: "score" })
+  visibleWhen?: Record<string, any>;
 }
 
 // React Flow Types

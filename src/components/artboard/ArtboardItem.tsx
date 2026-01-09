@@ -3,6 +3,8 @@ import type { PlacedItemType, PreviewState, VariableState } from "../../types";
 import "../Artboard.css";
 import { ResizeHandles } from "./ResizeHandles";
 import { useSelectionStore } from "../../stores/useSelectionStore";
+import { InputTracker } from "../../lib/InputTracker"; // 追加
+import { logAnalyticsEvent } from "../../lib/analytics"; // 追加
 
 // 国コードリスト（PreviewItemと共通）
 const COUNTRY_CODES = [
@@ -159,6 +161,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState(item.data?.countryCode || "+81");
+  const [inputTracker] = useState(() => new InputTracker()); // InputTracker初期化
 
   useEffect(() => {
     if (isPreviewing) {
@@ -224,6 +227,34 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
 
   const handleBlur = () => {
     if (isPreviewing) {
+      // InputTrackerのレポートを取得してログ記録
+      const report = inputTracker.getReport(inputValue);
+      console.log('🔍 [ArtboardItem] handleBlur called', {
+        id: item.id,
+        name: item.name,
+        inputValue,
+        report
+      });
+
+      // 入力または修正があった場合のみログ送信
+      const shouldLog = inputValue.length > 0 || report.raw.correction_count > 0;
+      if (shouldLog) {
+        console.log('🔍 [ArtboardItem] Sending input_analysis log...');
+        logAnalyticsEvent('input_analysis', {
+          nodeId: item.id,
+          nodeType: 'text_input',
+          metadata: {
+            metrics: report.metrics,
+            raw: report.raw,
+            item_name: item.name,
+          }
+        }).then(() => {
+          console.log('✅ [ArtboardItem] Log sent successfully');
+        }).catch(err => {
+          console.error('❌ [ArtboardItem] Log failed:', err);
+        });
+      }
+
       const isValid = validate(inputValue);
       if (isValid) {
         onItemEvent("onInputComplete", item.id);
@@ -325,18 +356,25 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
           placeholder={placeholder}
           value={inputValue}
           readOnly={!isPreviewing}
+          onCompositionStart={() => isPreviewing && inputTracker.onCompositionStart()}
+          onCompositionEnd={(e) => isPreviewing && inputTracker.onCompositionEnd(e.nativeEvent.data)}
           onChange={(e) => {
             if (isPreviewing) {
-              setInputValue(e.target.value);
-              onVariableChange(variableName, e.target.value);
+              const newValue = e.target.value;
+              setInputValue(newValue);
+              inputTracker.onInput(newValue); //InputTrackerへ通知
+              onVariableChange(variableName, newValue);
               // 入力中にエラーをクリア
-              if (error) validate(e.target.value);
+              if (error) validate(newValue);
             }
           }}
           onKeyDown={(e) => {
-            if (isPreviewing && e.key === "Enter") {
-              e.currentTarget.blur();
-              // blurイベントでhandleBlurが呼ばれるため、ここでは呼び出さない
+            if (isPreviewing) {
+              inputTracker.onKeyDown(e.nativeEvent, inputValue); // KeyDown通知
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+                // blurイベントでhandleBlurが呼ばれるため、ここでは呼び出さない
+              }
             }
           }}
           onBlur={handleBlur}

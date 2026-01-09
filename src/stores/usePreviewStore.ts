@@ -97,18 +97,20 @@ interface PreviewStoreState {
 // プレビュー状態はZustandの外部でRefとして保持する
 // (logicEngine内の高頻度更新による再描画を防ぐため)
 const previewStateRef = { current: {} as PreviewState };
-const variablesRef = { current: {} as VariableState };
+const variablesRef = { current: {} as VariableState }; // 復元
+// 思考時間計測用タイマー (Zustand外で管理)
+const interactionTimerRef = { current: 0 };
 
 export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   previewState: { currentPageId: '', isFinished: false },
   variables: {},
   activeListeners: new Map(),
-  currentNodeExecution: null, // 滞在時間計測用
-  engagementScore: 0, // エンゲージメントスコア
-  scoreBreakdown: [], // スコア履歴
-  navigationHistory: [], // ナビゲーション履歴
-  currentHistoryIndex: -1, // 現在の履歴インデックス
-  nodeRevisitCounts: {}, // ノード再訪回数
+  currentNodeExecution: null, // 削除予定だが型定義に残っているためnull
+  engagementScore: 0,
+  scoreBreakdown: [],
+  navigationHistory: [],
+  currentHistoryIndex: -1,
+  nodeRevisitCounts: {},
 
   // --- Actions ---
 
@@ -122,26 +124,23 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     const initialPS: PreviewState = { currentPageId: pageId, isFinished: false };
 
     items.forEach(item => {
-      // 初期表示設定を反映 (未設定の場合は true)
       let isVisible = item.data.initialVisibility !== false;
-
-      // ★ ミニチュア方式: 常にPC座標のみ使用
       const initialX = item.x;
       const initialY = item.y;
-
       initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
 
-    // 2. Refを初期化
     previewStateRef.current = initialPS;
     variablesRef.current = {};
+    interactionTimerRef.current = Date.now(); // ★ タイマー初期化
 
-    // 3. ストアをセット
     set({
       previewState: initialPS,
       variables: {},
       activeListeners: new Map(),
     });
+
+    // 古い計測開始コードは削除
   },
 
   stopPreview: () => {
@@ -181,27 +180,26 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
       return;
     }
 
-    // 1. (外部ストア) PageStore の選択ページIDを更新
     usePageStore.getState().setSelectedPageId(targetPageId);
 
-    // 2. (内部ストア) プレビュー状態をリセット
     const initialPS: PreviewState = { currentPageId: targetPageId, isFinished: false };
     targetPageData.placedItems.forEach(item => {
       const isVisible = item.data.initialVisibility !== false;
-
-      // ★ ミニチュア方式: 常にPC座標のみ使用
       const initialX = item.x;
       const initialY = item.y;
-
       initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
 
-    // Refも更新（triggerEventがこちらを参照するため重要）
     previewStateRef.current = initialPS;
+
+    // ★ ページ遷移時にタイマーリセット（前のページの最後の思考時間は遷移トリガーのアクションで記録済み）
+    interactionTimerRef.current = Date.now();
 
     set({
       previewState: initialPS,
     });
+
+    // 古い計測開始コードは削除
   },
 
   handleVariableChangeFromItem: (variableName, value) => {
@@ -215,17 +213,64 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     const currentPage = pages[selectedPageId!];
     if (!currentPage) return;
 
+    // ★ 思考時間 (Thinking Time) の計測とログ記録
+    // ユーザー操作 (click, input completion) のみを対象とする
+    if (eventName === 'click' || eventName === 'onInputComplete') {
+      const now = Date.now();
+      const durationMs = now - interactionTimerRef.current;
+      interactionTimerRef.current = now; // タイマーリセット
+
+      // 除外ルールの適用
+      // 1. 極端に短い (100ms未満) -> ノイズ
+      // 2. 極端に長い (30分以上) -> 除外
+      if (durationMs < 1800000) { // 30分未満
+        let thinkingPattern: 'intuitive' | 'normal' | 'hesitation' | 'noise' = 'normal';
+
+        if (durationMs < 100) {
+          thinkingPattern = 'noise';
+        } else if (durationMs < 2500) {
+          thinkingPattern = 'intuitive';
+        } else if (durationMs < 8000) {
+          thinkingPattern = 'normal';
+        } else {
+          thinkingPattern = 'hesitation';
+        }
+
+        // ノイズ以外、またはノイズも記録して分析側で弾く方針なら記録
+        // 仕様では「記録はするがundefinedまたはnoise」とのこと
+
+        // ページ名・ノード名の解決
+        let nodeName = originItemId;
+        const item = currentPage.placedItems.find(i => i.id === originItemId);
+        if (item) {
+          nodeName = item.data?.text || item.name;
+        }
+
+        logAnalyticsEvent('interaction', {
+          nodeId: originItemId,
+          nodeType: 'interaction', // イベントタイプとして使用
+          metadata: {
+            event_name: eventName,
+            duration_ms: durationMs,
+            thinking_pattern: thinkingPattern,
+            page_id: selectedPageId,
+            page_name: currentPage.name,
+            node_name: nodeName,
+          }
+        });
+      }
+    }
+
     const { placedItems, allItemLogics } = currentPage;
 
-    // ★ 全ロジックグラフをスキャンするように変更
-    // (特定のアイテムだけでなく、他のアイテムのロジック内に定義されたイベントハンドラも発火させるため)
+    // 古い計測終了コードは削除
+
     Object.entries(allItemLogics).forEach(([logicOwnerId, targetGraph]) => {
-      // グラフが存在し、ノードが含まれている場合のみ実行
       if (targetGraph && targetGraph.nodes.length > 0) {
         triggerEvent(
           eventName,
           originItemId,
-          logicOwnerId, // ★第三引数として logicOwnerId を渡す (logicEngine側も修正が必要)
+          logicOwnerId,
           targetGraph,
           placedItems,
           () => previewStateRef.current,
@@ -240,48 +285,9 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     });
   },
 
-  // ノード滞在時間計測開始
-  startNodeExecution: (nodeId, nodeType) => {
-    set({
-      currentNodeExecution: {
-        nodeId,
-        nodeType,
-        startTime: Date.now(),
-      }
-    });
-  },
-
-  // ノード滞在時間計測終了
-  endNodeExecution: () => {
-    const state = get();
-    if (!state.currentNodeExecution) return;
-
-    const { nodeId, nodeType, startTime } = state.currentNodeExecution;
-    const endTime = Date.now();
-    const durationMs = endTime - startTime;
-
-    // 滞在時間の分類
-    const isQuickDecision = durationMs < 3000;      // 3秒以内の即断
-    const isDeepThinking = durationMs > 10000;      // 10秒以上の熟考
-    const isAnomaly = durationMs > 180000;          // 3分以上の異常な長時間
-
-    // ログ記録
-    logAnalyticsEvent('node_execution', {
-      nodeId,
-      nodeType,
-      metadata: {
-        started_at: new Date(startTime).toISOString(),
-        ended_at: new Date(endTime).toISOString(),
-        duration_ms: durationMs,
-        is_quick_decision: isQuickDecision,
-        is_deep_thinking: isDeepThinking,
-        is_anomaly: isAnomaly,
-      }
-    });
-
-    // 計測状態をクリア
-    set({ currentNodeExecution: null });
-  },
+  // 古い計測メソッドは空の実装にするか警告を出す（インターフェース維持のため）
+  startNodeExecution: (nodeId, nodeType) => { /* Deprecated */ },
+  endNodeExecution: () => { /* Deprecated */ },
 
   // エンゲージメントスコア加算
   addScore: (nodeId, nodeType, scoreValue, reason) => {

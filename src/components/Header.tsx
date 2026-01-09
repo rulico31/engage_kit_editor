@@ -1,9 +1,9 @@
 import React from "react";
 import "./Header.css";
 import type { ViewMode } from "../types";
-import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
+// import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePageStore } from "../stores/usePageStore";
-import { usePreviewStore } from "../stores/usePreviewStore";
+// import { usePreviewStore } from "../stores/usePreviewStore";
 import { useAuthStore } from "../stores/useAuthStore";
 
 interface HeaderProps {
@@ -31,6 +31,7 @@ const IconRedo = () => (
   </svg>
 );
 
+/*
 const IconDesktop = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" />
@@ -42,6 +43,7 @@ const IconMobile = () => (
     <rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" />
   </svg>
 );
+*/
 
 const IconHome = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -99,10 +101,16 @@ const Header: React.FC<HeaderProps> = ({
     canRedo: state.canRedo
   }));
 
+  /* Unused due to hidden device switcher
   const { user, signOut } = useAuthStore();
 
   const isMobileView = useEditorSettingsStore((state) => state.isMobileView);
   const setIsMobileView = useEditorSettingsStore((state) => state.setIsMobileView);
+  */
+  const { user, signOut } = useAuthStore();
+
+  // const isMobileView = useEditorSettingsStore((state) => state.isMobileView);
+  // const setIsMobileView = useEditorSettingsStore((state) => state.setIsMobileView);
 
   // デバッグ: userの状態を確認
   console.log('Header - user:', user);
@@ -163,15 +171,14 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* 右側：アクション */}
       <div className="header-right">
-        {/* Device Switcher */}
+        {/* Device Switcher (Hidden) */}
+        {/*
         <div className="device-switcher-group">
           <button
             className={`device-switch-btn ${!isMobileView ? 'active' : ''}`}
             onClick={() => {
-              // PCモードへ切り替え
-              if (!isMobileView) return; // 既にPCなら何もしない
+              if (!isMobileView) return;
               setIsMobileView(false);
-
               if (isPreviewing) {
                 usePreviewStore.getState().updateLayoutForViewMode(false);
               }
@@ -183,16 +190,9 @@ const Header: React.FC<HeaderProps> = ({
           <button
             className={`device-switch-btn ${isMobileView ? 'active' : ''}`}
             onClick={() => {
-              // モバイルモードへ切り替え
-              if (isMobileView) return; // 既にモバイルなら何もしない
-
-              // 1. レイアウト自動計算（未設定アイテムのみ）
+              if (isMobileView) return;
               usePageStore.getState().syncMobileLayouts();
-
-              // 2. ビュー切り替え
               setIsMobileView(true);
-
-              // 3. プレビュー中はレイアウト更新
               if (isPreviewing) {
                 usePreviewStore.getState().updateLayoutForViewMode(true);
               }
@@ -202,6 +202,7 @@ const Header: React.FC<HeaderProps> = ({
             <IconMobile />
           </button>
         </div>
+        */}
 
         <button className="icon-button-ghost" onClick={onSave} title="下書き保存">
           <IconCloud />

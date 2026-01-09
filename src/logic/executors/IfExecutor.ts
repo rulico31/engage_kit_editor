@@ -2,6 +2,7 @@ import type { Node } from "reactflow";
 import type { NodeExecutor, ExecutionResult, RuntimeState } from "../NodeExecutor";
 import type { LogicRuntimeContext } from "../../logicEngine";
 import { findNextNodes, resolveTriggerItem } from "../NodeExecutor";
+import { usePreviewStore } from "../../stores/usePreviewStore";
 
 interface IfNodeData {
     conditionSource?: 'item' | 'variable';
@@ -44,6 +45,9 @@ export class IfExecutor implements NodeExecutor<IfNodeData> {
             comparison,
             comparisonValue
         });
+
+        // ノード滞在時間計測開始
+        usePreviewStore.getState().startNodeExecution(node.id, 'IfNode');
 
         let conditionResult = false;
 
@@ -101,6 +105,9 @@ export class IfExecutor implements NodeExecutor<IfNodeData> {
                 variableName
             }
         });
+
+        // 滞在時間計測終了
+        usePreviewStore.getState().endNodeExecution();
 
         return {
             nextNodes: findNextNodes(node.id, conditionResult ? "true" : "false", state.allEdges)

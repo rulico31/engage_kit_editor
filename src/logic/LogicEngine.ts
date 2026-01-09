@@ -11,6 +11,7 @@ import { SetVariableExecutor } from "./executors/SetVariableExecutor";
 import { DelayExecutor } from "./executors/DelayExecutor";
 import { AnimateExecutor } from "./executors/AnimateExecutor";
 
+
 import { ABTestExecutor } from "./executors/ABTestExecutor";
 import { SubmitFormExecutor, ExternalApiExecutor } from "./executors/NetworkExecutor";
 
@@ -80,13 +81,6 @@ export class LogicEngine {
         for (const nodeId of executionQueue) {
             const node = allNodes.find((n) => n.id === nodeId);
             if (!node) continue;
-
-            // Log execution
-            context.logEvent('node_execution', {
-                nodeId: node.id,
-                nodeType: node.type,
-                metadata: { label: node.data.label }
-            });
 
             try {
                 const executor = this.executors.get(node.type || '');

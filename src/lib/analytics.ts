@@ -31,6 +31,8 @@ export type AnalyticsEventType =
   | 'interaction'     // ユーザー操作 (クリックなど)
   | 'score_change'    // エンゲージメントスコア変更
   | 'backtracking'    // バックトラッキング（戻る操作）
+  | 'input_correction' // 入力修正（バックスペース・削除検知 - 旧）
+  | 'input_analysis'   // 入力心理分析（新）
   | 'error';          // ランタイムエラー
 
 /**

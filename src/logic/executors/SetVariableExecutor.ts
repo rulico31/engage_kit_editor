@@ -2,11 +2,17 @@ import type { Node } from "reactflow";
 import type { NodeExecutor, ExecutionResult, RuntimeState } from "../NodeExecutor";
 import type { LogicRuntimeContext } from "../../logicEngine";
 import { findNextNodes } from "../NodeExecutor";
+import { usePreviewStore } from "../../stores/usePreviewStore";
 
 interface SetVariableNodeData {
+    operationMode?: 'variable' | 'score';
+    // 変数モード用
     variableName?: string;
     operation?: 'set' | 'add';
     value?: string | number;
+    // スコアモード用
+    scoreValue?: number;
+    scoringReason?: string;
 }
 
 /**
@@ -18,16 +24,38 @@ export class SetVariableExecutor implements NodeExecutor<SetVariableNodeData> {
         context: LogicRuntimeContext,
         state: RuntimeState
     ): Promise<ExecutionResult> {
-        const { variableName, operation = 'set', value } = node.data;
+        const { operationMode = 'variable', variableName, operation = 'set', value, scoreValue, scoringReason } = node.data;
 
         console.log('📊 変数セットノード実行', {
             nodeId: node.id,
+            operationMode,
             variableName,
             operation,
-            value
+            value,
+            scoreValue,
+            scoringReason
         });
 
-        if (variableName) {
+        // ★ スコアモードの場合
+        if (operationMode === 'score') {
+            const score = scoreValue || 0;
+            const reason = scoringReason || '';
+
+            usePreviewStore.getState().addScore(
+                node.id,
+                'setVariableNode',
+                score,
+                reason
+            );
+
+            console.log('✅ エンゲージメントスコア加算完了', {
+                nodeId: node.id,
+                scoreValue: score,
+                reason
+            });
+        }
+        // ★ 変数モードの場合（従来の処理）
+        else if (variableName) {
             const currentVars = state.getVariables();
             let newValue = value;
 

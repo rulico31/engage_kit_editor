@@ -1,43 +1,39 @@
-/**
- * InputTracker - テキスト入力の書き直し検知クラス
- * ユーザーの迷いや修正行動を追跡し、心理状態を推定
- * 
- * IME対応: 日本語入力時の変換中キーストロークを分離カウント
- */
-
-export interface InputCorrectionData {
-    input_correction_count: number;    // バックスペース・削除キーの合計回数
-    backspace_count: number;           // バックスペースキーのみの回数
-    delete_count: number;              // Deleteキーのみの回数
-    major_deletion_count: number;      // 大幅削除（50%以上）の回数
-    paste_count: number;               // ペースト操作の回数
-    max_char_length: number;           // 途中での最大文字数
-    final_char_length: number;         // 最終的な文字数
-    max_char_delta: number;            // 最大文字数と最終文字数の差
-    input_duration_ms: number;         // 入力フォーカスから送信までの時間
-    average_typing_speed: number;      // 平均入力速度（文字/秒）
-    hesitation_score: number;          // 迷いスコア（0-100、高いほど迷っている）
-    first_value?: string;              // 最初に入力した値（削除前）
-    final_value: string;               // 最終的な入力値
-    ime_backspace_count: number;       // IME変換中のバックスペース回数（別カウント）
-    ime_delete_count: number;          // IME変換中のDelete回数（別カウント）
+export interface InputAnalysisReport {
+    metrics: {
+        exploration: number;      // 探索スコア
+        reversal: number;         // 転換スコア
+        confidence: number;       // 確信スコア
+        hesitation_score: number; // 総合迷い指数
+    };
+    raw: {
+        correction_count: number;
+        major_deletion_count: number;
+        paste_count: number;
+        max_char_length: number;
+        final_char_length: number;
+        max_char_delta: number;
+        input_duration_ms: number;
+        first_value?: string;
+        original_value?: string;  // 修正前の最大長の値
+        final_value: string;
+    };
 }
 
 export class InputTracker {
-    private backspaceCount = 0;
-    private deleteCount = 0;
+    private correctionCount = 0; // Backspace / Delete (IME除く)
     private majorDeletionCount = 0;
     private pasteCount = 0;
     private maxCharLength = 0;
+    private maxLengthValue = "";
     private currentLength = 0;
-    private startTime = Date.now();
+    private startTime = 0;
+    private hasStarted = false;
     private firstValue: string | null = null;
     private previousLength = 0;
 
     // IME対応
     private isComposing = false;
-    private imeBackspaceCount = 0;
-    private imeDeleteCount = 0;
+    private lastInputValue = "";
 
     /**
      * IME変換開始イベント
@@ -48,9 +44,28 @@ export class InputTracker {
 
     /**
      * IME変換終了イベント
+     * @param data - 確定された文字列
      */
-    onCompositionEnd() {
+    onCompositionEnd(data: string) {
         this.isComposing = false;
+
+        // IME確定時の文字列で各種値を更新
+        // firstValueが未設定なら、最初の確定文字列を設定
+        if (this.firstValue === null && data.length > 0) {
+            this.firstValue = data;
+        }
+
+        // IME確定時に最大文字数を更新
+        if (this.currentLength > this.maxCharLength) {
+            this.maxCharLength = this.currentLength;
+            this.maxLengthValue = this.lastInputValue;
+        }
+
+        // 入力開始時刻の記録（IME経由で最初に入力された場合）
+        if (!this.hasStarted) {
+            this.startTime = Date.now();
+            this.hasStarted = true;
+        }
     }
 
     /**
@@ -59,26 +74,20 @@ export class InputTracker {
      * @param currentValue - 現在の入力値
      */
     onKeyDown(e: KeyboardEvent, currentValue: string) {
-        this.currentLength = currentValue.length;
-
-        // バックスペース検知
-        if (e.key === 'Backspace') {
-            if (this.isComposing) {
-                // 変換中のバックスペースは別カウント
-                this.imeBackspaceCount++;
-            } else {
-                // 通常のバックスペースは迷いとしてカウント
-                this.backspaceCount++;
-            }
+        // 入力開始時刻の記録
+        if (!this.hasStarted) {
+            this.startTime = Date.now();
+            this.hasStarted = true;
         }
 
-        // Delete検知
-        if (e.key === 'Delete') {
-            if (this.isComposing) {
-                this.imeDeleteCount++;
-            } else {
-                this.deleteCount++;
-            }
+        this.currentLength = currentValue.length;
+
+        // IME変換中はカウントしない
+        if (this.isComposing) return;
+
+        // バックスペース・Delete検知
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            this.correctionCount++;
         }
 
         // ペースト検知
@@ -92,14 +101,25 @@ export class InputTracker {
      * @param currentValue - 現在の入力値
      */
     onInput(currentValue: string) {
-        // 初回入力を記録
-        if (this.firstValue === null && currentValue.length > 0) {
-            this.firstValue = currentValue;
+        // 入力開始時刻の記録（マウス操作などで入力された場合）
+        if (!this.hasStarted) {
+            this.startTime = Date.now();
+            this.hasStarted = true;
         }
 
-        // 最大文字数更新
-        if (currentValue.length > this.maxCharLength) {
-            this.maxCharLength = currentValue.length;
+        this.lastInputValue = currentValue;
+
+        if (!this.isComposing) {
+            // 初回入力を記録
+            if (this.firstValue === null && currentValue.length > 0) {
+                this.firstValue = currentValue;
+            }
+
+            // 最大文字数更新
+            if (currentValue.length > this.maxCharLength) {
+                this.maxCharLength = currentValue.length;
+                this.maxLengthValue = currentValue;
+            }
         }
 
         // 大幅削除検知（前回から50%以上減少）
@@ -108,58 +128,81 @@ export class InputTracker {
         }
 
         this.previousLength = currentValue.length;
+        this.currentLength = currentValue.length;
     }
 
     /**
-     * 最終レポート取得
+     * レポート生成
      * @param finalValue - 最終的な入力値
-     * @returns 入力修正データ
      */
-    getReport(finalValue: string): InputCorrectionData {
-        const duration = Date.now() - this.startTime;
+    getReport(finalValue: string): InputAnalysisReport {
+        const endTime = Date.now();
+        const durationMs = this.hasStarted ? (endTime - this.startTime) : 0;
+        const durationSec = durationMs / 1000;
         const totalChars = finalValue.length;
+        const lengthDelta = Math.max(0, this.maxCharLength - totalChars);
 
-        // 迷いスコア計算（0-100）
-        // 通常のバックスペース・削除のみをカウント（IME変換中は除外）
-        const correctionScore = (this.backspaceCount + this.deleteCount) * 2;
-        const deletionScore = this.majorDeletionCount * 10;
-        const deltaScore = (this.maxCharLength - totalChars) * 0.5;
-        const hesitationScore = Math.min(100, correctionScore + deletionScore + deltaScore);
+        // --- 心理指標計算 (The 3 Axes) ---
+
+        // A. Exploration (探索): 修正の手数と時間の経過
+        let exploration = (this.correctionCount * 1.5);
+        if (durationSec > 10) {
+            exploration += (durationSec - 10) * 0.5;
+        }
+
+        // B. Reversal (転換): 全削除等の大幅削除と、書いてから削った文字数
+        let reversal = (this.majorDeletionCount * 30);
+        reversal += Math.min(lengthDelta, 50);
+
+        // C. Confidence (確信): ペーストや修正ゼロでの完走
+        let confidence = 0;
+        if (this.pasteCount > 0) confidence += 30;
+        if (this.correctionCount === 0 && durationSec > 0) confidence += 20;
+
+        // --- 総合指標: Hesitation Score ---
+        // Hesitation = (Exploration * 0.4) + (Reversal * 0.6) - (Confidence * 0.5)
+        let hesitationScore = (exploration * 0.4) + (reversal * 0.6) - (confidence * 0.5);
+
+        // 正規化 (0-100)
+        hesitationScore = Math.max(0, Math.min(100, Math.round(hesitationScore)));
 
         return {
-            input_correction_count: this.backspaceCount + this.deleteCount,
-            backspace_count: this.backspaceCount,
-            delete_count: this.deleteCount,
-            major_deletion_count: this.majorDeletionCount,
-            paste_count: this.pasteCount,
-            max_char_length: this.maxCharLength,
-            final_char_length: totalChars,
-            max_char_delta: this.maxCharLength - totalChars,
-            input_duration_ms: duration,
-            average_typing_speed: duration > 0 ? (totalChars / duration) * 1000 : 0,
-            hesitation_score,
-            first_value: this.firstValue || undefined,
-            final_value: finalValue,
-            ime_backspace_count: this.imeBackspaceCount,
-            ime_delete_count: this.imeDeleteCount,
+            metrics: {
+                exploration: Math.round(exploration * 10) / 10,
+                reversal: Math.round(reversal * 10) / 10,
+                confidence: Math.round(confidence * 10) / 10,
+                hesitation_score: hesitationScore,
+            },
+            raw: {
+                correction_count: this.correctionCount,
+                major_deletion_count: this.majorDeletionCount,
+                paste_count: this.pasteCount,
+                max_char_length: this.maxCharLength,
+                final_char_length: totalChars,
+                max_char_delta: lengthDelta,
+                input_duration_ms: durationMs,
+                first_value: this.firstValue || undefined,
+                original_value: this.maxLengthValue || undefined,
+                final_value: finalValue,
+            }
         };
     }
 
     /**
-     * トラッカーをリセット（新しい入力フィールド用）
+     * トラッカーをリセット
      */
     reset() {
-        this.backspaceCount = 0;
-        this.deleteCount = 0;
+        this.correctionCount = 0;
         this.majorDeletionCount = 0;
         this.pasteCount = 0;
         this.maxCharLength = 0;
+        this.maxLengthValue = "";
         this.currentLength = 0;
         this.startTime = Date.now();
+        this.hasStarted = false;
         this.firstValue = null;
         this.previousLength = 0;
         this.isComposing = false;
-        this.imeBackspaceCount = 0;
-        this.imeDeleteCount = 0;
+        this.lastInputValue = "";
     }
 }

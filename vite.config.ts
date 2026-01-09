@@ -5,6 +5,9 @@ import { resolve } from 'path'
 export default defineConfig({
   base: './',
   plugins: [react()],
+  optimizeDeps: {
+    include: ['ua-parser-js'],
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

@@ -103,7 +103,10 @@ const App: React.FC = () => {
     const mode = params.get("mode");
 
     if (pid && mode === "view") {
-      setViewerProjectId(pid);
+      // プロジェクトIDから不要なクエリパラメータ部分を除去
+      // 例: "abc-123?utm_source=google" → "abc-123"
+      const cleanProjectId = pid.split('?')[0].trim();
+      setViewerProjectId(cleanProjectId);
       setCurrentRoute("viewer");
     }
   }, []);

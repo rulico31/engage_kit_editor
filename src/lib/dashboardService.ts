@@ -135,6 +135,164 @@ export const fetchProjectStats = async (projectId: string) => {
   };
 };
 
+// --- Phase 4: Extended Analytics ---
+
+export interface ThinkingTimeStat {
+  pattern: 'intuitive' | 'normal' | 'hesitation' | 'noise';
+  count: number;
+  percentage: number;
+}
+
+export interface InputAnalyticsStat {
+  nodeId: string;
+  nodeName: string; // metadata.item_name
+  avgExploration: number;
+  avgReversal: number;
+  avgConfidence: number;
+  avgHesitation: number;
+  sampleCount: number;
+}
+
+export interface BacktrackStat {
+  fromPage: string;
+  toPage: string;
+  count: number;
+}
+
+export interface ExtendedStats {
+  thinkingTime: ThinkingTimeStat[];
+  inputAnalytics: InputAnalyticsStat[];
+  backtracks: BacktrackStat[];
+  engagementDistribution: { range: string; count: number }[];
+}
+
+/**
+ * 詳細分析データの取得（心理分析・フロー）
+ * 現時点ではRawログを取得してクライアント集計する
+ */
+export const fetchExtendedStats = async (projectId: string): Promise<ExtendedStats> => {
+  if (!projectId || projectId.startsWith('local-')) {
+    return { thinkingTime: [], inputAnalytics: [], backtracks: [], engagementDistribution: [] };
+  }
+
+  // 1. 思考時間データの取得 (interaction イベント)
+  const { data: interactionLogs } = await supabase
+    .from('analytics_logs')
+    .select('metadata')
+    .eq('project_id', projectId)
+    .eq('event_type', 'interaction');
+
+  const thinkingTimeCounts: Record<string, number> = { intuitive: 0, normal: 0, hesitation: 0, noise: 0 };
+  (interactionLogs || []).forEach((log: any) => {
+    const pattern = log.metadata?.thinking_pattern || 'normal';
+    if (thinkingTimeCounts[pattern] !== undefined) {
+      thinkingTimeCounts[pattern]++;
+    }
+  });
+
+  const totalInteractions = Object.values(thinkingTimeCounts).reduce((a, b) => a + b, 0);
+  const thinkingTimeStats: ThinkingTimeStat[] = Object.entries(thinkingTimeCounts).map(([pattern, count]) => ({
+    pattern: pattern as any,
+    count,
+    percentage: totalInteractions > 0 ? (count / totalInteractions) * 100 : 0
+  }));
+
+  // 2. 入力心理データの取得 (input_analysis イベント)
+  const { data: inputLogs } = await supabase
+    .from('analytics_logs')
+    .select('node_id, metadata')
+    .eq('project_id', projectId)
+    .eq('event_type', 'input_analysis'); // 古い input_correction は無視
+
+  const inputMap = new Map<string, { name: string; exp: number; rev: number; conf: number; hes: number; count: number }>();
+
+  (inputLogs || []).forEach((log: any) => {
+    const nodeId = log.node_id;
+    const meta = log.metadata;
+    const metrics = meta?.metrics;
+
+    // metricsがない場合（古い形式など）はスキップ
+    if (!metrics) return;
+
+    const current = inputMap.get(nodeId) || {
+      name: meta.item_name || nodeId,
+      exp: 0, rev: 0, conf: 0, hes: 0, count: 0
+    };
+
+    current.exp += (metrics.exploration || 0);
+    current.rev += (metrics.reversal || 0);
+    current.conf += (metrics.confidence || 0);
+    current.hes += (metrics.hesitation_score || 0);
+    current.count++;
+
+    inputMap.set(nodeId, current);
+  });
+
+  const inputStats: InputAnalyticsStat[] = Array.from(inputMap.entries()).map(([nodeId, val]) => ({
+    nodeId,
+    nodeName: val.name,
+    avgExploration: val.exp / val.count,
+    avgReversal: val.rev / val.count,
+    avgConfidence: val.conf / val.count,
+    avgHesitation: val.hes / val.count,
+    sampleCount: val.count
+  })).sort((a, b) => b.avgHesitation - a.avgHesitation); // 迷いが高い順
+
+  // 3. バックトラッキングの取得
+  const { data: backtrackLogs } = await supabase
+    .from('analytics_logs')
+    .select('metadata')
+    .eq('project_id', projectId)
+    .eq('event_type', 'backtracking');
+
+  const backtrackMap = new Map<string, number>();
+  (backtrackLogs || []).forEach((log: any) => {
+    const from = log.metadata?.from_page_name || 'Unknown';
+    const to = log.metadata?.to_page_name || 'Unknown';
+    const key = `${from} → ${to}`;
+    backtrackMap.set(key, (backtrackMap.get(key) || 0) + 1);
+  });
+
+  const backtrackStats: BacktrackStat[] = Array.from(backtrackMap.entries())
+    .map(([key, count]) => {
+      const [fromPage, toPage] = key.split(' → ');
+      return { fromPage, toPage, count };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  // 4. エンゲージメントスコア分布 (leadsテーブルから最新スコアを取得)
+  const { data: leads } = await supabase
+    .from('leads')
+    .select('engagement_score')
+    .eq('project_id', projectId);
+
+  const scoreRanges = {
+    '0-20 (Cold)': 0,
+    '21-50 (Warm)': 0,
+    '51-80 (Hot)': 0,
+    '81+ (Super Hot)': 0
+  };
+
+  (leads || []).forEach((l: any) => {
+    const score = l.engagement_score || 0;
+    if (score <= 20) scoreRanges['0-20 (Cold)']++;
+    else if (score <= 50) scoreRanges['21-50 (Warm)']++;
+    else if (score <= 80) scoreRanges['51-80 (Hot)']++;
+    else scoreRanges['81+ (Super Hot)']++;
+  });
+
+  const engagementDistribution = Object.entries(scoreRanges).map(([range, count]) => ({
+    range, count
+  }));
+
+  return {
+    thinkingTime: thinkingTimeStats,
+    inputAnalytics: inputStats,
+    backtracks: backtrackStats,
+    engagementDistribution
+  };
+};
+
 /**
  * リードデータをCSV形式に変換してダウンロード
  */

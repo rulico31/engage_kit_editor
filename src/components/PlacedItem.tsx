@@ -1,9 +1,11 @@
-// src/components/PreviewItem.tsx
+// src/components/PlacedItem.tsx
 
 import React, { useState, useEffect } from "react";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./PreviewItem.css";
 import { usePreviewStore } from "../stores/usePreviewStore";
+import { InputTracker } from "../lib/InputTracker";
+import { logAnalyticsEvent } from "../lib/analytics";
 
 interface PreviewItemProps {
   item: PlacedItemType;
@@ -25,6 +27,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   const variableName = item.data.variableName || "";
   const [inputValue, setInputValue] = useState("");
+  const [inputTracker] = useState(() => new InputTracker()); // InputTrackerインスタンス
 
   useEffect(() => {
     if (variableName && variables[variableName] !== undefined) {
@@ -71,14 +74,55 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         className="preview-input-content"
         placeholder={item.data.placeholder || "入力してください"}
         value={inputValue}
+        onCompositionStart={() => inputTracker.onCompositionStart()}
+        onCompositionEnd={() => inputTracker.onCompositionEnd()}
         onChange={(e) => {
-          setInputValue(e.target.value);
-          onVariableChange(variableName, e.target.value);
+          const newValue = e.target.value;
+          setInputValue(newValue);
+          inputTracker.onInput(newValue);
+          onVariableChange(variableName, newValue);
         }}
         onBlur={() => {
+          console.log('🔍 [PlacedItem] onBlur called', {
+            id,
+            name,
+            inputValue,
+            inputTrackerState: inputTracker
+          });
+
+          // InputTrackerのレポートを取得してログ記録
+          const report = inputTracker.getReport(inputValue);
+          console.log('🔍 [PlacedItem] InputTracker report:', report);
+
+          // Supabaseに入力修正データを記録
+          const shouldLog = inputValue.length > 0 || report.input_correction_count > 0;
+
+          if (shouldLog) {
+            console.log('🔍 [PlacedItem] Calling logAnalyticsEvent...', {
+              eventType: 'input_correction',
+              nodeId: id
+            });
+
+            logAnalyticsEvent('input_correction', {
+              nodeId: id,
+              nodeType: 'text_input',
+              metadata: {
+                ...report,
+                item_name: name,
+              }
+            }).then(() => {
+              console.log('✅ [PlacedItem] logAnalyticsEvent promise resolved');
+            }).catch(err => {
+              console.error('❌ [PlacedItem] logAnalyticsEvent failed:', err);
+            });
+          } else {
+            console.log('⚠️ [PlacedItem] Skipping log: No input or correction detected');
+          }
+
           onItemEvent("onInputComplete", id);
         }}
         onKeyDown={(e) => {
+          inputTracker.onKeyDown(e.nativeEvent, inputValue);
           if (e.key === "Enter") {
             e.currentTarget.blur();
           }

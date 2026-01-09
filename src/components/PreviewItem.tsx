@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./PreviewItem.css";
 import { usePreviewStore } from "../stores/usePreviewStore";
+import { InputTracker } from "../lib/InputTracker";
+import { logAnalyticsEvent } from "../lib/analytics";
 
 interface PreviewItemProps {
   item: PlacedItemType;
@@ -33,6 +35,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   const variableName = item.data.variableName || item.id;
   const [inputValue, setInputValue] = useState("");
+  const [inputTracker] = useState(() => new InputTracker()); // InputTrackerインスタンス
 
   useEffect(() => {
     if (variableName && variables[variableName] !== undefined) {
@@ -143,6 +146,42 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   }, [inputValue, error, item.data.inputType, item.data.required]);
 
   const handleBlur = () => {
+    console.log('🔍 [PreviewItem] handleBlur called', {
+      id,
+      name,
+      inputValue,
+      inputTrackerState: inputTracker
+    });
+
+    // InputTrackerのレポートを取得してログ記録（バリデーション結果に関係なく記録）
+    const report = inputTracker.getReport(inputValue);
+    console.log('🔍 [PreviewItem] InputTracker report:', report);
+
+    // ★ Supabaseに入力修正データを記録（入力があった場合のみ）
+    const shouldLog = inputValue.length > 0 || report.input_correction_count > 0;
+
+    if (shouldLog) {
+      console.log('🔍 [PreviewItem] Calling logAnalyticsEvent...', {
+        eventType: 'input_correction',
+        nodeId: id
+      });
+
+      logAnalyticsEvent('input_correction', {
+        nodeId: id,
+        nodeType: 'text_input',
+        metadata: {
+          ...report,
+          item_name: name,
+        }
+      }).then(() => {
+        console.log('✅ [PreviewItem] logAnalyticsEvent promise resolved');
+      }).catch(err => {
+        console.error('❌ [PreviewItem] logAnalyticsEvent failed:', err);
+      });
+    } else {
+      console.log('⚠️ [PreviewItem] Skipping log: No input or correction detected');
+    }
+
     // バリデーションを実行し、成功した場合のみ完了イベントを発火
     const isValid = validate(inputValue);
     if (isValid) {
@@ -217,19 +256,24 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
           }}
           placeholder={placeholder}
           value={inputValue}
+          onCompositionStart={() => inputTracker.onCompositionStart()}
+          onCompositionEnd={() => inputTracker.onCompositionEnd()}
           onChange={(e) => {
-            setInputValue(e.target.value);
-            onVariableChange(variableName, e.target.value);
+            const newValue = e.target.value;
+            setInputValue(newValue);
+            inputTracker.onInput(newValue);
+            onVariableChange(variableName, newValue);
             // 入力中にエラーをクリアするか？ UX的にはBlurまで待つのが一般的だが、即座に消すのもあり
-            if (error) validate(e.target.value);
+            if (error) validate(newValue);
           }}
-          onBlur={handleBlur}
           onKeyDown={(e) => {
+            inputTracker.onKeyDown(e.nativeEvent, inputValue);
             if (e.key === "Enter") {
               e.currentTarget.blur();
               // 注意: ここで直接onItemEventを呼ばない。blur()経由でhandleBlurが呼ばれるため。
             }
           }}
+          onBlur={handleBlur}
           onClick={(e) => e.stopPropagation()}
         />
       </>
