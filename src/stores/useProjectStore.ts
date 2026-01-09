@@ -54,7 +54,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   createProject: async (name: string) => {
     set({ isLoading: true, error: null });
     try {
-      const initialData = { ...initialProjectData, projectName: name };
+      const initialData = { ...initialProjectData, projectName: name, version: 1 };
       const { data, error } = await supabase
         .from('projects')
         .insert({ name, data: initialData })
@@ -129,6 +129,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       theme: projectMeta?.data?.theme,
       dataRetentionPeriod: projectMeta?.data?.dataRetentionPeriod,
       deviceType: editorSettings.isMobileView ? 'mobile' : 'desktop', // ★追加: デバイスタイプを保存
+      version: 1, // ★追加: 常にバージョン1として保存
       ...dataOverrides // ★ここで上書きデータをマージ
     };
 

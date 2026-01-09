@@ -1,0 +1,15 @@
+
+> engage-kit-editor@0.1.2 build:viewer
+> tsc && vite build --config vite.config.viewer.ts
+
+[36mvite v7.1.12 [32mbuilding for production...[36m[39m
+transforming...
+[32m笨・[39m 34 modules transformed.
+笨・[39m Build failed in 342ms
+error during build:
+Could not resolve "../logic/triggerEvent" from "src/stores/usePreviewStore.ts"
+file: C:/engage-kit-editor/src/stores/usePreviewStore.ts
+    at getRollupError (file:///C:/engage-kit-editor/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+    at error (file:///C:/engage-kit-editor/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+    at ModuleLoader.handleInvalidResolvedId (file:///C:/engage-kit-editor/node_modules/rollup/dist/es/shared/node-entry.js:21565:24)
+    at file:///C:/engage-kit-editor/node_modules/rollup/dist/es/shared/node-entry.js:21525:26

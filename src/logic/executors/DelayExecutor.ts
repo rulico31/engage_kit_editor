@@ -1,22 +1,8 @@
-import type { Node } from "reactflow";
-import type { NodeExecutor, ExecutionResult, RuntimeState } from "../NodeExecutor";
-import type { LogicRuntimeContext } from "../../logicEngine";
-import { findNextNodes } from "../NodeExecutor";
+import type { NodeExecutor, ExecutionParams } from "../NodeExecutor";
 
-interface DelayNodeData {
-    durationS?: number;
-}
-
-/**
- * Executor for Delay nodes
- * This is an async executor that waits for a specified duration
- */
-export class DelayExecutor implements NodeExecutor<DelayNodeData> {
-    async execute(
-        node: Node<DelayNodeData>,
-        context: LogicRuntimeContext,
-        state: RuntimeState
-    ): Promise<ExecutionResult> {
+export class DelayExecutor implements NodeExecutor {
+    async execute(params: ExecutionParams): Promise<void> {
+        const { node, allEdges, pushNext, processQueue } = params;
         const { durationS = 1.0 } = node.data;
 
         console.log('⏱️ 遅延ノード実行', {
@@ -24,13 +10,19 @@ export class DelayExecutor implements NodeExecutor<DelayNodeData> {
             durationS
         });
 
-        // Wait for the specified duration
-        await new Promise(resolve => setTimeout(resolve, Number(durationS) * 1000));
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                console.log('✅ 遅延完了', { nodeId: node.id, durationS });
+                const nextQueue: string[] = [];
+                pushNext(node.id, null, allEdges, nextQueue);
 
-        console.log('✅ 遅延完了', { nodeId: node.id, durationS });
-
-        return {
-            nextNodes: findNextNodes(node.id, null, state.allEdges)
-        };
+                // 再帰的に次のノードを実行
+                if (nextQueue.length > 0) {
+                    processQueue(nextQueue).then(() => resolve());
+                } else {
+                    resolve();
+                }
+            }, Number(durationS) * 1000);
+        });
     }
 }

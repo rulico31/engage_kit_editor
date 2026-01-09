@@ -7,7 +7,7 @@ import type {
 
 } from '../types';
 import { type ActiveListeners, type LogicRuntimeContext } from '../logicEngine';
-import { triggerEvent } from '../logic/triggerEvent'; // ★ 新しいLogicEngine実装を使用
+import { triggerEvent } from "../logicEngine"; // ★ 新しいLogicEngine実装を使用
 import { usePageStore } from './usePageStore';
 import { logAnalyticsEvent } from '../lib/analytics';
 import { submitLeadData } from '../lib/leads';
@@ -286,7 +286,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   },
 
   // 古い計測メソッドは空の実装にするか警告を出す（インターフェース維持のため）
-  startNodeExecution: (nodeId, nodeType) => { /* Deprecated */ },
+  startNodeExecution: (_nodeId, _nodeType) => { /* Deprecated */ },
   endNodeExecution: () => { /* Deprecated */ },
 
   // エンゲージメントスコア加算

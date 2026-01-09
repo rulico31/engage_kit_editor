@@ -1,47 +1,21 @@
-import type { Node } from "reactflow";
-import type { NodeExecutor, ExecutionResult, RuntimeState } from "../NodeExecutor";
-import type { LogicRuntimeContext } from "../../logicEngine";
-import { findNextNodes as findNext, resolveTriggerItem as resolve } from "../NodeExecutor";
+import type { NodeExecutor, ExecutionParams } from "../NodeExecutor";
 
-interface ActionNodeData {
-    targetItemId?: string;
-    mode?: 'show' | 'hide' | 'toggle';
-}
-
-/**
- * Executor for Action nodes (show/hide/toggle items)
- */
-export class ActionExecutor implements NodeExecutor<ActionNodeData> {
-    async execute(
-        node: Node<ActionNodeData>,
-        _context: LogicRuntimeContext,
-        state: RuntimeState
-    ): Promise<ExecutionResult> {
+export class ActionExecutor implements NodeExecutor {
+    async execute(params: ExecutionParams): Promise<void> {
+        const { node, getPreviewState, setPreviewState, triggerItemId, pushNext, allEdges, accumulatedQueue } = params;
         const { targetItemId, mode } = node.data;
 
         console.log('🎬 アクションノード実行', {
             nodeId: node.id,
             targetItemId,
             mode,
-            currentPreviewState: state.getPreviewState(),
-            allVariables: state.getVariables(),
-            triggerItemId: state.triggerItemId,
-            availableItemIds: Object.keys(state.getPreviewState())
         });
 
-        // Resolve TRIGGER_ITEM placeholder
-        const resolvedTargetId = resolve(targetItemId, state.triggerItemId);
+        const resolvedTargetId = targetItemId === 'TRIGGER_ITEM' ? triggerItemId : targetItemId;
 
         if (resolvedTargetId) {
-            const currentState = state.getPreviewState();
+            const currentState = getPreviewState();
             const targetItemState = currentState[resolvedTargetId];
-
-            console.log('🎯 ターゲットアイテム状態 (Resolved)', {
-                targetItemId,
-                resolvedTargetId,
-                targetItemState,
-                exists: !!targetItemState
-            });
 
             if (targetItemState) {
                 let newVisibility = targetItemState.isVisible;
@@ -49,30 +23,18 @@ export class ActionExecutor implements NodeExecutor<ActionNodeData> {
                 else if (mode === "hide") newVisibility = false;
                 else if (mode === "toggle") newVisibility = !targetItemState.isVisible;
 
-                console.log('✨ 表示状態を更新', {
-                    targetItemId: resolvedTargetId,
-                    oldVisibility: targetItemState.isVisible,
-                    newVisibility,
-                    mode
-                });
-
-                state.setPreviewState({
+                setPreviewState({
                     ...currentState,
                     [resolvedTargetId]: { ...targetItemState, isVisible: newVisibility },
                 });
             } else {
-                console.warn('⚠️ ターゲットアイテムが見つかりません', {
-                    resolvedTargetId,
-                    availableItems: JSON.stringify(Object.keys(currentState).filter(k => k !== 'currentPageId' && k !== 'isFinished')),
-                    allItemIds: JSON.stringify(Object.keys(currentState))
-                });
+                console.warn('⚠️ ターゲットアイテムが見つかりません', { resolvedTargetId });
             }
         } else {
-            console.warn('⚠️ targetItemIdが設定されていません', { nodeId: node.id, nodeData: node.data });
+            console.warn('⚠️ targetItemIdが設定されていません', { nodeId: node.id });
         }
 
-        return {
-            nextNodes: findNext(node.id, null, state.allEdges)
-        };
+        // 同期的に次のノードをキューに追加
+        pushNext(node.id, null, allEdges, accumulatedQueue);
     }
 }

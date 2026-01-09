@@ -9,7 +9,9 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE, PATCH, HEAD',
 }
 
-Deno.serve(async (req) => {
+declare const Deno: any;
+
+Deno.serve(async (req: Request) => {
     // CORS Preflight リクエストへの対応（認証不要）
     if (req.method === 'OPTIONS') {
         return new Response('ok', {
@@ -66,7 +68,7 @@ Deno.serve(async (req) => {
             },
         })
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('❌ Proxy error:', error)
         return new Response(JSON.stringify({
             error: error.message || 'Unknown error',

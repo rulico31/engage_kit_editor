@@ -102,6 +102,7 @@ export interface ProjectData {
   theme?: ThemeConfig; // ★追加: テーマ設定
   dataRetentionPeriod?: 'forever' | '1year' | '3months';
   deviceType?: 'mobile' | 'desktop'; // ★追加: デバイスタイプ
+  version?: number; // ★追加: データバージョン
 }
 
 export interface PageInfo {

@@ -1,30 +1,9 @@
-import type { Node } from "reactflow";
-import type { NodeExecutor, ExecutionResult, RuntimeState } from "../NodeExecutor";
-import type { LogicRuntimeContext } from "../../logicEngine";
-import { findNextNodes as findNext, resolveTriggerItem as resolve } from "../NodeExecutor";
+import type { NodeExecutor, ExecutionParams } from "../NodeExecutor";
 
-interface AnimateNodeData {
-    targetItemId?: string;
-    animType?: 'opacity' | 'moveX' | 'moveY' | 'scale' | 'rotate';
-    value?: number;
-    durationS?: number;
-    delayS?: number;
-    easing?: string;
-    animationMode?: 'absolute' | 'relative';
-    loopMode?: 'none' | 'count';
-    loopCount?: number;
-    relativeOperation?: 'multiply' | 'subtract';
-}
+export class AnimateExecutor implements NodeExecutor {
+    async execute(params: ExecutionParams): Promise<void> {
+        const { node, getPreviewState, setPreviewState, placedItems, triggerItemId, pushNext, allEdges, processQueue } = params;
 
-/**
- * Executor for Animate nodes
- */
-export class AnimateExecutor implements NodeExecutor<AnimateNodeData> {
-    async execute(
-        node: Node<AnimateNodeData>,
-        _context: LogicRuntimeContext,
-        state: RuntimeState
-    ): Promise<ExecutionResult> {
         console.log('🎬 アニメーションノード実行', {
             nodeId: node.id,
             nodeData: node.data,
@@ -44,131 +23,124 @@ export class AnimateExecutor implements NodeExecutor<AnimateNodeData> {
             relativeOperation = 'multiply'
         } = node.data;
 
-        // Resolve TRIGGER_ITEM placeholder
-        const resolvedTargetId = resolve(targetItemId, state.triggerItemId);
+        const resolvedTargetId = targetItemId === 'TRIGGER_ITEM' ? triggerItemId : targetItemId;
 
-        if (!resolvedTargetId) {
-            console.warn('⚠️ targetItemIdが設定されていません', { nodeId: node.id });
-            return {
-                nextNodes: findNext(node.id, null, state.allEdges)
-            };
-        }
+        if (resolvedTargetId) {
+            const currentState = getPreviewState();
+            const initialItem = placedItems.find(p => p.id === resolvedTargetId);
 
-        const currentState = state.getPreviewState();
-        const initialItem = state.placedItems.find(p => p.id === resolvedTargetId);
+            if (currentState[resolvedTargetId] && initialItem) {
 
-        // PreviewState にアイテムが存在しない場合はスキップ
-        if (!currentState[resolvedTargetId] || !initialItem) {
-            console.warn('⚠️ ターゲットアイテムが見つかりません', { resolvedTargetId });
-            return {
-                nextNodes: findNext(node.id, null, state.allEdges)
-            };
-        }
-
-        const durationMs = (Number(durationS) + Number(delayS)) * 1000;
-
-        // アニメーション実行関数（Promiseベース）
-        const playAnimation = async (remaining: number): Promise<void> => {
-            return new Promise((resolve) => {
                 let cssProperty = '';
+                const durationMs = (Number(durationS) + Number(delayS)) * 1000;
                 let toState: Partial<any>;
-                const currentItemState = state.getPreviewState()[resolvedTargetId];
 
-                if (animationMode === 'relative') {
-                    const fromState = { ...currentItemState, transition: 'none' };
-                    toState = { ...fromState };
-                    const numValue = Number(value || 0);
+                const playAnimation = (remaining: number) => {
+                    let fromState: any;
+                    // 最新のStateを取得
+                    const currentItemState = getPreviewState()[resolvedTargetId];
 
-                    if (animType === 'opacity') {
-                        cssProperty = 'opacity';
-                        if (relativeOperation === 'subtract') {
-                            toState.opacity = fromState.opacity - numValue;
-                        } else {
-                            toState.opacity = fromState.opacity * numValue;
+                    if (animationMode === 'relative') {
+                        fromState = { ...currentItemState, transition: 'none' };
+                        toState = { ...fromState };
+                        const numValue = Number(value || 0);
+
+                        if (animType === 'opacity') {
+                            cssProperty = 'opacity';
+                            if (relativeOperation === 'subtract') {
+                                toState.opacity = fromState.opacity - numValue;
+                            } else {
+                                toState.opacity = fromState.opacity * numValue;
+                            }
                         }
-                    }
-                    else if (animType === 'moveX') {
-                        cssProperty = 'left';
-                        toState.x = fromState.x + numValue;
-                    }
-                    else if (animType === 'moveY') {
-                        cssProperty = 'top';
-                        toState.y = fromState.y + numValue;
-                    }
-                    else if (animType === 'scale') {
-                        cssProperty = 'transform';
-                        toState.scale = fromState.scale * numValue;
-                    }
-                    else if (animType === 'rotate') {
-                        cssProperty = 'transform';
-                        toState.rotation = fromState.rotation + numValue;
-                    }
+                        else if (animType === 'moveX') {
+                            cssProperty = 'left';
+                            toState.x = fromState.x + numValue;
+                        }
+                        else if (animType === 'moveY') {
+                            cssProperty = 'top';
+                            toState.y = fromState.y + numValue;
+                        }
+                        else if (animType === 'scale') {
+                            cssProperty = 'transform';
+                            toState.scale = fromState.scale * numValue;
+                        }
+                        else if (animType === 'rotate') {
+                            cssProperty = 'transform';
+                            toState.rotation = fromState.rotation + numValue;
+                        }
 
-                    // 1. まず transition: none で開始状態をセット (リセット)
-                    state.setPreviewState({
-                        ...state.getPreviewState(),
-                        [resolvedTargetId]: fromState,
-                    });
-
-                } else {
-                    // 絶対値モード
-                    const fromState = {
-                        ...currentItemState,
-                        transition: 'none',
-                    };
-                    toState = { ...fromState };
-
-                    if (animType === 'opacity') { cssProperty = 'opacity'; toState.opacity = Number(value); }
-                    else if (animType === 'moveX') { cssProperty = 'left'; toState.x = Number(value); }
-                    else if (animType === 'moveY') { cssProperty = 'top'; toState.y = Number(value); }
-                    else if (animType === 'scale') { cssProperty = 'transform'; toState.scale = Number(value); }
-                    else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = Number(value); }
-
-                    // 1. まず transition: none で開始状態をセット (リセット)
-                    state.setPreviewState({
-                        ...state.getPreviewState(),
-                        [resolvedTargetId]: fromState,
-                    });
-                }
-
-                if (!cssProperty) {
-                    resolve();
-                    return;
-                }
-
-                // 2. わずかに遅らせて transition を有効にし、目標値をセット
-                setTimeout(() => {
-                    state.setPreviewState({
-                        ...state.getPreviewState(),
-                        [resolvedTargetId]: {
-                            ...state.getPreviewState()[resolvedTargetId],
-                            ...toState,
-                            transition: `${cssProperty} ${durationS}s ${easing} ${delayS}s`
-                        },
-                    });
-                }, 10);
-
-                // 3. アニメーション終了後の処理
-                setTimeout(() => {
-                    if (loopMode === 'count' && remaining > 1) {
-                        // ループ継続
-                        playAnimation(remaining - 1).then(resolve);
                     } else {
-                        // ループ完了
-                        resolve();
+                        // 絶対値モード
+                        fromState = {
+                            ...currentItemState,
+                            transition: 'none',
+                        };
+                        toState = { ...fromState };
+
+                        if (animType === 'opacity') { cssProperty = 'opacity'; toState.opacity = Number(value); }
+                        else if (animType === 'moveX') { cssProperty = 'left'; toState.x = Number(value); }
+                        else if (animType === 'moveY') { cssProperty = 'top'; toState.y = Number(value); }
+                        else if (animType === 'scale') { cssProperty = 'transform'; toState.scale = Number(value); }
+                        else if (animType === 'rotate') { cssProperty = 'transform'; toState.rotation = Number(value); }
                     }
-                }, durationMs + 20); // 少し余裕を持たせる
-            });
-        };
 
-        // アニメーションを実行（ループ対応）
-        const initialPlays = (loopMode === 'count') ? Number(loopCount) : 1;
-        await playAnimation(initialPlays);
+                    if (!cssProperty) {
+                        pushNext(node.id, null, allEdges, []);
+                        // TODO: pushNext だけでは再帰が進まないので、本来呼び出し元ループに戻るか processQueue する必要がある
+                        // ここでは processQueue を呼ぶ
+                        const nextQ: string[] = [];
+                        pushNext(node.id, null, allEdges, nextQ);
+                        if (nextQ.length > 0) processQueue(nextQ);
+                        return;
+                    }
 
-        console.log('✅ アニメーション完了', { nodeId: node.id, resolvedTargetId });
+                    // 1. まず transition: none で開始状態をセット (リセット)
+                    setPreviewState({
+                        ...getPreviewState(),
+                        [resolvedTargetId]: fromState,
+                    });
 
-        return {
-            nextNodes: findNext(node.id, null, state.allEdges)
-        };
+                    // 2. わずかに遅らせて transition を有効にし、目標値をセット
+                    setTimeout(() => {
+                        setPreviewState({
+                            ...getPreviewState(),
+                            [resolvedTargetId]: {
+                                ...getPreviewState()[resolvedTargetId],
+                                ...toState,
+                                transition: `${cssProperty} ${durationS}s ${easing} ${delayS}s`
+                            },
+                        });
+                    }, 10);
+
+                    // 3. アニメーション終了後の処理 (ループまたは次のノードへ)
+                    setTimeout(() => {
+                        if (loopMode === 'count' && remaining > 1) {
+                            const nextRemaining = remaining - 1;
+                            playAnimation(nextRemaining);
+                        } else {
+                            const nextQueue: string[] = [];
+                            pushNext(node.id, null, allEdges, nextQueue);
+                            if (nextQueue.length > 0) {
+                                processQueue(nextQueue);
+                            }
+                        }
+                    }, durationMs + 20); // 少し余裕を持たせる
+                };
+
+                const initialPlays = (loopMode === 'count') ? Number(loopCount) : 1;
+                playAnimation(initialPlays);
+
+            } else {
+                // ターゲットが見つからない場合はスキップ
+                const nextQueue: string[] = [];
+                pushNext(node.id, null, allEdges, nextQueue);
+                if (nextQueue.length > 0) processQueue(nextQueue);
+            }
+        } else {
+            const nextQueue: string[] = [];
+            pushNext(node.id, null, allEdges, nextQueue);
+            if (nextQueue.length > 0) processQueue(nextQueue);
+        }
     }
 }

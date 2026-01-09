@@ -83,10 +83,10 @@ drop policy if exists "Public can delete projects" on projects;
 
 -- 誰でもプロジェクト作成可能 (匿名ユーザー対応)
 create policy "Public can insert projects" on projects for insert with check (true);
--- 誰でも更新可能 (実運用では所有権チェック推奨だが、現状の仕様に合わせて開放)
-create policy "Public can update projects" on projects for update using (true);
--- 誰でも削除可能 (開発環境用の暫定対応)
-create policy "Public can delete projects" on projects for delete using (true);
+-- 更新は所有者のみ
+create policy "Users can update own projects" on projects for update using (auth.uid() = user_id);
+-- 削除は所有者のみ
+create policy "Users can delete own projects" on projects for delete using (auth.uid() = user_id);
 -- 自分のプロジェクトは見れる
 create policy "Users can view own projects" on projects for select using (auth.uid() = user_id);
 -- 公開プロジェクトは誰でも見れる (Viewer用)

@@ -1,93 +1,51 @@
 import type { Node, Edge } from "reactflow";
 import type { PlacedItemType, VariableState, PreviewState } from "../types";
-import type { LogicRuntimeContext, ActiveListeners } from "../logicEngine";
+import { logAnalyticsEvent } from "../lib/analytics";
+import { submitLeadData } from "../lib/leads";
 
-/**
- * Result of a node execution
- */
-export interface ExecutionResult {
-    /**
-     * IDs of the next nodes to execute
-     * If undefined, execution stops at this node
-     */
-    nextNodes?: string[];
-
-    /**
-     * Whether to wait for async operation (e.g., animation, delay)
-     * If true, the engine will not proceed to nextNodes immediately
-     */
-    isAsync?: boolean;
+export interface LogicRuntimeContext {
+    logEvent: typeof logAnalyticsEvent;
+    submitLead: typeof submitLeadData;
+    fetchApi: (url: string, options: RequestInit) => Promise<any>;
 }
 
-/**
- * Runtime state bundle to reduce parameter passing
- */
-export interface RuntimeState {
-    placedItems: PlacedItemType[];
+export type ActiveListeners = Map<string, Array<() => void>>;
+
+export interface ExecutionParams {
+    node: Node;
     allNodes: Node[];
     allEdges: Edge[];
-
+    placedItems: PlacedItemType[];
     getPreviewState: () => PreviewState;
     setPreviewState: (newState: PreviewState) => void;
-
+    requestPageChange: (pageId: string) => void;
     getVariables: () => VariableState;
     setVariables: (newVars: VariableState) => void;
-
-    requestPageChange: (pageId: string) => void;
-
     activeListeners: ActiveListeners;
-
-    /**
-     * ID of the item that triggered the current execution flow
-     * Used for resolving TRIGGER_ITEM placeholders
-     */
+    context: LogicRuntimeContext;
     triggerItemId: string | null;
+    // ヘルパー
+    pushNext: (srcId: string, handle: string | null, edges: Edge[], queue: string[]) => void;
+    // 再帰呼び出し用 (非同期フロー用)
+    processQueue: (queue: string[]) => Promise<void>;
+    // 同期フロー用キュー (呼び出し元で管理されている配列)
+    accumulatedQueue: string[];
 }
 
-/**
- * Base interface for all node executors
- */
-export interface NodeExecutor<TData = any> {
-    /**
-     * Execute the node logic
-     * @param node The node to execute
-     * @param context External dependencies (logging, API calls)
-     * @param state Runtime state bundle
-     * @returns Execution result with next nodes to execute
-     */
-    execute(
-        node: Node<TData>,
-        context: LogicRuntimeContext,
-        state: RuntimeState
-    ): Promise<ExecutionResult>;
+export interface NodeExecutor {
+    execute(params: ExecutionParams): Promise<void>;
 }
 
-/**
- * Helper to find next nodes from a source node and handle
- */
-export const findNextNodes = (
-    srcId: string,
-    handle: string | null,
-    edges: Edge[]
-): string[] => {
-    return edges
-        .filter((e) => {
-            if (e.source !== srcId) return false;
-            if (handle === null) return true;
-            return e.sourceHandle === handle;
-        })
-        .map((e) => e.target);
-};
+export class ExecutorRegistry {
+    private executors: Record<string, NodeExecutor> = {};
 
-/**
- * Helper to resolve TRIGGER_ITEM placeholder
- */
-export const resolveTriggerItem = (
-    targetItemId: string | undefined,
-    triggerItemId: string | null
-): string | undefined => {
-    if (targetItemId === 'TRIGGER_ITEM') {
-        return triggerItemId || undefined;
+    register(nodeType: string, executor: NodeExecutor) {
+        this.executors[nodeType] = executor;
     }
-    return targetItemId;
-};
+
+    getExecutor(nodeType: string): NodeExecutor | undefined {
+        return this.executors[nodeType];
+    }
+}
+
+export const registry = new ExecutorRegistry();

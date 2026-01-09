@@ -1,28 +1,8 @@
-import type { Node } from "reactflow";
-import type { NodeExecutor, ExecutionResult, RuntimeState } from "../NodeExecutor";
-import type { LogicRuntimeContext } from "../../logicEngine";
-import { findNextNodes, resolveTriggerItem } from "../NodeExecutor";
-import { usePreviewStore } from "../../stores/usePreviewStore";
+import type { NodeExecutor, ExecutionParams } from "../NodeExecutor";
 
-interface IfNodeData {
-    conditionSource?: 'item' | 'variable';
-    conditionTargetId?: string;
-    conditionType?: 'isVisible' | 'isHidden';
-    variableName?: string;
-    comparisonType?: 'string' | 'number';
-    comparison?: '==' | '!=' | 'contains' | 'not_contains' | '>' | '>=' | '<' | '<=';
-    comparisonValue?: string | number;
-}
-
-/**
- * Executor for If/Condition nodes
- */
-export class IfExecutor implements NodeExecutor<IfNodeData> {
-    async execute(
-        node: Node<IfNodeData>,
-        context: LogicRuntimeContext,
-        state: RuntimeState
-    ): Promise<ExecutionResult> {
+export class IfExecutor implements NodeExecutor {
+    async execute(params: ExecutionParams): Promise<void> {
+        const { node, getPreviewState, getVariables, triggerItemId, pushNext, allEdges, context, accumulatedQueue } = params;
         const {
             conditionSource = 'item',
             conditionTargetId,
@@ -33,26 +13,18 @@ export class IfExecutor implements NodeExecutor<IfNodeData> {
             comparisonValue
         } = node.data;
 
-        const resolvedTargetId = resolveTriggerItem(conditionTargetId, state.triggerItemId);
+        const resolvedTargetId = conditionTargetId === 'TRIGGER_ITEM' ? triggerItemId : conditionTargetId;
 
         console.log('🔀 Ifノード実行', {
             nodeId: node.id,
             conditionSource,
             conditionTargetId,
-            conditionType,
-            variableName,
-            comparisonType,
-            comparison,
-            comparisonValue
         });
-
-        // ノード滞在時間計測開始
-        usePreviewStore.getState().startNodeExecution(node.id, 'IfNode');
 
         let conditionResult = false;
 
         if (conditionSource === 'item') {
-            const currentState = state.getPreviewState();
+            const currentState = getPreviewState();
             const targetItemState = resolvedTargetId ? currentState[resolvedTargetId] : undefined;
             if (targetItemState) {
                 if (conditionType === "isVisible") {
@@ -62,8 +34,8 @@ export class IfExecutor implements NodeExecutor<IfNodeData> {
                 }
             }
         } else if (conditionSource === 'variable') {
-            const currentVars = state.getVariables();
-            const varValue = currentVars[variableName || ''];
+            const currentVars = getVariables();
+            const varValue = currentVars[variableName];
 
             if (comparisonType === 'number') {
                 const numVarValue = Number(varValue || 0);
@@ -90,12 +62,6 @@ export class IfExecutor implements NodeExecutor<IfNodeData> {
             }
         }
 
-        console.log('✅ If条件結果', {
-            nodeId: node.id,
-            conditionResult,
-            nextPath: conditionResult ? 'true' : 'false'
-        });
-
         context.logEvent('logic_branch', {
             nodeId: node.id,
             nodeType: node.type,
@@ -106,11 +72,6 @@ export class IfExecutor implements NodeExecutor<IfNodeData> {
             }
         });
 
-        // 滞在時間計測終了
-        usePreviewStore.getState().endNodeExecution();
-
-        return {
-            nextNodes: findNextNodes(node.id, conditionResult ? "true" : "false", state.allEdges)
-        };
+        pushNext(node.id, conditionResult ? "true" : "false", allEdges, accumulatedQueue);
     }
 }

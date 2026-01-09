@@ -1,158 +1,119 @@
-import type { Node } from "reactflow";
-import type { NodeExecutor, ExecutionResult, RuntimeState } from "../NodeExecutor";
-import type { LogicRuntimeContext } from "../../logicEngine";
-import { findNextNodes } from "../NodeExecutor";
+import type { NodeExecutor, ExecutionParams } from "../NodeExecutor";
+import { useDebugLogStore } from "../../stores/useDebugLogStore";
 
-interface SubmitFormNodeData {
-    targetItemIds?: string[];
-}
+export class NetworkExecutor implements NodeExecutor {
+    async execute(params: ExecutionParams): Promise<void> {
+        const { node, getVariables, setVariables, pushNext, allEdges, processQueue, context, placedItems } = params;
 
-interface ExternalApiNodeData {
-    url?: string;
-    method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD';
-    variableName?: string;
-}
+        // --- External API Node ---
+        if (node.type === "externalApiNode") {
+            const { url, method = "POST", variableName } = node.data;
+            console.log('🌐 外部APIノード実行', { nodeId: node.id, url, method, variableName });
 
-/**
- * Executor for SubmitForm nodes
- * Submits current variables as lead data
- */
-export class SubmitFormExecutor implements NodeExecutor<SubmitFormNodeData> {
-    async execute(
-        node: Node<SubmitFormNodeData>,
-        context: LogicRuntimeContext,
-        state: RuntimeState
-    ): Promise<ExecutionResult> {
-        try {
-            const currentVars = state.getVariables();
-            const success = await context.submitLead(currentVars);
-            const resultPath = success ? "success" : "error";
+            if (!url) {
+                useDebugLogStore.getState().addLog({
+                    level: 'error',
+                    message: `❌ API URL未設定`,
+                    details: { nodeId: node.id }
+                });
+                const nextQ: string[] = [];
+                pushNext(node.id, "error", allEdges, nextQ);
+                if (nextQ.length > 0) processQueue(nextQ);
+                return;
+            }
 
-            const submittedFieldTypes = state.placedItems
-                .filter(i => i.name.startsWith("テキスト入力欄"))
-                .map(i => ({ name: i.data.variableName || i.id, type: i.data.inputType || 'text' }));
+            try {
+                const currentVars = getVariables();
+                const options: any = { method };
 
-            context.logEvent('logic_branch', {
-                nodeId: node.id,
-                nodeType: node.type,
-                metadata: {
-                    result: resultPath,
-                    submittedFields: submittedFieldTypes
+                if (method !== 'GET' && method !== 'HEAD') {
+                    options.headers = { 'Content-Type': 'application/json' };
+                    options.body = JSON.stringify(currentVars);
                 }
-            });
 
-            return {
-                nextNodes: findNextNodes(node.id, resultPath, state.allEdges)
-            };
-        } catch (error) {
-            console.error("Submit failed:", error);
-            context.logEvent('logic_branch', {
-                nodeId: node.id,
-                nodeType: node.type,
-                metadata: {
-                    result: 'error',
-                    error: String(error)
+                useDebugLogStore.getState().addLog({
+                    level: 'info',
+                    message: `🌐 API送信: ${method} ${url} `,
+                    details: { url, method, body: options.body ? JSON.parse(options.body) : undefined, headers: options.headers }
+                });
+
+                const responseData = await context.fetchApi(url, options);
+
+                useDebugLogStore.getState().addLog({
+                    level: 'success',
+                    message: `✅ API成功: ${url} `,
+                    details: { responseData }
+                });
+
+                if (variableName) {
+                    // Re-fetch variables to ensure we have the latest state (though it shouldn't have changed much)
+                    const latestVars = getVariables();
+                    setVariables({ ...latestVars, [variableName]: responseData });
                 }
-            });
-            return {
-                nextNodes: findNextNodes(node.id, "error", state.allEdges)
-            };
-        }
-    }
-}
 
-/**
- * Executor for ExternalAPI nodes
- * Calls external webhooks/APIs with current variables via Supabase Edge Function proxy
- */
-export class ExternalApiExecutor implements NodeExecutor<ExternalApiNodeData> {
-    async execute(
-        node: Node<ExternalApiNodeData>,
-        context: LogicRuntimeContext,
-        state: RuntimeState
-    ): Promise<ExecutionResult> {
-        const { url, method = "POST", variableName } = node.data;
+                context.logEvent('node_execution', {
+                    nodeId: node.id,
+                    nodeType: node.type,
+                    metadata: { status: 'success', url }
+                });
 
-        console.log('🌐 外部APIノード実行 (Edge Function経由)', {
-            nodeId: node.id,
-            url,
-            method,
-            variableName
-        });
+                const nextQ: string[] = [];
+                pushNext(node.id, "success", allEdges, nextQ);
+                if (nextQ.length > 0) processQueue(nextQ);
 
-        if (!url) {
-            console.error('❌ API URL未設定', { nodeId: node.id });
-            return {
-                nextNodes: findNextNodes(node.id, "error", state.allEdges)
-            };
+            } catch (e: any) {
+                console.error("API fetch error:", e);
+                useDebugLogStore.getState().addLog({
+                    level: 'error',
+                    message: `❌ API失敗: ${url} `,
+                    details: { url, method, error: e.message || String(e), stack: e.stack }
+                });
+
+                context.logEvent('node_execution', {
+                    nodeId: node.id,
+                    nodeType: node.type,
+                    metadata: { status: 'error', url, error: String(e) }
+                });
+
+                const nextQ: string[] = [];
+                pushNext(node.id, "error", allEdges, nextQ);
+                if (nextQ.length > 0) processQueue(nextQ);
+            }
         }
 
-        try {
-            const currentVars = state.getVariables();
+        // --- Submit Form Node ---
+        else if (node.type === "submitFormNode") {
+            try {
+                const currentVars = getVariables();
+                const success = await context.submitLead(currentVars);
+                const resultPath = success ? "success" : "error";
 
-            // Edge Functionを経由して外部APIにリクエスト
-            // これによりCORS制限を回避
-            const { supabase } = await import('../../lib/supabaseClient');
+                const submittedFieldTypes = placedItems
+                    .filter(i => i.name.startsWith("テキスト入力欄"))
+                    .map(i => ({ name: i.data.variableName || i.id, type: i.data.inputType || 'text' }));
 
-            const requestBody: any = {
-                url,
-                method,
-                headers: {}
-            };
+                context.logEvent('logic_branch', {
+                    nodeId: node.id,
+                    nodeType: node.type,
+                    metadata: { result: resultPath, submittedFields: submittedFieldTypes }
+                });
 
-            // GET/HEAD以外の場合はボディを追加
-            if (method !== 'GET' && method !== 'HEAD') {
-                requestBody.headers['Content-Type'] = 'application/json';
-                requestBody.body = currentVars;
+                const nextQ: string[] = [];
+                pushNext(node.id, resultPath, allEdges, nextQ);
+                if (nextQ.length > 0) processQueue(nextQ);
+
+            } catch (error) {
+                console.error("Submit failed:", error);
+                context.logEvent('logic_branch', {
+                    nodeId: node.id,
+                    nodeType: node.type,
+                    metadata: { result: 'error', error: String(error) }
+                });
+
+                const nextQ: string[] = [];
+                pushNext(node.id, "error", allEdges, nextQ);
+                if (nextQ.length > 0) processQueue(nextQ);
             }
-
-            console.log('📡 Edge Functionに送信', requestBody);
-
-            const { data, error } = await supabase.functions.invoke('external-api-proxy', {
-                body: requestBody
-            });
-
-            if (error) {
-                throw new Error(`Edge Function error: ${error.message}`);
-            }
-
-            console.log('✅ Edge Functionからのレスポンス', data);
-
-            // レスポンスを変数に保存
-            if (variableName && data) {
-                const currentVars = state.getVariables();
-                // dataが文字列の場合はJSONパースを試みる
-                let parsedData = data;
-                if (typeof data === 'string') {
-                    try {
-                        parsedData = JSON.parse(data);
-                    } catch (e) {
-                        // パースできない場合はそのまま使用
-                        parsedData = data;
-                    }
-                }
-                state.setVariables({ ...currentVars, [variableName]: parsedData });
-            }
-
-            context.logEvent('node_execution', {
-                nodeId: node.id,
-                nodeType: node.type,
-                metadata: { status: 'success', url }
-            });
-
-            return {
-                nextNodes: findNextNodes(node.id, "success", state.allEdges)
-            };
-        } catch (e) {
-            console.error("API fetch error (Edge Function):", e);
-            context.logEvent('node_execution', {
-                nodeId: node.id,
-                nodeType: node.type,
-                metadata: { status: 'error', url, error: String(e) }
-            });
-            return {
-                nextNodes: findNextNodes(node.id, "error", state.allEdges)
-            };
         }
     }
 }
