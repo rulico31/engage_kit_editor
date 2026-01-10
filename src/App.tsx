@@ -295,6 +295,15 @@ const App: React.FC = () => {
 
       {/* トースト通知コンテナ */}
       <ToastContainer />
+
+      {/* 404 Fallback - ルートにマッチしない場合 */}
+      {!["home", "editor", "viewer"].includes(currentRoute) && (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <h1>404 Not Found</h1>
+          <p>お探しのページは見つかりませんでした。</p>
+          <button onClick={handleGoHome}>ホームに戻る</button>
+        </div>
+      )}
     </div>
   );
 };

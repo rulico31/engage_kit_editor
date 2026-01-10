@@ -1,12 +1,19 @@
--- Migration: 05_patch_strict_project_privacy
--- Description: プロジェクトの閲覧権限を厳格化し、ユーザー間の分離を徹底する
--- Created: 2026-01-10
+-- ------------------------------------------------------------------------------
+-- 0. RLS (Row Level Security) 自体の有効化
+-- ------------------------------------------------------------------------------
+-- これを実行しないとポリシーを作っても適用されません
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_logs ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- 1. Projectsテーブルの閲覧権限ポリシーを修正
 -- ------------------------------------------------------------------------------
 -- 既存の「誰でも見れる」ポリシーを削除
 DROP POLICY IF EXISTS "Public can view projects" ON projects;
+
+-- 既存の新しいポリシーも念のため削除（エラー回避）
+DROP POLICY IF EXISTS "Users can view own or published projects" ON projects;
 
 -- 新しいポリシー: 「自分のもの OR 公開済み」のみ閲覧可能
 -- ※ is_published = true はWebViewerなどで公開ページを見るために必要

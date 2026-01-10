@@ -4,7 +4,9 @@ import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import './DebugLogPanel.css';
 
 const DebugLogPanel: React.FC = () => {
-    const { logs, clearLogs } = useDebugLogStore();
+    const { logs, clearLogs, isVisible } = useDebugLogStore();
+
+    if (!isVisible) return null;
     const [isExpanded, setIsExpanded] = useState(true);
     const [expandedLogIds, setExpandedLogIds] = useState<Set<string>>(new Set());
 

@@ -12,14 +12,19 @@ export interface DebugLogEntry {
 
 interface DebugLogStore {
     logs: DebugLogEntry[];
+    isVisible: boolean; // デバッグパネルの表示状態
     addLog: (log: Omit<DebugLogEntry, 'id' | 'timestamp'>) => void;
     clearLogs: () => void;
+    toggleVisibility: () => void; // 表示切り替えアクション
 }
 
 const MAX_LOGS = 100;
 
 export const useDebugLogStore = create<DebugLogStore>((set) => ({
     logs: [],
+    isVisible: false, // デフォルトは非表示
+
+    toggleVisibility: () => set((state) => ({ isVisible: !state.isVisible })),
 
     addLog: (log) => set((state) => {
         const newLog: DebugLogEntry = {
