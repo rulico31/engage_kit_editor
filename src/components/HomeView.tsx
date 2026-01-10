@@ -9,7 +9,7 @@ import { AccountMenu } from "./Auth/AccountMenu";
 interface HomeViewProps {
   onCreateProject: (name: string, initialData?: any) => void;
   onOpenProject: (projectId: string) => void;
-  onLoadFromJSON?: () => void;
+  // onLoadFromJSON removed
 }
 
 interface Project {
@@ -21,7 +21,7 @@ interface Project {
   page_count?: number;
 }
 
-const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onLoadFromJSON }) => {
+const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProjectLoading, setIsProjectLoading] = useState(false); // プロジェクト読み込み中の状態
@@ -45,15 +45,27 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (user) {
+      fetchProjects();
+    } else {
+      setProjects([]);
+      setIsLoading(false);
+    }
+  }, [user]);
 
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
+      if (!user) {
+        setProjects([]);
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("projects")
         .select("*")
+        .eq('user_id', user.id) // ★ 自分のが所有するプロジェクトのみ取得
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
@@ -282,22 +294,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject, onL
 
           {/* 右側のボタングループ */}
           <div className="header-actions">
-            {/* JSONから読み込みボタン */}
-            {onLoadFromJSON && (
-              <button
-                className="load-json-btn"
-                onClick={() => {
-                  if (!user) {
-                    alert('プロジェクトを開くには、GoogleまたはMicrosoftアカウントでログインしてください。');
-                    return;
-                  }
-                  onLoadFromJSON();
-                }}
-                title={!user ? 'ログインが必要です' : 'JSONファイルから読み込み'}
-              >
-                📂 JSONから読み込み
-              </button>
-            )}
+
 
             {/* 新規プロジェクトボタン */}
             <button

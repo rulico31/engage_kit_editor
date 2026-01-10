@@ -216,12 +216,7 @@ const App: React.FC = () => {
     setCurrentRoute("editor");
   };
 
-  const handleLoadFromJSON = async () => {
-    // Webアプリではローカルファイルからの読み込みは非対応
-    alert('Webアプリではローカルファイルからの読み込みには対応していません。プロジェクト一覧から既存のプロジェクトを開くか、新規作成してください。');
-    // await loadProject(); // 引数なしで呼び出すとローカルファイル選択ダイアログが開く
-    // setCurrentRoute("editor");
-  };
+
 
   const handleGoHome = () => {
     setCurrentRoute("home");
@@ -269,7 +264,6 @@ const App: React.FC = () => {
         <HomeView
           onCreateProject={handleCreateProject}
           onOpenProject={handleOpenProject}
-          onLoadFromJSON={handleLoadFromJSON}
         />
       )}
 

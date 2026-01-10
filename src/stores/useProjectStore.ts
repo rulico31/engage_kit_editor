@@ -55,9 +55,16 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const initialData = { ...initialProjectData, projectName: name, version: 1 };
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
       const { data, error } = await supabase
         .from('projects')
-        .insert({ name, data: initialData })
+        .insert({
+          name,
+          data: initialData,
+          user_id: userId // 所有者を明示的に設定
+        })
         .select()
         .single();
 
