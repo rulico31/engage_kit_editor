@@ -343,6 +343,9 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
                   </svg>
                   Microsoftでログイン
                 </button>
+                <div style={{ marginTop: '16px', fontSize: '0.8rem', color: '#333', lineHeight: '1.5' }}>
+                  ログインすることで、<a href="#" target="_blank" rel="noopener noreferrer" style={{ color: '#4A90E2', textDecoration: 'none' }}>利用規約</a> および <a href="#" target="_blank" rel="noopener noreferrer" style={{ color: '#4A90E2', textDecoration: 'none' }}>プライバシーポリシー</a> に<br />同意したものとみなされます。
+                </div>
               </>
             ) : (
               <>
