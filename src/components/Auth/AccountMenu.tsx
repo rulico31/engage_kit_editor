@@ -94,7 +94,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({ user, onClose }) => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="account-menu-button"
-                    style={{ textDecoration: 'none', color: '#e4e4e7' }}
+                    style={{ textDecoration: 'none', color: '#fff' }}
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10"></circle>
