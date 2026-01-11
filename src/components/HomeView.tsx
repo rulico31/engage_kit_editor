@@ -344,7 +344,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
                   Microsoftでログイン
                 </button>
                 <div style={{ marginTop: '16px', fontSize: '0.8rem', color: '#333', lineHeight: '1.5' }}>
-                  ログインすることで、<a href="#" target="_blank" rel="noopener noreferrer" style={{ color: '#4A90E2', textDecoration: 'none' }}>利用規約</a> および <a href="#" target="_blank" rel="noopener noreferrer" style={{ color: '#4A90E2', textDecoration: 'none' }}>プライバシーポリシー</a> に<br />同意したものとみなされます。
+                  ログインすることで、<a href="https://orange-ballcap-0b2.notion.site/2e486797b80a80d7838cd6b15a9fc9fd?source=copy_link" target="_blank" rel="noopener noreferrer" style={{ color: '#4A90E2', textDecoration: 'none' }}>利用規約</a> および <a href="https://orange-ballcap-0b2.notion.site/2de86797b80a8078b022eb07ec521ee8?source=copy_link" target="_blank" rel="noopener noreferrer" style={{ color: '#4A90E2', textDecoration: 'none' }}>プライバシーポリシー</a> に<br />同意したものとみなされます。
                 </div>
               </>
             ) : (
