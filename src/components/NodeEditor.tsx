@@ -40,6 +40,7 @@ import ConfirmationNode from './nodes/ConfirmationNode';
 
 import { usePageStore } from '../stores/usePageStore';
 import { useSelectionStore } from '../stores/useSelectionStore';
+import { useEditorSettingsStore } from '../stores/useEditorSettingsStore';
 
 // nodeTypesをコンポーネントの外で定義（再レンダリング防止）
 const nodeTypes: NodeTypes = {
@@ -74,6 +75,10 @@ const NodeEditorContent: React.FC = () => {
   const activeLogicGraphId = useSelectionStore((state) => state.activeLogicGraphId);
   const selectItem = useSelectionStore((state) => state.selectItem);
 
+
+
+  // ストアからデータを個別に取得（再レンダリング最適化）
+
   // 現在編集中のグラフデータを取得
   const currentGraph = useMemo(() => {
     if (!selectedPageId || !activeLogicGraphId) return defaultGraph;
@@ -81,6 +86,28 @@ const NodeEditorContent: React.FC = () => {
     if (!page) return defaultGraph;
     return page.allItemLogics[activeLogicGraphId] || defaultGraph;
   }, [pages, selectedPageId, activeLogicGraphId]);
+
+  // Focus Management
+  const { pendingFocusNodeId, setPendingFocusNodeId } = useEditorSettingsStore(state => ({
+    pendingFocusNodeId: state.pendingFocusNodeId,
+    setPendingFocusNodeId: state.setPendingFocusNodeId
+  }));
+
+  // Watch for focus requests - Moved after currentGraph definition
+  React.useEffect(() => {
+    if (pendingFocusNodeId && currentGraph.nodes.some(n => n.id === pendingFocusNodeId)) {
+      const node = currentGraph.nodes.find(n => n.id === pendingFocusNodeId);
+      if (node) {
+        console.log('[NodeEditor] Focusing node:', pendingFocusNodeId);
+        // Center and zoom
+        reactFlowInstance.setCenter(node.position.x, node.position.y, { zoom: 1.2, duration: 800 });
+        // Select the node
+        selectItem(node.id, 'node', node.data.label || 'Node');
+        // Clear pending flag
+        setPendingFocusNodeId(null);
+      }
+    }
+  }, [pendingFocusNodeId, currentGraph.nodes, reactFlowInstance, selectItem, setPendingFocusNodeId]);
 
   // ストア更新用ヘルパー関数
   const updateGraph = useCallback((newNodes: Node[], newEdges: Edge[]) => {

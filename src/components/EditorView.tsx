@@ -17,6 +17,8 @@ import AuthLinkModal from "./Auth/AuthLinkModal"; // 追加
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { useAuthStore } from "../stores/useAuthStore"; // 追加
 import { useProjectStore } from "../stores/useProjectStore";
+import { usePageStore } from "../stores/usePageStore";
+import { useSelectionStore } from "../stores/useSelectionStore";
 import { useTabSync } from "../hooks/useTabSync";
 
 interface EditorViewProps {
@@ -92,7 +94,8 @@ const EditorView: React.FC<EditorViewProps> = ({
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // 認証関連
-  const { user, isAnonymous } = useAuthStore();
+  const { user } = useAuthStore();
+  const isAnonymous = user?.is_anonymous;
   const [isAuthLinkModalOpen, setIsAuthLinkModalOpen] = useState(false);
 
   // タブの自動同期（削除時のクローズ、Undo時の復元）
@@ -207,6 +210,71 @@ const EditorView: React.FC<EditorViewProps> = ({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isGridPopoverOpen]);
+
+  // Handle URL query parameters for deep linking (Jump to Editor)
+  const { setPendingFocusNodeId } = useEditorSettingsStore(state => ({
+    setPendingFocusNodeId: state.setPendingFocusNodeId
+  }));
+  const projectMeta = useProjectStore(state => state.projectMeta);
+  const setSelectedPageId = usePageStore(state => state.setSelectedPageId);
+  const handleItemSelect = useSelectionStore(state => state.handleItemSelect);
+
+  useEffect(() => {
+    // Check for nodeId in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const nodeIdParam = urlParams.get('nodeId');
+
+    if (nodeIdParam && projectMeta?.data?.pages) {
+      console.log('[EditorView] Found nodeId in URL:', nodeIdParam);
+
+      // Logic reused from DashboardView (simplified)
+      let foundPageId: string | null = null;
+      let foundItemId: string | null = null;
+      let isLogicNode = false;
+
+      for (const [pageId, page] of Object.entries(projectMeta.data.pages)) {
+        const item = page.placedItems.find((it: any) => it.id === nodeIdParam);
+        if (item) {
+          foundPageId = pageId;
+          foundItemId = item.id;
+          break;
+        }
+        if (page.allItemLogics) {
+          for (const [itemId, graph] of Object.entries(page.allItemLogics as Record<string, any>)) {
+            if (graph.nodes?.find((n: any) => n.id === nodeIdParam)) {
+              foundPageId = pageId;
+              foundItemId = itemId;
+              isLogicNode = true;
+              break;
+            }
+          }
+        }
+        if (foundPageId) break;
+      }
+
+      if (foundPageId && foundItemId) {
+        const page = projectMeta.data.pages[foundPageId];
+        const item = page.placedItems.find((i: any) => i.id === foundItemId);
+
+        setSelectedPageId(foundPageId);
+        if (item) {
+          handleItemSelect(foundItemId, item.displayName || item.name, false);
+        }
+
+        if (isLogicNode) {
+          setViewMode('split');
+          setPendingFocusNodeId(nodeIdParam);
+        } else {
+          setViewMode('design');
+          setPendingFocusNodeId(nodeIdParam);
+        }
+
+        // Clean up URL without reload
+        const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+      }
+    }
+  }, [projectMeta, setSelectedPageId, handleItemSelect, setViewMode, setPendingFocusNodeId]);
 
 
   return (

@@ -35,10 +35,40 @@ export interface NodeStats {
 
 export interface ABTestStats {
   variant: string;
-  visitors: number;
-  conversions: number;
   conversion_rate: number;
 }
+
+/**
+ * ノードデータから「人間が分かる名前」を抽出するヘルパー関数
+ * 優先順位: Admin Label > Question/Label/Text > Button Text > Type+ID
+ */
+export const getNodeLabel = (node: any): string => {
+  if (!node || !node.data) return "削除されたアイテム";
+
+  const data = node.data;
+
+  // 1. 管理用ラベル（もし実装していれば最優先）
+  if (data.adminLabel) return data.adminLabel;
+
+  // 2. 設問のテキスト/ラベル
+  if (data.label) return data.label; // Input系のラベル
+  if (data.question) return data.question; // Survey系の質問文
+  if (data.text) return truncateText(data.text, 20); // テキストノード
+
+  // 3. ボタンの文字
+  if (data.buttonText) return `ボタン: ${data.buttonText}`;
+
+  // 4. それでもなければタイプ名 + ID
+  const typeLabel = node.type || 'Unknown';
+  const idSuffix = node.id ? `...${node.id.slice(-4)}` : '';
+  return `${typeLabel} (${idSuffix})`;
+};
+
+// 文字数制限用
+const truncateText = (text: string, limit: number) => {
+  if (!text) return "";
+  return text.length > limit ? text.substring(0, limit) + "..." : text;
+};
 
 /**
  * プロジェクトの統計情報とリード一覧を取得
@@ -151,6 +181,7 @@ export interface InputAnalyticsStat {
   avgConfidence: number;
   avgHesitation: number;
   sampleCount: number;
+  avgDuration: number; // 平均検討時間(秒)
 }
 
 export interface BacktrackStat {
@@ -166,28 +197,97 @@ export interface ExtendedStats {
   engagementDistribution: { range: string; count: number }[];
 }
 
+export interface StatFilters {
+  dateRange?: { start: Date; end: Date };
+}
+
 /**
  * 詳細分析データの取得（心理分析・フロー）
  * 現時点ではRawログを取得してクライアント集計する
  */
-export const fetchExtendedStats = async (projectId: string): Promise<ExtendedStats> => {
+export const fetchExtendedStats = async (projectId: string, filters?: StatFilters): Promise<ExtendedStats> => {
   if (!projectId || projectId.startsWith('local-')) {
     return { thinkingTime: [], inputAnalytics: [], backtracks: [], engagementDistribution: [] };
   }
 
-  // 1. 思考時間データの取得 (interaction イベント)
-  const { data: interactionLogs } = await supabase
+  // クエリビルダヘルパー
+  const applyFilters = (query: any) => {
+    if (filters?.dateRange) {
+      query = query.gte('created_at', filters.dateRange.start.toISOString())
+        .lte('created_at', filters.dateRange.end.toISOString());
+    }
+    return query;
+  };
+
+  // 1. 入力心理データの取得 (inputLogs)
+  let inputQuery = supabase
     .from('analytics_logs')
-    .select('metadata')
+    .select('node_id, metadata, created_at, device_info')
+    .eq('project_id', projectId)
+    .eq('event_type', 'input_analysis');
+
+  inputQuery = applyFilters(inputQuery);
+  const { data: inputLogs } = await inputQuery;
+
+  // テキスト入力のnodeIdセットを作成
+  const inputNodeIds = new Set<string>();
+  (inputLogs || []).forEach((log: any) => {
+    if (log.node_id) inputNodeIds.add(log.node_id);
+  });
+
+  // 2. 思考時間データの取得 (interactionLogs)
+  let interactionQuery = supabase
+    .from('analytics_logs')
+    .select('node_id, metadata, created_at, device_info')
     .eq('project_id', projectId)
     .eq('event_type', 'interaction');
 
+  interactionQuery = applyFilters(interactionQuery);
+  const { data: interactionLogs } = await interactionQuery;
+
   const thinkingTimeCounts: Record<string, number> = { intuitive: 0, normal: 0, hesitation: 0, noise: 0 };
+
+  // マップ definition
+  const inputMap = new Map<string, {
+    name: string;
+    exp: number; rev: number; conf: number; hes: number;
+    count: number;
+    totalDuration: number; // ms
+  }>();
+
+  // interactionログの処理
   (interactionLogs || []).forEach((log: any) => {
+
+    // 思考時間集計
     const pattern = log.metadata?.thinking_pattern || 'normal';
     if (thinkingTimeCounts[pattern] !== undefined) {
       thinkingTimeCounts[pattern]++;
     }
+
+    // ノイズは除外
+    if (pattern === 'noise') return;
+
+    const nodeId = log.node_id;
+    // input_analysisが存在するノード（テキスト入力）は詳細分析側を優先するためスキップ
+    if (!nodeId || inputNodeIds.has(nodeId)) return;
+
+    const current = inputMap.get(nodeId) || {
+      name: log.metadata?.node_name || nodeId,
+      exp: 0, rev: 0, conf: 0, hes: 0, count: 0,
+      totalDuration: 0
+    };
+
+    // 簡易的な迷いスコアの割り当て
+    let score = 50;
+    if (pattern === 'intuitive') score = 10;
+    else if (pattern === 'normal') score = 40;
+    else if (pattern === 'hesitation') score = 90;
+
+    current.hes += score;
+    current.count++;
+    current.totalDuration += (log.metadata?.duration_ms || 0);
+
+    inputMap.set(nodeId, current);
   });
 
   const totalInteractions = Object.values(thinkingTimeCounts).reduce((a, b) => a + b, 0);
@@ -197,26 +297,19 @@ export const fetchExtendedStats = async (projectId: string): Promise<ExtendedSta
     percentage: totalInteractions > 0 ? (count / totalInteractions) * 100 : 0
   }));
 
-  // 2. 入力心理データの取得 (input_analysis イベント)
-  const { data: inputLogs } = await supabase
-    .from('analytics_logs')
-    .select('node_id, metadata')
-    .eq('project_id', projectId)
-    .eq('event_type', 'input_analysis'); // 古い input_correction は無視
-
-  const inputMap = new Map<string, { name: string; exp: number; rev: number; conf: number; hes: number; count: number }>();
-
+  // input_analysisログの処理
   (inputLogs || []).forEach((log: any) => {
+
     const nodeId = log.node_id;
     const meta = log.metadata;
     const metrics = meta?.metrics;
 
-    // metricsがない場合（古い形式など）はスキップ
     if (!metrics) return;
 
     const current = inputMap.get(nodeId) || {
       name: meta.item_name || nodeId,
-      exp: 0, rev: 0, conf: 0, hes: 0, count: 0
+      exp: 0, rev: 0, conf: 0, hes: 0, count: 0,
+      totalDuration: 0
     };
 
     current.exp += (metrics.exploration || 0);
@@ -224,6 +317,7 @@ export const fetchExtendedStats = async (projectId: string): Promise<ExtendedSta
     current.conf += (metrics.confidence || 0);
     current.hes += (metrics.hesitation_score || 0);
     current.count++;
+    current.totalDuration += (meta.raw?.input_duration_ms || 0);
 
     inputMap.set(nodeId, current);
   });
@@ -235,15 +329,19 @@ export const fetchExtendedStats = async (projectId: string): Promise<ExtendedSta
     avgReversal: val.rev / val.count,
     avgConfidence: val.conf / val.count,
     avgHesitation: val.hes / val.count,
-    sampleCount: val.count
-  })).sort((a, b) => b.avgHesitation - a.avgHesitation); // 迷いが高い順
+    sampleCount: val.count,
+    avgDuration: (val.totalDuration / val.count) / 1000 // ms -> sec
+  })).sort((a, b) => b.avgHesitation - a.avgHesitation);
 
   // 3. バックトラッキングの取得
-  const { data: backtrackLogs } = await supabase
+  let backtrackQuery = supabase
     .from('analytics_logs')
-    .select('metadata')
+    .select('metadata, created_at')
     .eq('project_id', projectId)
     .eq('event_type', 'backtracking');
+
+  backtrackQuery = applyFilters(backtrackQuery);
+  const { data: backtrackLogs } = await backtrackQuery;
 
   const backtrackMap = new Map<string, number>();
   (backtrackLogs || []).forEach((log: any) => {
@@ -261,10 +359,18 @@ export const fetchExtendedStats = async (projectId: string): Promise<ExtendedSta
     .sort((a, b) => b.count - a.count);
 
   // 4. エンゲージメントスコア分布 (leadsテーブルから最新スコアを取得)
-  const { data: leads } = await supabase
+  // Leads table has 'created_at', 'device_type'.
+  let leadsQuery = supabase
     .from('leads')
-    .select('engagement_score')
+    .select('engagement_score, created_at, device_type')
     .eq('project_id', projectId);
+
+  if (filters?.dateRange) {
+    leadsQuery = leadsQuery.gte('created_at', filters.dateRange.start.toISOString())
+      .lte('created_at', filters.dateRange.end.toISOString());
+  }
+
+  const { data: leads } = await leadsQuery;
 
   const scoreRanges = {
     '0-20 (Cold)': 0,

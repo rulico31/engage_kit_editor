@@ -382,3 +382,92 @@
 .clickable-row:hover {
   background-color: rgba(102, 126, 234, 0.1);
 }
+
+/* Psychometrics Table Styles */
+.node-name-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-id-sub {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.score-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 12px;
+  min-width: 30px;
+  text-align: center;
+}
+
+.score-badge.high {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #ef5350;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.score-badge.mid {
+  background-color: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.score-badge.low {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: #66bb6a;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.count-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.warning-icon {
+  cursor: help;
+  font-size: 14px;
+}
+
+.low-data-row td {
+  opacity: 0.6;
+}
+
+.low-data-row:hover td {
+  opacity: 1;
+}
+
+.jump-button {
+  background-color: transparent;
+  color: #667eea;
+  border: 1px solid #667eea;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.jump-button:hover {
+  background-color: rgba(102, 126, 234, 0.1);
+  transform: translateY(-1px);
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.chart-no-data {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #888;
+}

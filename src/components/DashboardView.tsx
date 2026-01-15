@@ -16,6 +16,7 @@ import {
   type NodeStats,
   type ABTestStats,
   type ExtendedStats,
+  getNodeLabel, // Added import
 } from "../lib/dashboardService";
 import "./DashboardView.css";
 import {
@@ -54,13 +55,20 @@ const DashboardView: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
 
+  // Filters
+
+  const [dateRangeFilter, setDateRangeFilter] = useState<number>(30); // days
+
   // 集計表示モード
   const [groupingMode, setGroupingMode] = useState<'node' | 'page' | 'type'>('node');
 
   // エディタへのジャンプ用のストアアクセス
   const setSelectedPageId = usePageStore(state => state.setSelectedPageId);
   const handleItemSelect = useSelectionStore(state => state.handleItemSelect);
-  const setViewMode = useEditorSettingsStore(state => state.setViewMode);
+  const { setViewMode, setPendingFocusNodeId } = useEditorSettingsStore(state => ({
+    setViewMode: state.setViewMode,
+    setPendingFocusNodeId: state.setPendingFocusNodeId
+  }));
 
   // エクスポート設定用のState
   const [showExportModal, setShowExportModal] = useState(false);
@@ -78,9 +86,17 @@ const DashboardView: React.FC = () => {
     const loadData = async () => {
       setLoading(true);
 
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - dateRangeFilter);
+
+      const filters = {
+        dateRange: { start: startDate, end: endDate }
+      };
+
       const [basicResult, extendedResult] = await Promise.all([
         fetchProjectStats(currentProjectId),
-        fetchExtendedStats(currentProjectId)
+        fetchExtendedStats(currentProjectId, filters)
       ]);
 
       setStats(basicResult.stats);
@@ -94,7 +110,7 @@ const DashboardView: React.FC = () => {
     };
 
     loadData();
-  }, [currentProjectId]);
+  }, [currentProjectId, dateRangeFilter]);
 
   // データロード時に全カラムを抽出（エクスポート用）
   useEffect(() => {
@@ -112,48 +128,49 @@ const DashboardView: React.FC = () => {
   const getNodeDisplayName = useCallback((nodeId: string): string => {
     if (!projectMeta?.data?.pages) return nodeId;
 
-    let parentItemId: string | null = null;
-    let parentPageId: string | null = null;
+    let foundNode: Node | null = null;
+    let foundItem: any = null;
 
-    // 1. 逆引き
+    // 1. 逆引き (Logic Nodes)
     for (const [pageId, page] of Object.entries(projectMeta.data.pages)) {
       if (page.allItemLogics) {
         for (const [itemId, nodeGraph] of Object.entries(page.allItemLogics)) {
           if (nodeGraph.nodes && Array.isArray(nodeGraph.nodes)) {
-            const foundNode = nodeGraph.nodes.find((node: Node) => node.id === nodeId);
-            if (foundNode) {
-              parentItemId = itemId;
-              parentPageId = pageId;
+            const n = nodeGraph.nodes.find((node: Node) => node.id === nodeId);
+            if (n) {
+              foundNode = n;
               break;
             }
           }
         }
-        if (parentItemId) break;
       }
-    }
+      if (foundNode) break;
 
-    // 2. 親アイテム発見時
-    if (parentItemId && parentPageId) {
-      const parentPage = projectMeta.data.pages[parentPageId];
-      const parentItem = parentPage.placedItems.find(item => item.id === parentItemId);
-      if (parentItem) {
-        if (parentItem.displayName) return parentItem.displayName;
-        const idMatch = parentItemId.match(/_(\d+)$/);
-        const idNumber = idMatch ? idMatch[1].slice(-4) : '';
-        return idNumber ? `${parentItem.name}-${idNumber}` : parentItem.name;
-      }
-    }
-
-    // 3. アイテム自体を探す
-    for (const page of Object.values(projectMeta.data.pages)) {
+      // 2. アイテム直接 (Placed Items)
       const item = page.placedItems.find(item => item.id === nodeId);
       if (item) {
-        if (item.displayName) return item.displayName;
-        const idMatch = nodeId.match(/_(\d+)$/);
-        const idNumber = idMatch ? idMatch[1].slice(-4) : '';
-        return idNumber ? `${item.name}-${idNumber}` : item.name;
+        foundItem = item;
+        break;
       }
     }
+
+    if (foundNode) return getNodeLabel(foundNode);
+    if (foundItem) {
+      // ユーザー要望: カスタム名(displayName) > アイテム名(name) の順で表示
+      // テキスト内容(ボタンの文字など)ではなく、アイテム種別名(「ボタン」「画像」など)を優先する
+      const label = foundItem.displayName || foundItem.name || foundItem.type;
+
+      const mockNode = {
+        id: foundItem.id,
+        type: foundItem.type,
+        data: {
+          label: label,
+          // text, buttonText等は設定しない（指定すると意図せず内容が表示されるのを防ぐ）
+        }
+      };
+      return getNodeLabel(mockNode);
+    }
+
     return nodeId;
   }, [projectMeta]);
 
@@ -265,44 +282,66 @@ const DashboardView: React.FC = () => {
     return [];
   }, [nodeStats, projectMeta, groupingMode, getNodeDisplayName]);
 
-  const handleJumpToEditor = useCallback((stat: GroupedStat) => {
+  const handleJumpToEditor = useCallback((nodeId: string) => {
     if (!projectMeta?.data?.pages) return;
 
-    // 簡易実装: nodeモードのみ対応
-    if (groupingMode === 'node') {
-      let foundPageId: string | null = null;
-      let foundItemId: string | null = null;
+    let foundPageId: string | null = null;
+    let foundItemId: string | null = null;
+    let isLogicNode = false;
 
-      for (const [pageId, page] of Object.entries(projectMeta.data.pages)) {
-        // アイテム直接
-        const item = page.placedItems.find(it => it.id === stat.id);
-        if (item) {
-          foundPageId = pageId;
-          foundItemId = item.id;
-          break;
-        }
-        // Logic内
-        if (page.allItemLogics) {
-          for (const [itemId, graph] of Object.entries(page.allItemLogics)) {
-            if (graph.nodes?.find((n: Node) => n.id === stat.id)) {
-              foundPageId = pageId;
-              foundItemId = itemId;
-              break;
-            }
+    // Search Logic & Items
+    for (const [pageId, page] of Object.entries(projectMeta.data.pages)) {
+      // 1. Placed Items
+      const item = page.placedItems.find(it => it.id === nodeId);
+      if (item) {
+        foundPageId = pageId;
+        foundItemId = item.id;
+        break;
+      }
+      // 2. Logic Nodes
+      if (page.allItemLogics) {
+        for (const [itemId, graph] of Object.entries(page.allItemLogics)) {
+          if (graph.nodes?.find((n: Node) => n.id === nodeId)) {
+            foundPageId = pageId;
+            foundItemId = itemId; // Select the parent item to open logic editor
+            isLogicNode = true;
+            break;
           }
         }
-        if (foundPageId) break;
+      }
+      if (foundPageId) break;
+    }
+
+    if (foundPageId && foundItemId) {
+      // 1. Switch Page
+      setSelectedPageId(foundPageId);
+
+      const page = projectMeta.data.pages[foundPageId];
+      const item = page.placedItems.find(i => i.id === foundItemId);
+
+      // 2. Select Item / Show View
+      if (item) {
+        handleItemSelect(foundItemId, item.displayName || item.name, false);
       }
 
-      if (foundPageId && foundItemId) {
-        setSelectedPageId(foundPageId);
-        const page = projectMeta.data.pages[foundPageId];
-        const item = page.placedItems.find(i => i.id === foundItemId);
-        if (item) handleItemSelect(foundItemId, item.displayName || item.name, false);
+      // 3. Set View Mode and Focus
+      // Logic nodeの場合はSplit/Logicビューが適切かもしれないが、
+      // 基本はDesignビューでLogicエディタが開くフローが自然ならDesignでも可
+      // ここではisLogicNodeならLogic viewを開くか、Splitにするなどを検討
+      // 既存のUXに合わせて、とりあえずDesign or Logicに切り替え
+      // setViewMode(isLogicNode ? 'logic' : 'design'); 
+      // -> LogicViewはアイテム選択が必要。handleItemSelectしているのでOK
+
+      // NodeEditor内の特定のノードにフォーカスしたい場合
+      if (isLogicNode) {
+        setViewMode('split'); // Logicも見たいのでSplit推奨
+        setPendingFocusNodeId(nodeId); // Logic Editor内でフォーカス
+      } else {
         setViewMode('design');
+        setPendingFocusNodeId(nodeId); // Artboard内でフォーカス
       }
     }
-  }, [projectMeta, groupingMode, setSelectedPageId, handleItemSelect, setViewMode]);
+  }, [projectMeta, setSelectedPageId, handleItemSelect, setViewMode, setPendingFocusNodeId]);
 
   const handleExportClick = () => {
     setShowExportModal(true);
@@ -426,7 +465,7 @@ const DashboardView: React.FC = () => {
               </thead>
               <tbody>
                 {groupedStats.map(stat => (
-                  <tr key={stat.id} onClick={() => handleJumpToEditor(stat)} className="clickable-row" style={{ cursor: 'pointer' }}>
+                  <tr key={stat.id} onClick={() => handleJumpToEditor(stat.id)} className="clickable-row" style={{ cursor: 'pointer' }}>
                     <td>{stat.name}</td>
                     <td>{stat.interaction_count}</td>
                     <td>{stat.unique_users}</td>
@@ -472,16 +511,100 @@ const DashboardView: React.FC = () => {
     </>
   );
 
-  const renderPsychometricsTab = () => (
-    <div className="dashboard-charts-section grid-2-col">
-      <div className="chart-container">
-        <ThinkingTimeChart data={extendedStats?.thinkingTime || []} />
+  const renderPsychometricsTab = () => {
+    // 心理分析データを取得し、新しいラベルロジックで名前を補完・ソート
+    const analysisData = extendedStats?.inputAnalytics || [];
+    const sortedData = [...analysisData].sort((a, b) => b.avgHesitation - a.avgHesitation);
+
+    return (
+      <div className="dashboard-charts-section grid-2-col">
+        <div className="filter-bar full-width" style={{ display: 'flex', gap: '12px', marginBottom: '8px', gridColumn: '1 / -1', alignItems: 'center' }}>
+          <select
+            value={dateRangeFilter}
+            onChange={(e) => setDateRangeFilter(Number(e.target.value))}
+            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #3f3f46', background: '#27272a', color: 'white' }}
+          >
+            <option value="7">過去7日間</option>
+            <option value="30">過去30日間</option>
+            <option value="90">過去90日間</option>
+            <option value="365">全期間</option>
+          </select>
+        </div>
+        <div className="chart-container">
+          <ThinkingTimeChart data={extendedStats?.thinkingTime || []} />
+        </div>
+        <div className="chart-container full-width">
+          <PsychometricsChart data={extendedStats?.inputAnalytics || []} />
+        </div>
+
+        {/* 詳細ランキングテーブル */}
+        <div className="dashboard-table-section full-width">
+          <h3 className="section-title">項目別 迷い・回答詳細一覧</h3>
+          <div className="table-wrapper">
+            <table className="leads-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '50px' }}>順位</th>
+                  <th>項目名</th>
+                  <th style={{ width: '100px' }}>平均検討時間</th>
+                  <th style={{ width: '100px' }}>迷い指数</th>
+                  <th style={{ width: '100px' }}>回答数 (N)</th>
+                  <th style={{ width: '80px' }}>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedData.map((item, index) => {
+                  // 最新のラベルを取得
+                  const displayName = getNodeDisplayName(item.nodeId);
+                  const isLowData = item.sampleCount < 10;
+
+                  return (
+                    <tr key={item.nodeId} className={isLowData ? "low-data-row" : ""}>
+                      <td>{index + 1}</td>
+                      <td>
+                        <div className="node-name-cell">
+                          {displayName}
+                          <span className="node-id-sub">{item.nodeId}</span>
+                        </div>
+                      </td>
+                      <td>
+                        {item.avgDuration ? `${item.avgDuration.toFixed(1)}秒` : '-'}
+                      </td>
+                      <td>
+                        <span className={`score-badge ${item.avgHesitation > 60 ? 'high' : item.avgHesitation > 30 ? 'mid' : 'low'}`}>
+                          {item.avgHesitation.toFixed(0)}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="count-cell">
+                          {item.sampleCount}
+                          {isLowData && (
+                            <span className="warning-icon" title={`回答数が少ないため（N=${item.sampleCount}）、統計的な信頼性が低くなっています`}>⚠️</span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <button
+                          className="jump-button"
+                          onClick={(e) => { e.stopPropagation(); handleJumpToEditor(item.nodeId); }}
+                          title="エディタで確認・修正"
+                        >
+                          🚀 修正
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {sortedData.length === 0 && (
+                  <tr><td colSpan={5} className="empty-cell">データがありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-      <div className="chart-container full-width">
-        <PsychometricsChart data={extendedStats?.inputAnalytics || []} />
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderFlowTab = () => (
     <div className="dashboard-charts-section grid-2-col">

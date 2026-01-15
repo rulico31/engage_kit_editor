@@ -41,11 +41,13 @@ const Artboard: React.FC = () => {
     handleBackgroundClick: state.handleBackgroundClick,
   }));
 
-  const { isPreviewing, gridSize, showGrid, isMobileView } = useEditorSettingsStore(state => ({
+  const { isPreviewing, gridSize, showGrid, isMobileView, pendingFocusNodeId, setPendingFocusNodeId } = useEditorSettingsStore(state => ({
     isPreviewing: state.isPreviewing,
     gridSize: state.gridSize,
     showGrid: state.showGrid,
     isMobileView: state.isMobileView,
+    pendingFocusNodeId: state.pendingFocusNodeId,
+    setPendingFocusNodeId: state.setPendingFocusNodeId
   }));
 
   const { previewState, variables, onItemEvent, onVariableChange, initPreview, stopPreview } = usePreviewStore(state => ({
@@ -92,6 +94,36 @@ const Artboard: React.FC = () => {
   }, [theme]);
 
   const artboardRef = useRef<HTMLDivElement>(null);
+
+  // Focus Management (Scrolling)
+  React.useEffect(() => {
+    if (pendingFocusNodeId && artboardRef.current) {
+      // Try to find DOM element
+      // Note: PlacedItem and Comment components should have IDs that can be targeted.
+      // Assuming PlacedItems are rendered with some ID attribute or we can find them via data attributes.
+      // If ArtboardItem wrapper doesn't have the ID, we might need to rely on the fact that they are children.
+      // Let's assume for now we can find by ID if the implementation supports it, otherwise we might need to iterate children.
+
+      // Actually, ArtboardItem is a component. We need checks.
+      // But simply searching for ID might work if the rendered HTML has it.
+      // If not, we might need a map of refs, but that's complex.
+      // Let's rely on `document.getElementById` if possible, or querySelector with data-id.
+      // Looking at ArtboardItem implementation (not fully visible here but assuming standard), it might not have the exact ID on wrapper.
+      // Let's try `[data-item-id="${pendingFocusNodeId}"]` which is common practice.
+
+      const el = artboardRef.current.querySelector(`[data-item-id="${pendingFocusNodeId}"]`) || document.getElementById(pendingFocusNodeId);
+
+      if (el) {
+        console.log('[Artboard] Scrolling to item:', pendingFocusNodeId);
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+
+        // Highlight/Select
+        handleItemSelect(pendingFocusNodeId, 'item', false); // Select it
+
+        setPendingFocusNodeId(null);
+      }
+    }
+  }, [pendingFocusNodeId, setPendingFocusNodeId, handleItemSelect]);
 
   // updateItem のラッパー（型の互換性のため）
   const handleItemUpdate = useCallback((id: string, updates: Partial<PlacedItemType>, addToHistory?: boolean) => {
