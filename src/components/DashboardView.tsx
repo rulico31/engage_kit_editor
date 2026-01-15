@@ -38,7 +38,7 @@ interface GroupedStat {
   unique_users: number;
 }
 
-type DashboardTab = 'overview' | 'psychometrics' | 'flow';
+type DashboardTab = 'overview' | 'behavior' | 'content';
 
 const DashboardView: React.FC = () => {
   const currentProjectId = useProjectStore(state => state.currentProjectId);
@@ -511,33 +511,159 @@ const DashboardView: React.FC = () => {
     </>
   );
 
-  const renderPsychometricsTab = () => {
+  // --- Behavior Analysis Tab (User Actions & Environment) ---
+  const renderBehaviorTab = () => {
+    if (!extendedStats?.advanced) return <div className="p-4 text-gray-400">データ収集中...</div>;
+    const { deviceStats, pageDwellTime } = extendedStats.advanced;
+
+    return (
+      <div className="space-y-8 animate-fade-in">
+        {/* 1. Device / Browser Analysis */}
+        <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
+          <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+            詳細デバイス・環境分析
+            <span className="text-xs font-normal text-zinc-400 bg-zinc-800 px-2 py-1 rounded">CVR分析</span>
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div style={{ height: 300 }}>
+              <h4 className="text-sm text-zinc-400 mb-2">OS別パフォーマンス</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deviceStats.os} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" horizontal={false} />
+                  <XAxis type="number" stroke="#a1a1aa" fontSize={12} />
+                  <YAxis dataKey="name" type="category" stroke="#a1a1aa" fontSize={12} width={80} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', color: '#fff' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="sessions" name="セッション" fill="#8884d8" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="mod_cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ height: 300 }}>
+              <h4 className="text-sm text-zinc-400 mb-2">ブラウザ別パフォーマンス</h4>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deviceStats.browser} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" horizontal={false} />
+                  <XAxis type="number" stroke="#a1a1aa" fontSize={12} />
+                  <YAxis dataKey="name" type="category" stroke="#a1a1aa" fontSize={12} width={80} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', color: '#fff' }}
+                    itemStyle={{ color: '#fff' }}
+                  />
+                  <Legend />
+                  <Bar dataKey="sessions" name="セッション" fill="#82ca9d" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
+
+        {/* 2. Flow & Navigation Analysis */}
+        <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
+          <h3 className="text-lg font-medium text-white mb-4">回遊・ナビゲーション分析</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Backtracks */}
+            <div className="chart-container" style={{ margin: 0, padding: 0, background: 'transparent', boxShadow: 'none' }}>
+              <BacktrackHeatmap data={extendedStats?.backtracks || []} />
+            </div>
+            {/* Engagement Distribution */}
+            <div className="chart-container" style={{ margin: 0, padding: 0, background: 'transparent', boxShadow: 'none' }}>
+              <EngagementDistribution data={extendedStats?.engagementDistribution || []} />
+            </div>
+          </div>
+        </section>
+
+        {/* 3. Page Dwell Time */}
+        <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
+          <h3 className="text-lg font-medium text-white mb-4">ページ別平均滞在時間 (秒)</h3>
+          <div style={{ height: 300 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={pageDwellTime} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" horizontal={false} />
+                <XAxis type="number" stroke="#a1a1aa" fontSize={12} unit="秒" />
+                <YAxis dataKey="pageName" type="category" stroke="#a1a1aa" fontSize={12} width={100} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', color: '#fff' }}
+                  cursor={{ fill: '#3f3f46', opacity: 0.4 }}
+                  formatter={(value: number) => [`${value.toFixed(1)} 秒`, '平均滞在時間']}
+                />
+                <Bar dataKey="avgTimeSec" fill="#fbbf24" radius={[0, 4, 4, 0]} barSize={30}>
+                  {pageDwellTime.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.avgTimeSec > 60 ? '#f87171' : '#fbbf24'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      </div>
+    );
+  };
+
+  // --- Content & Item Analysis Tab ---
+  const renderContentTab = () => {
     // 心理分析データを取得し、新しいラベルロジックで名前を補完・ソート
     const analysisData = extendedStats?.inputAnalytics || [];
     const sortedData = [...analysisData].sort((a, b) => b.avgHesitation - a.avgHesitation);
+    const scoreFlowData = extendedStats?.advanced?.scoreFlow || [];
 
     return (
-      <div className="dashboard-charts-section grid-2-col">
-        <div className="filter-bar full-width" style={{ display: 'flex', gap: '12px', marginBottom: '8px', gridColumn: '1 / -1', alignItems: 'center' }}>
-          <select
-            value={dateRangeFilter}
-            onChange={(e) => setDateRangeFilter(Number(e.target.value))}
-            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #3f3f46', background: '#27272a', color: 'white' }}
-          >
-            <option value="7">過去7日間</option>
-            <option value="30">過去30日間</option>
-            <option value="90">過去90日間</option>
-            <option value="365">全期間</option>
-          </select>
-        </div>
-        <div className="chart-container">
-          <ThinkingTimeChart data={extendedStats?.thinkingTime || []} />
-        </div>
-        <div className="chart-container full-width">
-          <PsychometricsChart data={extendedStats?.inputAnalytics || []} />
+      <div className="space-y-8 animate-fade-in">
+
+        {/* 1. Psychometrics Charts */}
+        <div className="dashboard-charts-section grid-2-col">
+          <div className="filter-bar full-width" style={{ display: 'flex', gap: '12px', marginBottom: '8px', gridColumn: '1 / -1', alignItems: 'center' }}>
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => setDateRangeFilter(Number(e.target.value))}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #3f3f46', background: '#27272a', color: 'white' }}
+            >
+              <option value="7">過去7日間</option>
+              <option value="30">過去30日間</option>
+              <option value="90">過去90日間</option>
+              <option value="365">全期間</option>
+            </select>
+          </div>
+          <div className="chart-container">
+            <ThinkingTimeChart data={extendedStats?.thinkingTime || []} />
+          </div>
+          <div className="chart-container full-width">
+            <PsychometricsChart data={extendedStats?.inputAnalytics || []} />
+          </div>
         </div>
 
-        {/* 詳細ランキングテーブル */}
+        {/* 2. Score Flow Analysis (Moved from Advanced) */}
+        <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
+          <h3 className="text-lg font-medium text-white mb-4">スコア変動フロー（熱量推移）</h3>
+          <p className="text-sm text-zinc-400 mb-4">設問ごとのユーザーエンゲージメントスコアの推移を可視化します。</p>
+          <div style={{ height: 350 }}>
+            {scoreFlowData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={scoreFlowData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" vertical={false} />
+                  <XAxis dataKey="nodeName" stroke="#a1a1aa" fontSize={12} angle={-15} textAnchor="end" height={60} />
+                  <YAxis stroke="#a1a1aa" fontSize={12} label={{ value: '累積スコア', angle: -90, position: 'insideLeft', fill: '#a1a1aa' }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', color: '#fff' }}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="cumulativeScore" name="平均累積スコア" stroke="#f472b6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="monotone" dataKey="avgScoreDelta" name="平均増減(Delta)" stroke="#60a5fa" strokeDasharray="5 5" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-zinc-500">
+                スコア変動データがありません（スコアアクション未設定の可能性）
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* 3. Detailed Ranking Table */}
         <div className="dashboard-table-section full-width">
           <h3 className="section-title">項目別 迷い・回答詳細一覧</h3>
           <div className="table-wrapper">
@@ -606,16 +732,7 @@ const DashboardView: React.FC = () => {
     );
   };
 
-  const renderFlowTab = () => (
-    <div className="dashboard-charts-section grid-2-col">
-      <div className="chart-container">
-        <BacktrackHeatmap data={extendedStats?.backtracks || []} />
-      </div>
-      <div className="chart-container">
-        <EngagementDistribution data={extendedStats?.engagementDistribution || []} />
-      </div>
-    </div>
-  );
+
 
   // --- Main Render ---
 
@@ -637,15 +754,15 @@ const DashboardView: React.FC = () => {
       </div>
 
       <div className="dashboard-tabs">
-        <button className={`dashboard-tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>📈 サマリー</button>
-        <button className={`dashboard-tab ${activeTab === 'psychometrics' ? 'active' : ''}`} onClick={() => setActiveTab('psychometrics')}>🧠 入力心理分析</button>
-        <button className={`dashboard-tab ${activeTab === 'flow' ? 'active' : ''}`} onClick={() => setActiveTab('flow')}>🔄 行動フロー</button>
+        <button className={`dashboard-tab ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>📈 全体サマリー</button>
+        <button className={`dashboard-tab ${activeTab === 'behavior' ? 'active' : ''}`} onClick={() => setActiveTab('behavior')}>🔄 ユーザー行動分析</button>
+        <button className={`dashboard-tab ${activeTab === 'content' ? 'active' : ''}`} onClick={() => setActiveTab('content')}>🧠 設問・コンテンツ分析</button>
       </div>
 
       <div className="dashboard-content">
         {activeTab === 'overview' && renderOverviewTab()}
-        {activeTab === 'psychometrics' && renderPsychometricsTab()}
-        {activeTab === 'flow' && renderFlowTab()}
+        {activeTab === 'behavior' && renderBehaviorTab()}
+        {activeTab === 'content' && renderContentTab()}
       </div>
 
       {showExportModal && (

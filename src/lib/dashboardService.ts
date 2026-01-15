@@ -190,16 +190,70 @@ export interface BacktrackStat {
   count: number;
 }
 
+export interface StatFilters {
+  dateRange?: { start: Date; end: Date };
+}
+
+// --- Advanced Stats Interfaces ---
+
+export interface DeviceStatItem {
+  name: string;
+  sessions: number;
+  conversions: number;
+  cvr: number;
+}
+
+export interface ScoreFlowStat {
+  nodeId: string;
+  nodeName: string;
+  avgScoreDelta: number;
+  cumulativeScore: number;
+  count: number;
+}
+
+export interface PageDwellTimeStat {
+  pageId: string;
+  pageName: string;
+  avgTimeSec: number;
+  sampleCount: number;
+}
+
+export interface AdvancedStats {
+  deviceStats: {
+    os: DeviceStatItem[];
+    browser: DeviceStatItem[];
+  };
+  scoreFlow: ScoreFlowStat[];
+  pageDwellTime: PageDwellTimeStat[];
+}
+
 export interface ExtendedStats {
   thinkingTime: ThinkingTimeStat[];
   inputAnalytics: InputAnalyticsStat[];
   backtracks: BacktrackStat[];
   engagementDistribution: { range: string; count: number }[];
+  advanced: AdvancedStats; // Added
 }
 
-export interface StatFilters {
-  dateRange?: { start: Date; end: Date };
-}
+// --- Helpers ---
+
+const normalizeOS = (os: string | undefined): string => {
+  if (!os) return 'Unknown';
+  if (os.match(/iOS|iPhone|iPad|iPod/i)) return 'Mobile iOS';
+  if (os.match(/Android/i)) return 'Android';
+  if (os.match(/Mac/i)) return 'Mac OS';
+  if (os.match(/Windows/i)) return 'Windows';
+  return os;
+};
+
+const normalizeBrowser = (browser: string | undefined): string => {
+  if (!browser) return 'Unknown';
+  if (browser.match(/Chrome|CriOS/i)) return 'Chrome';
+  if (browser.match(/Safari/i) && !browser.match(/Chrome|CriOS/i)) return 'Safari';
+  if (browser.match(/Firefox|FxiOS/i)) return 'Firefox';
+  if (browser.match(/Edge/i)) return 'Edge';
+  return browser;
+};
 
 /**
  * 詳細分析データの取得（心理分析・フロー）
@@ -207,7 +261,17 @@ export interface StatFilters {
  */
 export const fetchExtendedStats = async (projectId: string, filters?: StatFilters): Promise<ExtendedStats> => {
   if (!projectId || projectId.startsWith('local-')) {
-    return { thinkingTime: [], inputAnalytics: [], backtracks: [], engagementDistribution: [] };
+    return {
+      thinkingTime: [],
+      inputAnalytics: [],
+      backtracks: [],
+      engagementDistribution: [],
+      advanced: {
+        deviceStats: { os: [], browser: [] },
+        scoreFlow: [],
+        pageDwellTime: []
+      }
+    };
   }
 
   // クエリビルダヘルパー
@@ -238,12 +302,16 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
   // 2. 思考時間データの取得 (interactionLogs)
   let interactionQuery = supabase
     .from('analytics_logs')
-    .select('node_id, metadata, created_at, device_info')
+    .select('node_id, metadata, created_at, device_info, session_id, event_type')
     .eq('project_id', projectId)
     .eq('event_type', 'interaction');
 
   interactionQuery = applyFilters(interactionQuery);
   const { data: interactionLogs } = await interactionQuery;
+
+  // ...
+
+
 
   const thinkingTimeCounts: Record<string, number> = { intuitive: 0, normal: 0, hesitation: 0, noise: 0 };
 
@@ -343,6 +411,182 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
   backtrackQuery = applyFilters(backtrackQuery);
   const { data: backtrackLogs } = await backtrackQuery;
 
+  // --- Advanced Analytics Fetching ---
+
+  // 4. デバイス分析用（Page View + Leads）
+  // セッションベースでCVRを出すため、page_viewログとleadsを取得して突き合わせる
+  let pvQuery = supabase
+    .from('analytics_logs')
+    .select('session_id, device_info, created_at')
+    .eq('project_id', projectId)
+    .eq('event_type', 'page_view');
+  pvQuery = applyFilters(pvQuery);
+  const { data: pvLogs } = await pvQuery;
+
+  // Leads for CV matching (reuse logic below for query construction if needed, but fetch minimal fields)
+  let advLeadsQuery = supabase
+    .from('leads')
+    .select('session_id, created_at')
+    .eq('project_id', projectId);
+  if (filters?.dateRange) {
+    advLeadsQuery = advLeadsQuery.gte('created_at', filters.dateRange.start.toISOString())
+      .lte('created_at', filters.dateRange.end.toISOString());
+  }
+  const { data: advLeads } = await advLeadsQuery;
+  const cvSessionIds = new Set((advLeads || []).map((l: any) => l.session_id));
+
+  // 5. スコア変動分析用
+  let scoreQuery = supabase
+    .from('analytics_logs')
+    .select('node_id, metadata, created_at, session_id, event_type')
+    .eq('project_id', projectId)
+    .eq('event_type', 'score_change');
+  scoreQuery = applyFilters(scoreQuery);
+  const { data: scoreLogs } = await scoreQuery;
+
+  // 6. 滞在時間分析用 (Page Execution + Interactions to determine dwell time)
+  // ページ表示(node_execution:page)のログを取得。
+  // 終了時刻を知るために、同セッションの「次のイベント」を探す必要があるため、全イベント簡易ログが必要だが、
+  // 量が多いので、ここでは `interaction` と `node_execution` を merge して近似計算する。
+  let pageExecQuery = supabase
+    .from('analytics_logs')
+    .select('session_id, node_id, metadata, created_at, event_type')
+    .eq('project_id', projectId)
+    .eq('event_type', 'node_execution'); // type=page is in metadata
+  pageExecQuery = applyFilters(pageExecQuery);
+  const { data: pageLogs } = await pageExecQuery;
+
+  // --- Advanced Aggregation Logic ---
+
+  // A. Device Stats Aggregation
+  const osStats: Record<string, { sessions: number; conversions: number }> = {};
+  const browserStats: Record<string, { sessions: number; conversions: number }> = {};
+  const processedSessions = new Set<string>();
+
+  (pvLogs || []).forEach((log: any) => {
+    if (processedSessions.has(log.session_id)) return; // 1セッション1回カウント
+    processedSessions.add(log.session_id);
+
+    const info = log.device_info || {};
+    const osName = normalizeOS(info.os_name);
+    const browserName = normalizeBrowser(info.browser_name);
+
+    if (!osStats[osName]) osStats[osName] = { sessions: 0, conversions: 0 };
+    osStats[osName].sessions++;
+
+    if (!browserStats[browserName]) browserStats[browserName] = { sessions: 0, conversions: 0 };
+    browserStats[browserName].sessions++;
+
+    if (cvSessionIds.has(log.session_id)) {
+      osStats[osName].conversions++;
+      browserStats[browserName].conversions++;
+    }
+  });
+
+  const advancedDeviceStats = {
+    os: Object.entries(osStats).map(([name, val]) => ({
+      name,
+      sessions: val.sessions,
+      conversions: val.conversions,
+      cvr: val.sessions > 0 ? (val.conversions / val.sessions) * 100 : 0
+    })).sort((a, b) => b.sessions - a.sessions),
+    browser: Object.entries(browserStats).map(([name, val]) => ({
+      name,
+      sessions: val.sessions,
+      conversions: val.conversions,
+      cvr: val.sessions > 0 ? (val.conversions / val.sessions) * 100 : 0
+    })).sort((a, b) => b.sessions - a.sessions)
+  };
+
+  // B. Score Flow Aggregation (Waterfall)
+  const nodeScoreMap = new Map<string, { totalDelta: number; count: number; name: string }>();
+  (scoreLogs || []).forEach((log: any) => {
+    const nodeId = log.node_id;
+    const delta = log.metadata?.delta || 0;
+    const name = log.metadata?.node_name || nodeId; // ログに名前があれば使う
+
+    const current = nodeScoreMap.get(nodeId) || { totalDelta: 0, count: 0, name };
+    current.totalDelta += delta;
+    current.count++;
+    nodeScoreMap.set(nodeId, current);
+  });
+
+  // 累積スコア計算用の簡易ロジック（フロー順序が不明なため、ここでは単純にノードごとの平均増減を表示）
+  // 本来はフロー図順に並べる必要があるが、ここではリストとして返す。
+  let currentCumulative = 0;
+  const advancedScoreFlow = Array.from(nodeScoreMap.entries()).map(([nodeId, val]) => {
+    const avgDelta = val.totalDelta / val.count;
+    currentCumulative += avgDelta; // 注意: ノード順序が不定だと累積値は意味を持たない可能性がある。
+    // 将来的には projectMeta.pageOrder などを使ってソートすべき。
+    return {
+      nodeId,
+      nodeName: val.name,
+      avgScoreDelta: avgDelta,
+      cumulativeScore: currentCumulative, // 仮
+      count: val.count
+    };
+  }).sort((a, b) => b.count - a.count); // とりあえず回数順（よく通るルート）
+
+  // C. Page Dwell Time Aggregation
+  const sessionEventsMap = new Map<string, any[]>();
+  // マージ: page execution logs + interaction logs + score logs (as activity markers) + pv logs
+  // 必要なのは「ページが表示された時間」と「次の何かが起きた時間」
+  const allActivityLogs = [
+    ...(pageLogs || []),
+    ...(interactionLogs || []),
+    ...(scoreLogs || [])
+  ];
+
+  allActivityLogs.forEach((log: any) => {
+    if (!log.session_id) return;
+    if (!sessionEventsMap.has(log.session_id)) sessionEventsMap.set(log.session_id, []);
+    sessionEventsMap.get(log.session_id)?.push({
+      ...log,
+      timestamp: new Date(log.created_at).getTime()
+    });
+  });
+
+  const pageDwellMap = new Map<string, { totalTime: number; count: number; name: string }>();
+
+  sessionEventsMap.forEach((events) => {
+    // 時系列ソート
+    events.sort((a, b) => a.timestamp - b.timestamp);
+
+    events.forEach((ev, index) => {
+      // ページ表示イベントを探す
+      if (ev.event_type === 'node_execution' && ev.metadata?.type === 'page') {
+        const pageId = ev.node_id;
+        const pageName = ev.metadata?.page_name || pageId;
+
+        // 次のイベントを探す
+        const nextEv = events[index + 1];
+        if (nextEv) {
+          const diff = nextEv.timestamp - ev.timestamp;
+          // 異常値除外 (30分以上は除外, 0秒未満は無視)
+          if (diff > 0 && diff < 30 * 60 * 1000) {
+            const current = pageDwellMap.get(pageId) || { totalTime: 0, count: 0, name: pageName };
+            current.totalTime += diff;
+            current.count++;
+            pageDwellMap.set(pageId, current);
+          }
+        }
+      }
+    });
+  });
+
+  const advancedPageDwellTime = Array.from(pageDwellMap.entries()).map(([pageId, val]) => ({
+    pageId,
+    pageName: val.name,
+    avgTimeSec: (val.totalTime / val.count) / 1000,
+    sampleCount: val.count
+  })).sort((a, b) => b.avgTimeSec - a.avgTimeSec);
+
+  const advancedStats: AdvancedStats = {
+    deviceStats: advancedDeviceStats,
+    scoreFlow: advancedScoreFlow,
+    pageDwellTime: advancedPageDwellTime
+  };
+
   const backtrackMap = new Map<string, number>();
   (backtrackLogs || []).forEach((log: any) => {
     const from = log.metadata?.from_page_name || 'Unknown';
@@ -395,7 +639,8 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     thinkingTime: thinkingTimeStats,
     inputAnalytics: inputStats,
     backtracks: backtrackStats,
-    engagementDistribution
+    engagementDistribution,
+    advanced: advancedStats
   };
 };
 
