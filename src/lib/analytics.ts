@@ -33,6 +33,9 @@ export type AnalyticsEventType =
   | 'backtracking'    // バックトラッキング（戻る操作）
   | 'input_correction' // 入力修正（バックスペース・削除検知 - 旧）
   | 'input_analysis'   // 入力心理分析（新）
+  | 'read_content'    // 熟読検知 (New: B2B分析)
+  | 'scroll_depth'    // スクロール深度 (New: B2B分析)
+  | 'exit_intent'     // 離脱直前の挙動 (New: B2B分析)
   | 'error';          // ランタイムエラー
 
 /**

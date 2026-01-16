@@ -72,19 +72,26 @@ export const submitLeadData = async (variables: Record<string, any>): Promise<bo
   const sessionId = getOrCreateSessionId();
   const ipAddress = await fetchIpAddress();
 
-  const payload = {
+  // B2B Scoring Calculation
+  const totalScore = (variables._system_total_score as number) || 0;
+  let maturityRank = 'Cold';
+  if (totalScore >= 80) maturityRank = 'Hot';
+  else if (totalScore >= 40) maturityRank = 'Warm';
+
+  const userAgent = navigator.userAgent;
+  const deviceType = getDeviceType();
+
+  const { error } = await supabase.from('leads').insert({
     project_id: projectId,
     session_id: sessionId,
     data: variables,
     ip_address: ipAddress,
-    user_agent: navigator.userAgent,
+    user_agent: userAgent,
     referrer: document.referrer,
-    device_type: getDeviceType(),
-  };
-
-  const { error } = await supabase
-    .from('leads')
-    .insert(payload);
+    device_type: deviceType, // 'desktop', 'mobile', 'tablet'
+    score: totalScore,
+    maturity_rank: maturityRank
+  });
 
   if (error) {
     console.error('[Leads] Error submitting data:', error);

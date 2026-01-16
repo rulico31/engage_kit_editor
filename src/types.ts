@@ -61,6 +61,9 @@ export interface PlacedItemType {
     // 電話番号入力用
     enableCountryCode?: boolean; // 国コード選択UIを表示するか
     countryCode?: string; // 選択された国コード (例: "+81")
+
+    // B2B Scoring
+    score?: number; // 加算スコア (回答/クリック時)
   };
 }
 

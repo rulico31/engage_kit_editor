@@ -90,8 +90,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       useToastStore.getState().addToast('ログアウトしました', 'info');
     } catch (error: any) {
       console.error('Sign out failed:', error);
-      useToastStore.getState().addToast('ログアウトに失敗しました', 'error');
-      set({ isLoading: false });
+      // サーバー側のログアウトに失敗しても、クライアント側ではログアウト扱いにする
+      set({ user: null, isLoading: false });
+      // useToastStore.getState().addToast('ログアウトに失敗しました', 'error'); // To avoid confusion, maybe treat as success or warning?
+      // "ログアウトしました（サーバー通信エラーあり）"だとユーザーが困惑するので、
+      // ユーザーにとっては「ログアウトできた」ことが重要。
+      useToastStore.getState().addToast('ログアウトしました', 'info');
     }
   },
 

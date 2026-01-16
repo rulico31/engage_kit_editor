@@ -707,6 +707,26 @@ export const ItemPropertiesEditor: React.FC<ItemPropertiesEditorProps> = (props)
               <CheckboxProp label="初期状態で表示する" checked={item.data?.initialVisibility !== false} onChange={(v) => handleDataChange("initialVisibility", v)} onBlur={handleDataBlur} />
             </AccordionSection>
 
+            {/* B2B Scoring Section */}
+            {(item.name.startsWith("ボタン") || item.name.startsWith("テキスト入力欄")) && (
+              <AccordionSection title="スコアリング (B2B Analysis)" defaultOpen={true}>
+                <div className="prop-group">
+                  <div className="prop-label">
+                    スコア加算値 (Score Weight)
+                  </div>
+                  <NumberInput
+                    label="Points"
+                    value={item.data?.score || 0}
+                    onChange={(v) => handleDataChange("score", v)}
+                    onBlur={handleDataBlur}
+                  />
+                  <div style={{ fontSize: '10px', color: '#888', marginTop: 4 }}>
+                    ユーザーがこのアクションを行った際に加算されるスコア (Hot Lead判定に使用)
+                  </div>
+                </div>
+              </AccordionSection>
+            )}
+
 
           </>
         )}

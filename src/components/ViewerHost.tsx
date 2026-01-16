@@ -56,6 +56,13 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   const [scale, setScale] = useState(1);
 
+  // --- B2B Analytics Refs ---
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const maxScrollDepthRef = useRef(0);
+  const readTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastInteractedItemRef = useRef<{ id: string, type: string, timestamp: number } | null>(null);
+  const loggedThresholdsRef = useRef<Set<number>>(new Set());
+
   const initPreview = usePreviewStore(state => state.initPreview);
   const loadFromData = usePageStore(state => state.loadFromData);
 
@@ -163,6 +170,93 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // --- B2B Analytics Logic ---
+
+  // 1. Scroll Depth & Read Content
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollHeight <= clientHeight) return;
+
+      // Scroll Depth (0-100)
+      const scrollPercent = Math.round(((scrollTop + clientHeight) / scrollHeight) * 100);
+
+      if (scrollPercent > maxScrollDepthRef.current) {
+        maxScrollDepthRef.current = scrollPercent;
+
+        // Thresholds: 25, 50, 75, 90
+        [25, 50, 75, 90].forEach(threshold => {
+          if (scrollPercent >= threshold && !loggedThresholdsRef.current.has(threshold)) {
+            loggedThresholdsRef.current.add(threshold);
+            logAnalyticsEvent('scroll_depth', {
+              metadata: { depth: threshold, percent: scrollPercent }
+            }, projectId);
+          }
+        });
+      }
+
+      // Read Content (Stop for > 3s)
+      if (readTimerRef.current) clearTimeout(readTimerRef.current);
+      readTimerRef.current = setTimeout(() => {
+        // Calculate logical position (0.0 - 1.0)
+        const positionRatio = scrollTop / (scrollHeight - clientHeight);
+        logAnalyticsEvent('read_content', {
+          metadata: {
+            position_ratio: Math.round(positionRatio * 100) / 100,
+            duration_ms: 3000
+          }
+        }, projectId);
+      }, 3000);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (readTimerRef.current) clearTimeout(readTimerRef.current);
+    };
+  }, [projectId]);
+
+  // 2. Exit Intent (True Exit)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const lastItem = lastInteractedItemRef.current;
+      // 最後の操作から10秒以内なら「その操作で離脱した」とみなす
+      if (lastItem && (Date.now() - lastItem.timestamp < 10000)) {
+        // Note: beforeunloadでの非同期通信は保証されないため、navigator.sendBeaconがあれば使う
+        // logAnalyticsEvent内部実装に任せるが、ここではベストエフォート
+        const payload = {
+          nodeId: lastItem.id,
+          nodeType: lastItem.type,
+          metadata: { exit_type: 'window_close' }
+        };
+        // 同期的に送信できないため、sendBeacon推奨だが、簡易的に呼び出す
+        logAnalyticsEvent('exit_intent', payload, projectId);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [projectId]);
+
+  // 3. User Interaction Tracking (Capture Phase)
+  // onClickCaptureでページ内のクリックを監視し、最後に触ったアイテムを記録
+  const handleGlobalClickCapture = (e: React.MouseEvent) => {
+    // data-node-id 属性を持つ要素を探す (PreviewItemなどで付与されていると仮定、または付与する必要あり)
+    // 現状はDOM構造に依存するため、簡易的にターゲット情報を保存
+    const target = e.target as HTMLElement;
+    // もし要素にIDがあれば記録
+    // 実際のアイテムIDを拾うには PreviewItem 側で data-id をつけるのがベストだが
+    // ここでは座標やクラス名などをヒントにするか、PreviewStateの更新を監視する方が正確かもしれない
+    // いったん「最後にクリックが発生した」事実のみ記録
+    lastInteractedItemRef.current = {
+      id: target.id || 'unknown',
+      type: target.tagName,
+      timestamp: Date.now()
+    };
+  };
+
   // 計算した高さをスケールに合わせて適用
   const wrapperHeight = contentHeight * scale;
 
@@ -223,7 +317,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   };
 
   return (
-    <div style={backgroundStyle}>
+    <div
+      ref={scrollContainerRef}
+      style={backgroundStyle}
+      onClickCapture={handleGlobalClickCapture}
+    >
       <div style={{
         width: "100%",
         minHeight: "100%",

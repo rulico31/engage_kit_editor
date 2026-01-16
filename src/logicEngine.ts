@@ -252,6 +252,34 @@ export const triggerEvent = (
     }
   }
 
+  // --- B2B Scoring Logic ---
+  // イベント発生源のアイテムにスコアが設定されていれば加算する
+  const targetItem = placedItems.find(p => p.id === targetItemId);
+  if (targetItem && targetItem.data.score && typeof targetItem.data.score === 'number') {
+    const currentVars = getVariables();
+    const currentScore = (currentVars._system_total_score as number) || 0;
+    const scoreToAdd = targetItem.data.score;
+    const newScore = currentScore + scoreToAdd;
+
+    console.log(`📈 Score Update: ${currentScore} + ${scoreToAdd} = ${newScore}`);
+
+    setVariables({
+      ...currentVars,
+      _system_total_score: newScore
+    });
+
+    context.logEvent('score_change', {
+      nodeId: targetItemId,
+      nodeType: 'item_interaction',
+      metadata: {
+        oldScore: currentScore,
+        newScore: newScore,
+        added: scoreToAdd,
+        itemLabel: (targetItem.data as any).text || (targetItem.data as any).label || targetItem.name
+      }
+    });
+  }
+
   // 2. イベント開始ノードを探す
   const startingNodes = nodes.filter((n) => {
     if (n.type !== "eventNode" || n.data.eventType !== eventName) return false;

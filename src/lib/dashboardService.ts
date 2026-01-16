@@ -10,6 +10,8 @@ export interface LeadData {
   device_type: string | null;
   created_at: string;
   referrer: string | null;
+  score?: number;
+  maturity_rank?: string;
 }
 
 export interface AnalyticsStats {
@@ -103,12 +105,14 @@ export const fetchProjectStats = async (projectId: string) => {
 
   if (pvError) console.error('Error fetching PV:', pvError);
 
-  // 2. リードデータの取得 (leads)
+  // 2. リードの取得 (Hot Leads順: スコア降順 > 作成日降順)
   const { data: leads, error: leadsError } = await supabase
     .from('leads')
     .select('*')
     .eq('project_id', projectId)
-    .order('created_at', { ascending: false });
+    .order('score', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(100); // パフォーマンスのため直近100件に制限 (必要に応じてページネーション)
 
   if (leadsError) console.error('Error fetching leads:', leadsError);
 
@@ -260,7 +264,10 @@ const normalizeBrowser = (browser: string | undefined): string => {
  * 現時点ではRawログを取得してクライアント集計する
  */
 export const fetchExtendedStats = async (projectId: string, filters?: StatFilters): Promise<ExtendedStats> => {
+  console.log('[Dashboard-Extended] fetchExtendedStats called with projectId:', projectId, 'filters:', filters);
+
   if (!projectId || projectId.startsWith('local-')) {
+    console.warn('[Dashboard-Extended] Skipping stats fetch for local/empty projectId:', projectId);
     return {
       thinkingTime: [],
       inputAnalytics: [],
@@ -277,6 +284,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
   // クエリビルダヘルパー
   const applyFilters = (query: any) => {
     if (filters?.dateRange) {
+      console.log('[Dashboard-Extended] Applying Filter:', { start: filters.dateRange.start.toISOString(), end: filters.dateRange.end.toISOString() });
       query = query.gte('created_at', filters.dateRange.start.toISOString())
         .lte('created_at', filters.dateRange.end.toISOString());
     }
@@ -291,7 +299,8 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     .eq('event_type', 'input_analysis');
 
   inputQuery = applyFilters(inputQuery);
-  const { data: inputLogs } = await inputQuery;
+  const { data: inputLogs, error: inputError } = await inputQuery;
+  console.log('[Dashboard-Extended] Input Logs:', { count: inputLogs?.length, sample: inputLogs?.[0], error: inputError });
 
   // テキスト入力のnodeIdセットを作成
   const inputNodeIds = new Set<string>();
@@ -307,7 +316,8 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     .eq('event_type', 'interaction');
 
   interactionQuery = applyFilters(interactionQuery);
-  const { data: interactionLogs } = await interactionQuery;
+  const { data: interactionLogs, error: interactionError } = await interactionQuery;
+  console.log('[Dashboard-Extended] Interaction Logs:', { count: interactionLogs?.length, sample: interactionLogs?.[0], error: interactionError });
 
   // ...
 
@@ -410,6 +420,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
 
   backtrackQuery = applyFilters(backtrackQuery);
   const { data: backtrackLogs } = await backtrackQuery;
+  console.log('[Dashboard-Extended] Backtrack Logs:', { count: backtrackLogs?.length });
 
   // --- Advanced Analytics Fetching ---
 
@@ -443,6 +454,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     .eq('event_type', 'score_change');
   scoreQuery = applyFilters(scoreQuery);
   const { data: scoreLogs } = await scoreQuery;
+  console.log('[Dashboard-Extended] Score Logs:', { count: scoreLogs?.length });
 
   // 6. 滞在時間分析用 (Page Execution + Interactions to determine dwell time)
   // ページ表示(node_execution:page)のログを取得。
@@ -455,6 +467,8 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     .eq('event_type', 'node_execution'); // type=page is in metadata
   pageExecQuery = applyFilters(pageExecQuery);
   const { data: pageLogs } = await pageExecQuery;
+  console.log('[Dashboard-Extended] Page Execution Logs:', { count: pageLogs?.length, sample: pageLogs?.[0] });
+  console.log('[Dashboard-Extended] PV Logs (for Dwell Time):', { count: pvLogs?.length, sample: pvLogs?.[0] });
 
   // --- Advanced Aggregation Logic ---
 
@@ -483,16 +497,20 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     }
   });
 
+  const totalSessions = processedSessions.size || 1;
+
   const advancedDeviceStats = {
     os: Object.entries(osStats).map(([name, val]) => ({
       name,
       sessions: val.sessions,
+      sessionPercentage: (val.sessions / totalSessions) * 100, // Added percentage
       conversions: val.conversions,
       cvr: val.sessions > 0 ? (val.conversions / val.sessions) * 100 : 0
     })).sort((a, b) => b.sessions - a.sessions),
     browser: Object.entries(browserStats).map(([name, val]) => ({
       name,
       sessions: val.sessions,
+      sessionPercentage: (val.sessions / totalSessions) * 100, // Added percentage
       conversions: val.conversions,
       cvr: val.sessions > 0 ? (val.conversions / val.sessions) * 100 : 0
     })).sort((a, b) => b.sessions - a.sessions)
@@ -503,7 +521,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
   (scoreLogs || []).forEach((log: any) => {
     const nodeId = log.node_id;
     const delta = log.metadata?.delta || 0;
-    const name = log.metadata?.node_name || nodeId; // ログに名前があれば使う
+    const name = log.metadata?.node_name || nodeId;
 
     const current = nodeScoreMap.get(nodeId) || { totalDelta: 0, count: 0, name };
     current.totalDelta += delta;
@@ -511,30 +529,27 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     nodeScoreMap.set(nodeId, current);
   });
 
-  // 累積スコア計算用の簡易ロジック（フロー順序が不明なため、ここでは単純にノードごとの平均増減を表示）
-  // 本来はフロー図順に並べる必要があるが、ここではリストとして返す。
   let currentCumulative = 0;
   const advancedScoreFlow = Array.from(nodeScoreMap.entries()).map(([nodeId, val]) => {
     const avgDelta = val.totalDelta / val.count;
-    currentCumulative += avgDelta; // 注意: ノード順序が不定だと累積値は意味を持たない可能性がある。
-    // 将来的には projectMeta.pageOrder などを使ってソートすべき。
+    currentCumulative += avgDelta;
     return {
       nodeId,
       nodeName: val.name,
       avgScoreDelta: avgDelta,
-      cumulativeScore: currentCumulative, // 仮
+      cumulativeScore: currentCumulative,
       count: val.count
     };
-  }).sort((a, b) => b.count - a.count); // とりあえず回数順（よく通るルート）
+  }).sort((a, b) => b.count - a.count);
 
-  // C. Page Dwell Time Aggregation
+  // C. Page Dwell Time Aggregation (Improved)
   const sessionEventsMap = new Map<string, any[]>();
-  // マージ: page execution logs + interaction logs + score logs (as activity markers) + pv logs
-  // 必要なのは「ページが表示された時間」と「次の何かが起きた時間」
   const allActivityLogs = [
     ...(pageLogs || []),
     ...(interactionLogs || []),
-    ...(scoreLogs || [])
+    ...(scoreLogs || []),
+    ...(pvLogs || []),
+    ...(inputLogs || []) // ★追加: 入力イベントも含める
   ];
 
   allActivityLogs.forEach((log: any) => {
@@ -549,30 +564,76 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
   const pageDwellMap = new Map<string, { totalTime: number; count: number; name: string }>();
 
   sessionEventsMap.forEach((events) => {
-    // 時系列ソート
+    // Sort by time
     events.sort((a, b) => a.timestamp - b.timestamp);
 
-    events.forEach((ev, index) => {
-      // ページ表示イベントを探す
-      if (ev.event_type === 'node_execution' && ev.metadata?.type === 'page') {
-        const pageId = ev.node_id;
-        const pageName = ev.metadata?.page_name || pageId;
+    let currentPageStart = 0;
+    let currentPageId = "";
+    let currentPageName = "";
 
-        // 次のイベントを探す
-        const nextEv = events[index + 1];
-        if (nextEv) {
-          const diff = nextEv.timestamp - ev.timestamp;
-          // 異常値除外 (30分以上は除外, 0秒未満は無視)
+    events.forEach((ev, index) => {
+      // ページ開始の判定条件を緩和（複数のパターンに対応）
+      const isPageStart = (
+        // パターン1: page_viewイベント（LP）
+        ev.event_type === 'page_view' ||
+        // パターン2: node_executionでmetadata.nodeTypeがpageNode
+        (ev.event_type === 'node_execution' && ev.metadata?.nodeType === 'pageNode') ||
+        // パターン3: node_executionでmetadata.typeがpage
+        (ev.event_type === 'node_execution' && ev.metadata?.type === 'page') ||
+        // パターン4: node_executionでpage_nameが存在（明らかにページ遷移）
+        (ev.event_type === 'node_execution' && ev.metadata?.page_name)
+      );
+
+      const nextEv = events[index + 1];
+
+      if (isPageStart) {
+        // If we were already on a page, calculate its duration using this new page start as the end
+        if (currentPageId && currentPageStart > 0) {
+          const timeData = pageDwellMap.get(currentPageId) || { totalTime: 0, count: 0, name: currentPageName };
+          const diff = ev.timestamp - currentPageStart;
+          // Cap at 30 mins
           if (diff > 0 && diff < 30 * 60 * 1000) {
-            const current = pageDwellMap.get(pageId) || { totalTime: 0, count: 0, name: pageName };
-            current.totalTime += diff;
-            current.count++;
-            pageDwellMap.set(pageId, current);
+            timeData.totalTime += diff;
+            timeData.count++;
+            pageDwellMap.set(currentPageId, timeData);
           }
+        }
+
+        // Start tracking new page
+        currentPageStart = ev.timestamp;
+        currentPageId = ev.node_id || 'landing_page';
+        currentPageName = ev.metadata?.page_name || 'ランディングページ (LP)';
+
+        // If this is the last event in session, or next event is far away, allow using the last activity logic below?
+        // Actually, if this is the last event, duration is roughly 0 unless we assume something.
+        // We will rely on future events to close this page visit.
+      }
+
+      // If NOT a page start, providing we have a current page, we update the implicit "end" time
+      // But simpler approach: Dwell time = Time(Next Page Start) - Time(Current Page Start)
+      // OR Time(Last Interaction on Page) - Time(Current Page Start).
+
+      // Look ahead: If next event is null (Session End), verify duration from CurrentPageStart to THIS event
+      // Look ahead: If next event is null (Session End), verify duration from CurrentPageStart to THIS event
+      if (!nextEv && currentPageId && currentPageStart > 0) {
+        // End of session. Dwell is Time(Last Event) - PageStart
+        const diff = ev.timestamp - currentPageStart;
+        // Even if the last event IS the page view itself, diff is 0.
+        // We need at least one interaction (click, scroll, etc) to measure time.
+        // If ev is the same as start, diff=0, so it won't be added (which is correct, 0s dwell).
+        if (diff > 0 && diff < 30 * 60 * 1000) {
+          const timeData = pageDwellMap.get(currentPageId) || { totalTime: 0, count: 0, name: currentPageName };
+          timeData.totalTime += diff;
+          timeData.count++;
+          pageDwellMap.set(currentPageId, timeData);
+          console.log('[Dashboard-Extended] Last Page Dwell:', { page: currentPageName, time: diff });
         }
       }
     });
   });
+
+  console.log('[Dashboard-Extended] Dwell Time Map Size:', pageDwellMap.size);
+  console.log('[Dashboard-Extended] Dwell Time Map Entries:', Array.from(pageDwellMap.entries()));
 
   const advancedPageDwellTime = Array.from(pageDwellMap.entries()).map(([pageId, val]) => ({
     pageId,
@@ -580,6 +641,8 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     avgTimeSec: (val.totalTime / val.count) / 1000,
     sampleCount: val.count
   })).sort((a, b) => b.avgTimeSec - a.avgTimeSec);
+
+  console.log('[Dashboard-Extended] Final Page Dwell Time Stats:', advancedPageDwellTime);
 
   const advancedStats: AdvancedStats = {
     deviceStats: advancedDeviceStats,

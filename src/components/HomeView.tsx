@@ -126,7 +126,13 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
     // 少し遅延させて視覚的なフィードバックを確実にする（UX向上）
     // 実際の読み込みはonOpenProject内で行われる
     requestAnimationFrame(() => {
-      onOpenProject(projectId);
+      try {
+        onOpenProject(projectId);
+      } catch (e) {
+        console.error("Failed to open project:", e);
+        setIsProjectLoading(false);
+        alert("プロジェクトを開けませんでした");
+      }
     });
   };
 

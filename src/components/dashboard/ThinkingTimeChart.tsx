@@ -33,7 +33,7 @@ export const ThinkingTimeChart: React.FC<ThinkingTimeChartProps> = ({ data }) =>
             <h3 className="chart-title">思考時間パターン (Thinking Time)</h3>
             <div className="chart-subtitle">ユーザーがアクションを起こすまでの「迷い」の割合</div>
             <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={chartData}

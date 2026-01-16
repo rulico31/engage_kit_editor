@@ -23,7 +23,7 @@ export const EngagementDistribution: React.FC<EngagementDistributionProps> = ({ 
             <div className="chart-subtitle">獲得リードの温度感（スコア帯別の人数）</div>
 
             <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={data}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="range" style={{ fontSize: '12px' }} />

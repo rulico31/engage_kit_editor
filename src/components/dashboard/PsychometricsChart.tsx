@@ -36,9 +36,12 @@ export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) 
 
             <div className="chart-row">
                 <div className="chart-col">
-                    <h4 className="chart-subtitle">全体の心理傾向 (平均スコア)</h4>
+                    <h4 className="chart-subtitle">全体の心理傾向 (平均スコア分布)</h4>
+                    <p className="chart-description-text" style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '8px' }}>
+                        ※探索・転換・確信・迷いの4指標で、ユーザーの回答時の心理状態を可視化します。
+                    </p>
                     <div style={{ width: '100%', height: 250 }}>
-                        <ResponsiveContainer>
+                        <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData} layout="vertical">
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis type="number" domain={[0, 100]} />
@@ -59,7 +62,7 @@ export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) 
                             <tr>
                                 <th>項目名</th>
                                 <th>迷い指数</th>
-                                <th>転換(書き直し)</th>
+                                <th>転換(修正回数)</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -71,12 +74,12 @@ export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) 
                                             {item.avgHesitation.toFixed(0)}
                                         </span>
                                     </td>
-                                    <td>{item.avgReversal.toFixed(0)}</td>
+                                    <td>{item.avgReversal.toFixed(1)}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <p className="chart-hint">※「転換」が高い項目は、回答方針を変えたか、書きにくさを感じている箇所です。</p>
+                    <p className="chart-hint">※「転換」が高い項目は、回答方針を変えたか、書きにくさを感じている（書き直しが多い）箇所です。</p>
                 </div>
             </div>
         </div>

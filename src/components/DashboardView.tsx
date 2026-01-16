@@ -21,7 +21,7 @@ import {
 import "./DashboardView.css";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, Cell
+  BarChart, Bar, Cell, LabelList
 } from 'recharts';
 
 // New Components
@@ -29,6 +29,7 @@ import { ThinkingTimeChart } from "./dashboard/ThinkingTimeChart";
 import { PsychometricsChart } from "./dashboard/PsychometricsChart";
 import { BacktrackHeatmap } from "./dashboard/BacktrackHeatmap";
 import { EngagementDistribution } from "./dashboard/EngagementDistribution";
+import { HotLeadsTable } from "./dashboard/HotLeadsTable";
 
 // Grouped stats interface for dashboard aggregation
 interface GroupedStat {
@@ -106,6 +107,9 @@ const DashboardView: React.FC = () => {
       setAbStats(basicResult.abStats);
       setExtendedStats(extendedResult);
 
+      console.log('[DashboardView] Extended stats loaded:', extendedResult);
+      console.log('[DashboardView] Page Dwell Time data:', extendedResult?.advanced?.pageDwellTime);
+
       setLoading(false);
     };
 
@@ -154,7 +158,7 @@ const DashboardView: React.FC = () => {
       }
     }
 
-    if (foundNode) return getNodeLabel(foundNode);
+    if (foundNode) return ""; // 内部ロジックノードはリストに表示しない
     if (foundItem) {
       // ユーザー要望: カスタム名(displayName) > アイテム名(name) の順で表示
       // テキスト内容(ボタンの文字など)ではなく、アイテム種別名(「ボタン」「画像」など)を優先する
@@ -164,26 +168,28 @@ const DashboardView: React.FC = () => {
         id: foundItem.id,
         type: foundItem.type,
         data: {
+          ...foundItem.data, // データの詳細(buttonText等)を渡してgetNodeLabelでの名前解決を改善
           label: label,
-          // text, buttonText等は設定しない（指定すると意図せず内容が表示されるのを防ぐ）
         }
       };
       return getNodeLabel(mockNode);
     }
 
-    return nodeId;
+    return ""; // 以前は nodeId を返していたが、表示対象外とするため空文字を返す
   }, [projectMeta]);
 
   const groupedStats = useMemo(() => {
     if (!nodeStats.length) return [];
 
     if (groupingMode === 'node') {
-      return nodeStats.map(ns => ({
-        id: ns.node_id,
-        name: getNodeDisplayName(ns.node_id),
-        interaction_count: ns.interaction_count,
-        unique_users: ns.unique_users
-      }));
+      return nodeStats
+        .map(ns => ({
+          id: ns.node_id,
+          name: getNodeDisplayName(ns.node_id),
+          interaction_count: ns.interaction_count,
+          unique_users: ns.unique_users
+        }))
+        .filter(item => item.name !== ""); // 名前が解決できない(=内部ノード)は除外
     }
 
     if (groupingMode === 'page') {
@@ -478,41 +484,22 @@ const DashboardView: React.FC = () => {
       )}
 
       {/* 最新データ (Overviewに維持) */}
+      {/* 最新データ (Overviewに維持) -> Hot Leads Tableへ置換 */}
       <div className="dashboard-table-section">
-        <h3 className="section-title">獲得データ一覧 (最新50件)</h3>
-        <div className="table-wrapper">
-          <table className="leads-table">
-            <thead>
-              <tr>
-                <th>日時</th><th>IPアドレス</th><th>デバイス</th><th>回答データ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.length === 0 ? (
-                <tr><td colSpan={4} className="empty-cell">データがありません</td></tr>
-              ) : (
-                leads.slice(0, 50).map((lead) => (
-                  <tr key={lead.id}>
-                    <td>{new Date(lead.created_at).toLocaleString()}</td>
-                    <td>{lead.ip_address || '-'}</td>
-                    <td>{lead.device_type}</td>
-                    <td className="json-cell">
-                      {Object.entries(lead.data).map(([k, v]) => (
-                        <div key={k} className="data-tag"><span className="key">{k}:</span> <span className="val">{String(v)}</span></div>
-                      ))}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* <h3 className="section-title">獲得データ一覧 (最新50件)</h3> */}
+        {/* <div className="table-wrapper"> */}
+        <HotLeadsTable leads={leads} />
+        {/* </div> */}
       </div>
     </>
   );
 
   // --- Behavior Analysis Tab (User Actions & Environment) ---
   const renderBehaviorTab = () => {
+    console.log('[DashboardView] Rendering Behavior Tab. ExtendedStats:', extendedStats);
+    console.log('[DashboardView] Advanced stats available:', !!extendedStats?.advanced);
+    console.log('[DashboardView] Page Dwell Time:', extendedStats?.advanced?.pageDwellTime);
+
     if (!extendedStats?.advanced) return <div className="p-4 text-gray-400">データ収集中...</div>;
     const { deviceStats, pageDwellTime } = extendedStats.advanced;
 
@@ -525,7 +512,7 @@ const DashboardView: React.FC = () => {
             <span className="text-xs font-normal text-zinc-400 bg-zinc-800 px-2 py-1 rounded">CVR分析</span>
           </h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div style={{ height: 300 }}>
+            <div style={{ height: 300, minHeight: 300, width: '100%' }}>
               <h4 className="text-sm text-zinc-400 mb-2">OS別パフォーマンス</h4>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={deviceStats.os} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
@@ -535,14 +522,25 @@ const DashboardView: React.FC = () => {
                   <Tooltip
                     contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', color: '#fff' }}
                     itemStyle={{ color: '#fff' }}
+                    labelFormatter={(label) => `OS: ${label}`}
+                    formatter={(value: any, name: any, props: any) => {
+                      if (name === "セッション") {
+                        const total = extendedStats?.advanced?.deviceStats?.os?.reduce((sum, item) => sum + item.sessions, 0) || 1;
+                        const percent = ((Number(value) / total) * 100).toFixed(1);
+                        return [`${value} (${percent}%)`, name];
+                      }
+                      return [value, name];
+                    }}
                   />
                   <Legend />
-                  <Bar dataKey="sessions" name="セッション" fill="#8884d8" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#8884d8" radius={[0, 4, 4, 0]} barSize={20}>
+                    <LabelList dataKey="sessions" position="right" fill="#ccc" fontSize={10} formatter={(val: any) => Number(val) > 0 ? val + '回' : ''} />
+                  </Bar>
                   <Bar dataKey="mod_cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div style={{ height: 300 }}>
+            <div style={{ height: 300, minHeight: 300, width: '100%' }}>
               <h4 className="text-sm text-zinc-400 mb-2">ブラウザ別パフォーマンス</h4>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={deviceStats.browser} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
@@ -552,9 +550,20 @@ const DashboardView: React.FC = () => {
                   <Tooltip
                     contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', color: '#fff' }}
                     itemStyle={{ color: '#fff' }}
+                    labelFormatter={(label) => `Browser: ${label}`}
+                    formatter={(value: any, name: any, props: any) => {
+                      if (name === "セッション") {
+                        const total = extendedStats?.advanced?.deviceStats?.browser?.reduce((sum, item) => sum + item.sessions, 0) || 1;
+                        const percent = ((Number(value) / total) * 100).toFixed(1);
+                        return [`${value} (${percent}%)`, name];
+                      }
+                      return [value, name];
+                    }}
                   />
                   <Legend />
-                  <Bar dataKey="sessions" name="セッション" fill="#82ca9d" radius={[0, 4, 4, 0]} barSize={20} />
+                  <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#82ca9d" radius={[0, 4, 4, 0]} barSize={20}>
+                    <LabelList dataKey="sessions" position="right" fill="#ccc" fontSize={10} formatter={(val: any) => Number(val) > 0 ? val + '回' : ''} />
+                  </Bar>
                   <Bar dataKey="cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
@@ -577,29 +586,45 @@ const DashboardView: React.FC = () => {
           </div>
         </section>
 
-        {/* 3. Page Dwell Time */}
-        <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
-          <h3 className="text-lg font-medium text-white mb-4">ページ別平均滞在時間 (秒)</h3>
-          <div style={{ height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pageDwellTime} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" horizontal={false} />
-                <XAxis type="number" stroke="#a1a1aa" fontSize={12} unit="秒" />
-                <YAxis dataKey="pageName" type="category" stroke="#a1a1aa" fontSize={12} width={100} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', color: '#fff' }}
-                  cursor={{ fill: '#3f3f46', opacity: 0.4 }}
-                  formatter={(value: number) => [`${value.toFixed(1)} 秒`, '平均滞在時間']}
-                />
-                <Bar dataKey="avgTimeSec" fill="#fbbf24" radius={[0, 4, 4, 0]} barSize={30}>
-                  {pageDwellTime.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.avgTimeSec > 60 ? '#f87171' : '#fbbf24'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+        {/* 3. Page Dwell Time - Block Display (データがある場合のみ表示) */}
+        {pageDwellTime.length > 0 && (
+          <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
+            <h3 className="text-lg font-medium text-white mb-4">ページ別平均滞在時間</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {pageDwellTime.map((page, index) => (
+                <div
+                  key={page.pageId}
+                  className="bg-zinc-900/50 p-5 rounded-lg border border-zinc-700/30 hover:border-zinc-600/50 transition-all"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-zinc-300 mb-1">
+                        {page.pageName}
+                      </h4>
+                      <p className="text-xs text-zinc-500">
+                        サンプル数: {page.sampleCount}件
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className={`text-3xl font-bold ${page.avgTimeSec > 60 ? 'text-red-400' :
+                        page.avgTimeSec > 30 ? 'text-yellow-400' :
+                          'text-green-400'
+                        }`}
+                    >
+                      {page.avgTimeSec > 0 ? page.avgTimeSec.toFixed(1) : '0.0'}
+                    </span>
+                    <span className="text-sm text-zinc-400">秒</span>
+                  </div>
+                  {page.avgTimeSec === 0 && (
+                    <p className="text-xs text-zinc-500 mt-2">データ不足</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     );
   };
