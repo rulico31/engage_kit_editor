@@ -157,10 +157,11 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     const report = inputTracker.getReport(inputValue);
     console.log('🔍 [PreviewItem] InputTracker report:', report);
 
-    // ★ Supabaseに入力修正データを記録（入力があった場合のみ）
-    const shouldLog = inputValue.length > 0 || report.input_correction_count > 0;
+    // ★ Supabaseに入力修正データを記録
+    const hasInput = inputValue.length > 0;
+    const hasCorrection = report.input_correction_count > 0;
 
-    if (shouldLog) {
+    if (hasInput || hasCorrection) {
       console.log('🔍 [PreviewItem] Calling logAnalyticsEvent...', {
         eventType: 'input_correction',
         nodeId: id
@@ -179,7 +180,16 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         console.error('❌ [PreviewItem] logAnalyticsEvent failed:', err);
       });
     } else {
-      console.log('⚠️ [PreviewItem] Skipping log: No input or correction detected');
+      // 入力放棄 (Focusしたのに何もせずBlur)
+      console.log('⚠️ [PreviewItem] Input Abandonment detected');
+      logAnalyticsEvent('input_abandonment', {
+        nodeId: id,
+        nodeType: 'text_input',
+        metadata: {
+          item_name: name,
+          timestamp: Date.now()
+        }
+      });
     }
 
     // バリデーションを実行し、成功した場合のみ完了イベントを発火

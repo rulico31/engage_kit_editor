@@ -11,12 +11,15 @@ export class AbTestExecutor implements NodeExecutor {
         const isPathA = randomValue < probability;
         const resultPath = isPathA ? "pathA" : "pathB";
 
-        console.log('🎲 A/Bテストノード実行', {
-            nodeId: node.id,
-            probability,
-            randomValue,
-            resultPath
-        });
+
+        if (import.meta.env.DEV) {
+            console.log('🎲 A/Bテストノード実行', {
+                nodeId: node.id,
+                probability,
+                randomValue,
+                resultPath
+            });
+        }
 
         context.logEvent('logic_branch', {
             nodeId: node.id,

@@ -1,103 +1,98 @@
-// src/lib/leads.ts
-
 import { supabase } from './supabaseClient';
-import { useProjectStore } from '../stores/useProjectStore';
-import { getOrCreateSessionId } from './analytics';
+import { usePageStore } from '../stores/usePageStore';
+
+import type { PlacedItemType } from '../types';
 
 /**
- * ユーザーのIPアドレスを取得するヘルパー関数
+ * リードデータを送信する
+ * B2B行動分析機能: 送信時スコア再計算 & 行動フラグ生成を含む
  */
-const fetchIpAddress = async (): Promise<string | null> => {
-  try {
-    const response = await fetch('https://api.ipify.org?format=json');
-    if (response.ok) {
-      const data = await response.json();
-      return data.ip;
-    }
-    return null;
-  } catch (e) {
-    console.warn('Failed to fetch IP address', e);
-    return null;
-  }
-};
+export const submitLeadData = async (
+  projectId: string,
+  data: Record<string, any>,
+  // 引数互換性のため残すが、内部ではStoreの最新状態を優先して使用することを推奨
+  _placedItems?: PlacedItemType[],
+  _analyticsLogs?: any[]
+) => {
 
-/**
- * デバイスタイプを簡易判定
- */
-const getDeviceType = (): string => {
-  const ua = navigator.userAgent;
-  if (/mobile/i.test(ua)) return 'mobile';
-  if (/iPad|Android|Touch/i.test(ua)) return 'tablet';
-  return 'desktop';
-};
+  // 1. 最新のマスタデータとログを取得 (Storeから直接取得して整合性を担保)
+  // 1. 最新のマスタデータとログを取得
+  const state = usePageStore.getState();
+  const pageId = state.selectedPageId;
+  const placedItems = (pageId && state.pages[pageId]) ? state.pages[pageId].placedItems : (_placedItems || []);
 
-/**
- * リードデータの送信
- * @param variables 現在の全変数（回答データ、スコア等）
- * @returns 送信成功時はtrue, 失敗時はfalse
- */
-export const submitLeadData = async (variables: Record<string, any>): Promise<boolean> => {
-  const projectId = useProjectStore.getState().currentProjectId;
+  // NOTE: Analytics logs are now sent directly to DB, so we rely on what's passed or fetch if critical.
+  // For this implementation, we use the passed _analyticsLogs if available, or empty array.
+  // In a real scenario, we might want to fetch from DB or keep a short buffer in a store.
+  const analyticsLogs = _analyticsLogs || [];
 
-  // プレビュー中などでプロジェクトIDがない場合、またはローカルプロジェクトの場合はスキップ
-  if (!projectId || projectId.startsWith('local-')) {
-    console.log('[Leads/Dev] Data submission simulation (Local/No ID):', variables);
-    return true;
-  }
+  // UTMパラメータの取得
+  const utmParams = {
+    source: sessionStorage.getItem('utm_source'),
+    medium: sessionStorage.getItem('utm_medium'),
+    campaign: sessionStorage.getItem('utm_campaign'),
+  };
 
-  // 1. 月間回答数制限のチェック (Phase 4: Billing Gate)
-  try {
-    const { data: isAllowed, error: rpcError } = await supabase.rpc('check_monthly_lead_limit', {
-      project_uuid: projectId
+  // 2. スコア再計算 (送信時計算モデル)
+  let totalScore = 0;
+
+  // 回答データ(data)の値と、アイテムIDを照合
+  Object.values(data).forEach(value => {
+    // valueが配列(複数選択)の場合と、単一の値の場合がある
+    const valuesToCheck = Array.isArray(value) ? value : [value];
+
+    valuesToCheck.forEach(val => {
+      // 値(val)がアイテムIDと一致するものを探す
+      const item = placedItems.find(i => i.id === val);
+      if (item && item.data.score) {
+        totalScore += item.data.score;
+      }
     });
+  });
 
-    if (rpcError) {
-      console.error('[Leads] Limit check failed:', rpcError);
-      // チェックに失敗しても、サーバーエラーでユーザーをブロックしないように
-      // 安全側に倒して送信を許可するか、厳格にするかはビジネス判断。
-      // ここでは厳格にエラーログを出して続行とします（ベータ版想定）。
-    }
+  // 3. ランク判定
+  let rank = 'Cold';
+  if (totalScore >= 80) rank = 'Hot';
+  else if (totalScore >= 30) rank = 'Warm';
 
-    if (isAllowed === false) {
-      console.warn('[Leads] Monthly limit reached for project:', projectId);
-      alert("このプロジェクトの今月の回答受付数は上限に達しました。\n(Monthly submission limit reached)");
-      return false; // 送信ブロック
-    }
+  // 4. 行動フラグ生成 (JSONB)
+  const behaviorFlags: any = {};
 
-  } catch (e) {
-    console.error('[Leads] Exception during limit check:', e);
+  // ペースト検知
+  if (analyticsLogs.some((l: any) => l.event_type === 'input_paste')) {
+    behaviorFlags.pasted = true;
+  }
+  // 熟考検知
+  if (analyticsLogs.some((l: any) => l.event_type === 'idle_hesitation')) {
+    behaviorFlags.long_idle = true;
+  }
+  // レイジクリック
+  if (analyticsLogs.some((l: any) => l.event_type === 'rage_click')) {
+    behaviorFlags.rage = true;
+  }
+  // モバイル判定
+  if (/Mobi|Android/i.test(navigator.userAgent)) {
+    behaviorFlags.mobile = true;
   }
 
-  // 2. データ送信処理
-  const sessionId = getOrCreateSessionId();
-  const ipAddress = await fetchIpAddress();
-
-  // B2B Scoring Calculation
-  const totalScore = (variables._system_total_score as number) || 0;
-  let maturityRank = 'Cold';
-  if (totalScore >= 80) maturityRank = 'Hot';
-  else if (totalScore >= 40) maturityRank = 'Warm';
-
-  const userAgent = navigator.userAgent;
-  const deviceType = getDeviceType();
-
+  // 5. DB保存
   const { error } = await supabase.from('leads').insert({
     project_id: projectId,
-    session_id: sessionId,
-    data: variables,
-    ip_address: ipAddress,
-    user_agent: userAgent,
-    referrer: document.referrer,
-    device_type: deviceType, // 'desktop', 'mobile', 'tablet'
-    score: totalScore,
-    maturity_rank: maturityRank
+    data: data,
+    total_score: totalScore,
+    maturity_rank: rank,
+    behavior_flags: behaviorFlags,
+    device_category: behaviorFlags.mobile ? 'mobile' : 'desktop',
+    utm_source: utmParams.source,
+    utm_medium: utmParams.medium,
+    utm_campaign: utmParams.campaign,
+    // ip_address等はSupabase側で取得するか、Edge Functions経由が必要(ここでは省略)
   });
 
   if (error) {
-    console.error('[Leads] Error submitting data:', error);
-    return false;
+    console.error('Lead submission failed:', error);
+    throw error;
   } else {
-    console.log('[Leads] Data submitted successfully');
-    return true;
+    console.log('Lead submitted successfully:', { rank, totalScore, flags: behaviorFlags });
   }
 };

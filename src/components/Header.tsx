@@ -113,7 +113,7 @@ const Header: React.FC<HeaderProps> = ({
   // const setIsMobileView = useEditorSettingsStore((state) => state.setIsMobileView);
 
   // デバッグ: userの状態を確認
-  console.log('Header - user:', user);
+
 
   // ログアウト処理
   const handleLogout = async () => {

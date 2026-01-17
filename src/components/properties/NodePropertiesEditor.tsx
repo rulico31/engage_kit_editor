@@ -388,6 +388,20 @@ export const NodePropertiesEditor: React.FC<{ node: Node }> = ({ node }) => {
 
   const configs = Array.isArray(configOrConfigs) ? configOrConfigs : [configOrConfigs];
 
+  // デフォルト値を反映したデータを作成
+  const effectiveData = { ...node.data };
+  configs.forEach((config: any) => {
+    if (config?.properties) {
+      config.properties.forEach((prop: PropertyConfig) => {
+        if (effectiveData[prop.name] === undefined && prop.defaultValue !== undefined) {
+          effectiveData[prop.name] = prop.defaultValue;
+        }
+      });
+    }
+  });
+
+  const effectiveNode = { ...node, data: effectiveData };
+
   return (
     <div className="properties-panel-content">
       {baseInfo}
@@ -399,20 +413,20 @@ export const NodePropertiesEditor: React.FC<{ node: Node }> = ({ node }) => {
             if (prop.condition) {
               // conditionが関数の場合
               if (typeof prop.condition === 'function') {
-                if (!prop.condition(node.data)) return null;
+                if (!prop.condition(effectiveData)) return null;
               }
-              // conditionがオブジェクト形式 { name: string, value: any } の場合
+              // conditionがオブジェクト形式の場合
               else if (typeof prop.condition === 'object' && 'name' in prop.condition && 'value' in prop.condition) {
-                const conditionName = prop.condition.name;
-                const conditionValue = prop.condition.value;
-                const currentValue = node.data[conditionName];
+                const conditionName = (prop.condition as any).name;
+                const conditionValue = (prop.condition as any).value;
+                const currentValue = effectiveData[conditionName];
 
                 // 条件が一致しない場合は表示しない
                 if (currentValue !== conditionValue) return null;
               }
             }
 
-            return <DynamicPropertyInput key={prop.name} node={node} propConfig={prop} />;
+            return <DynamicPropertyInput key={prop.name} node={effectiveNode} propConfig={prop} />;
           })}
         </AccordionSection>
       ))}

@@ -5,11 +5,14 @@ export class PageExecutor implements NodeExecutor {
         const { node, placedItems, getVariables, getPreviewState, setPreviewState, requestPageChange } = params;
         const { targetPageId, enableValidation = true } = node.data;
 
-        console.log('📄 ページ遷移ノード実行', {
-            nodeId: node.id,
-            targetPageId,
-            enableValidation
-        });
+
+        if (import.meta.env.DEV) {
+            console.log('📄 ページ遷移ノード実行', {
+                nodeId: node.id,
+                targetPageId,
+                enableValidation
+            });
+        }
 
         if (enableValidation) {
             const requiredItems = placedItems.filter(item =>
@@ -50,7 +53,9 @@ export class PageExecutor implements NodeExecutor {
                 setPreviewState(newPreviewState);
 
                 if (hasError) {
-                    console.log("🚫 ページ遷移ブロック - 必須入力エラー");
+                    if (import.meta.env.DEV) {
+                        console.log("🚫 ページ遷移ブロック - 必須入力エラー");
+                    }
                     return;
                 }
             }

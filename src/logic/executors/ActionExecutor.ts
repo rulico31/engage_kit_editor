@@ -5,11 +5,14 @@ export class ActionExecutor implements NodeExecutor {
         const { node, getPreviewState, setPreviewState, triggerItemId, pushNext, allEdges, accumulatedQueue } = params;
         const { targetItemId, mode } = node.data;
 
-        console.log('🎬 アクションノード実行', {
-            nodeId: node.id,
-            targetItemId,
-            mode,
-        });
+
+        if (import.meta.env.DEV) {
+            console.log('🎬 アクションノード実行', {
+                nodeId: node.id,
+                targetItemId,
+                mode,
+            });
+        }
 
         const resolvedTargetId = targetItemId === 'TRIGGER_ITEM' ? triggerItemId : targetItemId;
 

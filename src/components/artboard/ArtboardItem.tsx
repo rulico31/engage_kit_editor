@@ -237,21 +237,34 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       });
 
       // 入力または修正があった場合のみログ送信
-      const shouldLog = inputValue.length > 0 || report.raw.correction_count > 0;
-      if (shouldLog) {
-        console.log('🔍 [ArtboardItem] Sending input_analysis log...');
-        logAnalyticsEvent('input_analysis', {
+      const hasInput = inputValue.length > 0;
+      const hasCorrection = report.input_correction_count > 0;
+
+      if (hasInput || hasCorrection) {
+        console.log('🔍 [ArtboardItem] Sending input_correction log...');
+        // @ts-ignore - input_analysis was invalid, changed to input_correction
+        logAnalyticsEvent('input_correction', {
           nodeId: item.id,
           nodeType: 'text_input',
           metadata: {
-            metrics: report.metrics,
-            raw: report.raw,
+            ...report, // フラットな構造を展開
             item_name: item.name,
           }
         }).then(() => {
           console.log('✅ [ArtboardItem] Log sent successfully');
         }).catch(err => {
           console.error('❌ [ArtboardItem] Log failed:', err);
+        });
+      } else {
+        // 入力放棄 (Focusしたのに何もせずBlur)
+        console.log('⚠️ [ArtboardItem] Input Abandonment detected');
+        logAnalyticsEvent('input_abandonment', {
+          nodeId: item.id,
+          nodeType: 'text_input',
+          metadata: {
+            item_name: item.name,
+            timestamp: Date.now()
+          }
         });
       }
 
@@ -357,7 +370,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
           value={inputValue}
           readOnly={!isPreviewing}
           onCompositionStart={() => isPreviewing && inputTracker.onCompositionStart()}
-          onCompositionEnd={(e) => isPreviewing && inputTracker.onCompositionEnd(e.nativeEvent.data)}
+          onCompositionEnd={() => isPreviewing && inputTracker.onCompositionEnd()}
           onChange={(e) => {
             if (isPreviewing) {
               const newValue = e.target.value;
@@ -403,6 +416,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       style={containerStyle}
       onClick={handleClick}
       onMouseDown={handleMouseDown}
+      data-node-id={item.id}
     >
       {content}
       {renderChildren(item.id)}

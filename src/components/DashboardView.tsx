@@ -30,6 +30,7 @@ import { PsychometricsChart } from "./dashboard/PsychometricsChart";
 import { BacktrackHeatmap } from "./dashboard/BacktrackHeatmap";
 import { EngagementDistribution } from "./dashboard/EngagementDistribution";
 import { HotLeadsTable } from "./dashboard/HotLeadsTable";
+import { RageClickTable } from "./dashboard/RageClickTable";
 
 // Grouped stats interface for dashboard aggregation
 interface GroupedStat {
@@ -586,7 +587,39 @@ const DashboardView: React.FC = () => {
           </div>
         </section>
 
-        {/* 3. Page Dwell Time - Block Display (データがある場合のみ表示) */}
+        {/* 3. Frustration Signals (New Section) */}
+        <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
+          <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
+            ⚠️ ユーザーフラストレーション検知
+            <span className="text-xs font-normal text-zinc-400 bg-zinc-800 px-2 py-1 rounded">Rage / Hesitation</span>
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Hesitation Rate Card */}
+            <div className="bg-zinc-900/50 p-6 rounded-lg border border-zinc-700/30">
+              <h4 className="text-sm font-medium text-zinc-300 mb-2">ヘジテーション発生率 (迷い)</h4>
+              <p className="text-xs text-zinc-500 mb-4">セッション全体のうち、強い迷いが検知された割合</p>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-4xl font-bold ${(extendedStats?.hesitationStats?.rate || 0) > 30 ? 'text-red-400' :
+                    (extendedStats?.hesitationStats?.rate || 0) > 10 ? 'text-yellow-400' : 'text-green-400'
+                  }`}>
+                  {(extendedStats?.hesitationStats?.rate || 0).toFixed(1)}
+                </span>
+                <span className="text-sm text-zinc-400">%</span>
+              </div>
+              <div className="mt-4 text-xs text-zinc-500">
+                影響を受けたセッション: {extendedStats?.hesitationStats?.hesitationSessions || 0} / {extendedStats?.hesitationStats?.totalSessions || 0}
+              </div>
+            </div>
+
+            {/* Rage Clicks Table */}
+            <div className="lg:col-span-2">
+              <h4 className="text-sm font-medium text-zinc-300 mb-2">Rage Click 発生箇所 (イライラ)</h4>
+              <RageClickTable data={extendedStats?.rageClicks || []} />
+            </div>
+          </div>
+        </section>
+
+        {/* 4. Page Dwell Time - Block Display (データがある場合のみ表示) */}
         {pageDwellTime.length > 0 && (
           <section className="bg-zinc-800/50 p-6 rounded-lg border border-zinc-700/50">
             <h3 className="text-lg font-medium text-white mb-4">ページ別平均滞在時間</h3>

@@ -1,111 +1,70 @@
-// src/lib/analytics.ts
-
 import { supabase } from './supabaseClient';
-import { useProjectStore } from '../stores/useProjectStore';
-import { getStoredUTMData } from './UTMTracker';
-import { getStoredDeviceInfo } from './DeviceDetector';
 
-// セッションIDのキー
-const SESSION_KEY = 'engage_kit_session_id';
-
-/**
- * セッションIDを取得または生成する
- * (ユニークユーザー数 UU の計測に使用)
- */
-export const getOrCreateSessionId = (): string => {
-  let sessionId = localStorage.getItem(SESSION_KEY);
-  if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    localStorage.setItem(SESSION_KEY, sessionId);
-  }
-  return sessionId;
-};
-
-/**
- * 分析イベントの種類
- */
 export type AnalyticsEventType =
-  | 'page_view'       // ビュー数 (PV)
-  | 'node_execution'  // ノード実行 (ステップ進行・完了率・離脱率の基礎)
-  | 'logic_branch'    // ロジック分岐 (Ifノードの結果など)
-  | 'interaction'     // ユーザー操作 (クリックなど)
-  | 'score_change'    // エンゲージメントスコア変更
-  | 'backtracking'    // バックトラッキング（戻る操作）
-  | 'input_correction' // 入力修正（バックスペース・削除検知 - 旧）
-  | 'input_analysis'   // 入力心理分析（新）
-  | 'read_content'    // 熟読検知 (New: B2B分析)
-  | 'scroll_depth'    // スクロール深度 (New: B2B分析)
-  | 'exit_intent'     // 離脱直前の挙動 (New: B2B分析)
-  | 'error';          // ランタイムエラー
+  | 'page_view'
+  | 'node_execution'
+  | 'lead_submit'
+  | 'session_start'
+  | 'input_paste'        // B2B: 外部テキスト貼り付け
+  | 'input_correction'   // B2B: 推敲・修正
+  | 'input_abandonment'  // B2B: 入力放棄
+  | 'idle_hesitation'    // B2B: 熟考・停止
+  | 'rage_click'         // B2B: イライラ
+  | 'interaction'        // B2B: 汎用インタラクション (Thinking Time計測用)
+  | 'exit_context';      // B2B: 離脱時の状況
 
-/**
- * 分析イベントのペイロード型
- */
-export type AnalyticsEventPayload = {
-  nodeId?: string;
-  nodeType?: string;
+export interface AnalyticsEvent {
+  project_id: string;
+  session_id: string;
+  event_type: AnalyticsEventType;
+  node_id?: string;
+  page_id?: string;
   metadata?: Record<string, any>;
-  // 他にも必要に応じて追加
+  created_at?: string;
+}
+
+// セッションIDの生成・取得 (簡易実装)
+const getSessionId = () => {
+  let sid = sessionStorage.getItem('engage_session_id');
+  if (!sid) {
+    sid = crypto.randomUUID();
+    sessionStorage.setItem('engage_session_id', sid);
+  }
+  return sid;
 };
 
-/**
- * ログ送信関数
- */
 export const logAnalyticsEvent = async (
   eventType: AnalyticsEventType,
-  payload?: AnalyticsEventPayload,
-  explicitProjectId?: string // ★追加: プロジェクトIDを明示的に指定可能にする
-): Promise<void> => {
+  metadata: Record<string, any> = {},
+  projectId?: string
+) => {
+  const sessionId = getSessionId();
+  // プロジェクトIDは引数で渡されるか、storeなどから取得する必要がある
+  // ここでは簡易的に引数または空文字とする(実際はViewerContext等から注入推奨)
+  const pid = projectId || '';
+
+  // 開発環境のコンソールログ
+  if (import.meta.env.DEV) {
+    console.log(`[Analytics] ${eventType}`, metadata);
+  }
+
+  if (!pid) return;
+
   try {
-    // 引数で渡されたIDを優先し、なければStoreから取得
-    const projectId = explicitProjectId || useProjectStore.getState().currentProjectId;
-
-    // ローカルプロジェクトの場合はSupabaseに送信しない（UUID形式ではないため）
-    if (!projectId || projectId.startsWith('local-')) {
-      console.log('[Analytics] (Local Project - Not sent to Supabase)', {
-        eventType,
-        payload,
-        projectId
-      });
-      return; // ローカルプロジェクトの場合は早期リターン
-    }
-
-    const timestamp = new Date().toISOString();
-
-    const sessionId = getOrCreateSessionId(); // セッションIDを取得
-
-    console.log('[Analytics] Event logged:', {
-      eventType,
-      projectId,
-      sessionId, // ログにも表示
-      payload,
-      timestamp
-    });
-
-    // UTMとデバイス情報をsessionStorageから取得
-    const utmData = getStoredUTMData();
-    const deviceInfo = getStoredDeviceInfo();
-
     const { error } = await supabase
       .from('analytics_logs')
       .insert({
-        project_id: projectId,
-        session_id: sessionId, // ★追加: 必須カラム
+        project_id: pid,
+        session_id: sessionId,
         event_type: eventType,
-        node_id: payload?.nodeId,
-        node_type: payload?.nodeType,
-        metadata: payload?.metadata || {},
-        utm_data: utmData,        // UTMパラメータ
-        device_info: deviceInfo,  // デバイス情報
-        created_at: timestamp
+        metadata: metadata,
+        // node_id, page_id は metadata から抽出して保存してもよい
       });
 
     if (error) {
-      console.error('[Analytics] Error logging event:', error);
-    } else {
-      console.log(`[Analytics] Success (${eventType}):`, payload);
+      console.error('Failed to log analytics event:', error);
     }
-  } catch (error) {
-    console.error('[Analytics] Unexpected error:', error);
+  } catch (err) {
+    console.error('Analytics logging error:', err);
   }
 };

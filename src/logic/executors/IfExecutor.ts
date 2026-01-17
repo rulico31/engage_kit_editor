@@ -15,11 +15,14 @@ export class IfExecutor implements NodeExecutor {
 
         const resolvedTargetId = conditionTargetId === 'TRIGGER_ITEM' ? triggerItemId : conditionTargetId;
 
-        console.log('🔀 Ifノード実行', {
-            nodeId: node.id,
-            conditionSource,
-            conditionTargetId,
-        });
+
+        if (import.meta.env.DEV) {
+            console.log('🔀 Ifノード実行', {
+                nodeId: node.id,
+                conditionSource,
+                conditionTargetId,
+            });
+        }
 
         let conditionResult = false;
 

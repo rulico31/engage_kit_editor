@@ -20,6 +20,7 @@ import { useProjectStore } from "../stores/useProjectStore";
 import { usePageStore } from "../stores/usePageStore";
 import { useSelectionStore } from "../stores/useSelectionStore";
 import { useTabSync } from "../hooks/useTabSync";
+import { useActionAnalytics } from "../hooks/useActionAnalytics";
 
 interface EditorViewProps {
   projectName: string;
@@ -89,7 +90,10 @@ const EditorView: React.FC<EditorViewProps> = ({
     togglePreview: state.togglePreview,
   }));
 
-  const { saveProject } = useProjectStore();
+  const { saveProject, currentProjectId } = useProjectStore(state => ({
+    saveProject: state.saveProject,
+    currentProjectId: state.currentProjectId
+  }));
   const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
@@ -100,6 +104,9 @@ const EditorView: React.FC<EditorViewProps> = ({
 
   // タブの自動同期（削除時のクローズ、Undo時の復元）
   useTabSync();
+
+  // Previewモード時の行動分析 (Rage Click, Hesitation等)
+  useActionAnalytics(currentProjectId, isPreviewing);
 
   const handleSave = async () => {
     try {
