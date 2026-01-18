@@ -14,6 +14,7 @@ interface PreviewHostProps {
   ) => void;
   allItemLogics: Record<string, NodeGraph>;
   isMobile?: boolean; // 追加
+  projectId?: string; // 追加
 }
 
 const PreviewHost: React.FC<PreviewHostProps> = ({
@@ -22,6 +23,7 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
   setPreviewState,
   allItemLogics,
   isMobile = false,
+  projectId
 }) => {
   const clearLogs = useDebugLogStore(state => state.clearLogs);
 
@@ -63,6 +65,8 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
             setPreviewState={setPreviewState}
             allItemLogics={allItemLogics}
             isMobile={isMobile}
+            projectId={projectId}
+            placedItems={placedItems} // Added for submitLeadData
           />
         );
       })}

@@ -32,7 +32,13 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
         const resetIdleTimer = () => {
             clearTimeout(idleTimer);
             idleTimer = setTimeout(() => {
-                logAnalyticsEvent('idle_hesitation', { duration: 5 }, projectId);
+                // session_idを含めることでダッシュボードでの集計が可能になる
+                const sessionId = sessionStorage.getItem('engage_session_id');
+                logAnalyticsEvent('idle_hesitation', {
+                    duration: 5,
+                    session_id: sessionId
+                }, projectId);
+                console.log('[Analytics] idle_hesitation triggered after 5s inactivity');
             }, 5000);
         };
 

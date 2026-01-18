@@ -245,6 +245,58 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                 </div>
             </AccordionSection>
 
+            {/* ACTION (Button Only) */}
+            {item.type === 'button' && (
+                <AccordionSection title="ACTION" defaultOpen={true}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        {/* Action Type */}
+                        <div>
+                            <div style={labelStyle}>Click Action</div>
+                            <select
+                                value={item.data?.actionType || 'none'}
+                                onChange={(e) => handleDataChange("actionType", e.target.value)}
+                                className="prop-select"
+                                style={{
+                                    width: '100%',
+                                    padding: '6px',
+                                    background: '#333',
+                                    border: '1px solid #444',
+                                    color: '#eee',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                <option value="none">Node Flow (Default)</option>
+                                <option value="submit">Submit Form</option>
+                            </select>
+                        </div>
+
+                        {/* Submit Settings */}
+                        {item.data?.actionType === 'submit' && (
+                            <div style={{
+                                padding: '10px',
+                                background: '#2a2a2e',
+                                borderRadius: '6px',
+                                border: '1px solid #444'
+                            }}>
+                                <div style={{ marginBottom: '8px' }}>
+                                    <div style={labelStyle}>Redirect URL (Optional)</div>
+                                    <input
+                                        type="text"
+                                        value={item.data?.submitRedirectUrl || ""}
+                                        onChange={(e) => handleDataChange("submitRedirectUrl", e.target.value)}
+                                        className="prop-input"
+                                        placeholder="https://example.com/thanks"
+                                    />
+                                    <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+                                        Leave empty to show default success message.
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </AccordionSection>
+            )}
+
             {/* Design / Appearance */}
             <AccordionSection title="APPEARANCE" defaultOpen={true}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -286,6 +338,6 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
 
                 </div>
             </AccordionSection>
-        </div>
+        </div >
     );
 };

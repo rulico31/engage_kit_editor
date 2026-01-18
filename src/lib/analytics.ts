@@ -43,10 +43,8 @@ export const logAnalyticsEvent = async (
   // ここでは簡易的に引数または空文字とする(実際はViewerContext等から注入推奨)
   const pid = projectId || '';
 
-  // 開発環境のコンソールログ
-  if (import.meta.env.DEV) {
-    console.log(`[Analytics] ${eventType}`, metadata);
-  }
+  // コンソールログ (検証用に常に出力)
+  console.log(`[Analytics] ${eventType}`, metadata);
 
   if (!pid) return;
 

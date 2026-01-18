@@ -3,6 +3,9 @@ import type { PlacedItemType, PreviewState, VariableState } from "../../types";
 import "../Artboard.css";
 import { ResizeHandles } from "./ResizeHandles";
 import { useSelectionStore } from "../../stores/useSelectionStore";
+import { usePreviewStore } from "../../stores/usePreviewStore";
+import { usePageStore } from "../../stores/usePageStore";
+import { useProjectStore } from "../../stores/useProjectStore"; // Added
 import { InputTracker } from "../../lib/InputTracker"; // 追加
 import { logAnalyticsEvent } from "../../lib/analytics"; // 追加
 
@@ -276,9 +279,61 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   };
 
   // イベントハンドラ
-  const handleClick = (e: React.MouseEvent) => {
+  // イベントハンドラ
+  const handleClick = async (e: React.MouseEvent) => {
     if (isPreviewing) {
       if (e.target instanceof HTMLTextAreaElement) return;
+
+      // ★ ワンクリック送信 (Simplified CV) - Editor Preview Support
+      if (item.data.actionType === 'submit') {
+        console.log('🚀 One-Click Submit Triggered (Editor Preview)');
+        e.stopPropagation(); // イベント伝播を止める
+
+        try {
+          // 1. 変数の取得
+          const variables = usePreviewStore.getState().variables; // ストアから直接取得
+          const submitData = { ...variables };
+
+          // 2. Project IDの取得 (URL or Store)
+          // Editorの場合はURLに project_id がある場合が多い、または store から
+          let projectId = useProjectStore.getState().currentProjectId;
+          if (!projectId) {
+            const params = new URLSearchParams(window.location.search);
+            projectId = params.get('project_id') || undefined;
+          }
+
+          // 3. データ送信 (leads.ts の submitLeadData を使用)
+          // Editor Previewではページ全体の状態を取得してスコア計算に利用する
+          const currentPageId = usePageStore.getState().selectedPageId;
+          const pages = usePageStore.getState().pages;
+          const placedItems = (currentPageId && pages[currentPageId]) ? pages[currentPageId].placedItems : [];
+
+          // leads.tsのsubmitLeadDataを呼び出し（ここでleadsテーブルへのINSERTとanalyticsログ送信が行われる）
+          const { submitLeadData } = await import("../../lib/leads"); // Dynamic import to avoid circular dependency issues if any
+
+          await submitLeadData(
+            submitData,
+            projectId,
+            placedItems
+          );
+
+          console.log('✅ Lead Submitted via submitLeadData (Editor Preview)');
+
+          // 4. リダイレクト処理 (Editor上ではAlertのみにするか、window.openにするか)
+          if (item.data.submitRedirectUrl) {
+            // Editor Previewなので、遷移せずにアラートだけ出すのが安全かも
+            alert(`送信成功！\n本来は "${item.data.submitRedirectUrl}" に遷移します。\n(Editor Preview Mode)`);
+          } else {
+            alert('送信しました！ (Thank you for submitting!)');
+          }
+
+        } catch (err) {
+          console.error('❌ Submit Failed:', err);
+          alert('送信に失敗しました。(Submission Failed)');
+        }
+        return;
+      }
+
       onItemEvent("click", item.id);
     } else {
       onItemSelect(e, item.id, item.data.text || item.name);

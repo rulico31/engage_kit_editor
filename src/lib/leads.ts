@@ -4,16 +4,33 @@ import { usePageStore } from '../stores/usePageStore';
 import type { PlacedItemType } from '../types';
 
 /**
+ * URLからproject_idを取得するヘルパー
+ */
+const getProjectIdFromUrl = (): string | null => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('project_id');
+};
+
+/**
  * リードデータを送信する
  * B2B行動分析機能: 送信時スコア再計算 & 行動フラグ生成を含む
+ * 
+ * @param data - フォームデータ（変数の値）
+ * @param projectId - オプショナル。省略時はURLから取得
+ * @param _placedItems - 互換性維持用（内部ではストアを使用）
+ * @param _analyticsLogs - 互換性維持用
  */
 export const submitLeadData = async (
-  projectId: string,
   data: Record<string, any>,
-  // 引数互換性のため残すが、内部ではStoreの最新状態を優先して使用することを推奨
+  projectId?: string,
   _placedItems?: PlacedItemType[],
   _analyticsLogs?: any[]
 ) => {
+  // projectIdが指定されていない場合はURLから取得
+  const resolvedProjectId = projectId || getProjectIdFromUrl();
+  if (!resolvedProjectId) {
+    throw new Error('Project ID is required. Please provide it as an argument or ensure it is in the URL.');
+  }
 
   // 1. 最新のマスタデータとログを取得 (Storeから直接取得して整合性を担保)
   // 1. 最新のマスタデータとログを取得
@@ -37,7 +54,9 @@ export const submitLeadData = async (
   let totalScore = 0;
 
   // 回答データ(data)の値と、アイテムIDを照合
-  Object.values(data).forEach(value => {
+  // dataがnull/undefinedの場合は空オブジェクトとして扱う
+  const safeData = data || {};
+  Object.values(safeData).forEach(value => {
     // valueが配列(複数選択)の場合と、単一の値の場合がある
     const valuesToCheck = Array.isArray(value) ? value : [value];
 
@@ -76,8 +95,16 @@ export const submitLeadData = async (
   }
 
   // 5. DB保存
+  // session_idの取得または生成
+  let sessionId = sessionStorage.getItem('engage_session_id');
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    sessionStorage.setItem('engage_session_id', sessionId);
+  }
+
   const { error } = await supabase.from('leads').insert({
-    project_id: projectId,
+    project_id: resolvedProjectId,
+    session_id: sessionId, // Added: Required field
     data: data,
     total_score: totalScore,
     maturity_rank: rank,

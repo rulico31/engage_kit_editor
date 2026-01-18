@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { LeadData } from '../../lib/dashboardService';
 import { MicroJourneyModal } from './MicroJourneyModal';
+import { ChevronRight, Flame, Clock, Smartphone, Tablet, Monitor, MousePointerClick, Hourglass, Clipboard } from 'lucide-react';
 
 interface HotLeadsTableProps {
     leads: LeadData[];
@@ -10,112 +11,148 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
     const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
 
     return (
-        <div className="hot-leads-container" style={{ padding: '20px', background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ marginBottom: '16px', fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                🔥 Hot Leads (有望見込み客)
-                <span style={{ fontSize: '12px', background: '#fef3c7', color: '#d97706', padding: '2px 8px', borderRadius: '12px' }}>B2B行動分析</span>
+        <div className="bento-card h-full p-6 bg-[#18181b] w-full">
+            <h3 className="mb-4 text-base font-bold flex items-center gap-2 text-zinc-100">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-500/10 text-red-500">
+                    <Flame size={14} fill="currentColor" />
+                </span>
+                Hot Leads
+                <span className="text-xs font-normal text-zinc-500 ml-2">有望見込み客の行動分析</span>
             </h3>
 
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                    <thead>
-                        <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
-                            <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151' }}>ランク</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151' }}>スコア</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151' }}>リード情報</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151' }}>行動インサイト</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151' }}>発生日時/デバイス</th>
-                            <th style={{ padding: '12px 16px', fontWeight: 600, color: '#374151' }}>詳細</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <div className="w-full min-w-full overflow-x-auto rounded-lg border border-zinc-800/50">
+                <div role="table" className="min-w-[1000px] w-full text-sm text-left">
+                    <div role="rowgroup" className="bg-zinc-900/50 text-zinc-500 border-b border-zinc-800 font-medium text-xs tracking-wider uppercase">
+                        <div role="row" className="grid grid-cols-[60px_60px_1.5fr_2.5fr_1fr_1.2fr_50px] items-center">
+                            <div role="columnheader" className="py-3 px-2 pl-6 whitespace-nowrap">ランク</div>
+                            <div role="columnheader" className="py-3 px-2 whitespace-nowrap">スコア</div>
+                            <div role="columnheader" className="py-3 px-2 whitespace-nowrap">リード情報</div>
+                            <div role="columnheader" className="py-3 px-2 whitespace-nowrap">送信データ</div>
+                            <div role="columnheader" className="py-3 px-2 whitespace-nowrap">行動インサイト</div>
+                            <div role="columnheader" className="py-3 px-2 whitespace-nowrap">発生日時 / デバイス</div>
+                            <div role="columnheader" className="py-3 px-2 pr-4 text-right whitespace-nowrap">詳細</div>
+                        </div>
+                    </div>
+                    <div role="rowgroup" className="divide-y divide-zinc-800">
                         {leads.length === 0 ? (
-                            <tr>
-                                <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#6b7280' }}>
-                                    データがまだありません
-                                </td>
-                            </tr>
+                            <div role="row" className="p-12 text-center text-zinc-500 text-xs">
+                                <div className="flex flex-col items-center gap-2">
+                                    <Clock size={24} className="opacity-20" />
+                                    <span>データがまだありません</span>
+                                </div>
+                            </div>
                         ) : (
                             leads.map((lead) => {
                                 const rank = lead.maturity_rank || 'Cold';
-                                const rankColor = rank === 'Hot' ? '#ef4444' : rank === 'Warm' ? '#d97706' : '#3b82f6';
-                                const rankBg = rank === 'Hot' ? '#fee2e2' : rank === 'Warm' ? '#fef3c7' : '#dbeafe';
 
-                                // リード情報の抽出 (メール > 名前 > ID)
-                                const leadInfo = lead.data?.email || lead.data?.name || lead.data?.company || lead.session_id.slice(0, 8);
+                                // Rank Styling
+                                let rankStyle = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+                                let rankIcon = null;
+                                if (rank === 'Hot') {
+                                    rankStyle = "bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)]";
+                                    rankIcon = <Flame size={10} fill="currentColor" />;
+                                } else if (rank === 'Warm') {
+                                    rankStyle = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+                                }
 
-                                // 行動フラグ
+                                // Lead Info
+                                const leadInfo = lead.data?.email || lead.data?.name || lead.data?.company || 'Anonymous';
+                                const hasName = !!(lead.data?.email || lead.data?.name || lead.data?.company);
+
+                                // Behavior Flags
                                 const flags = lead.behavior_flags || {};
 
                                 return (
-                                    <tr key={lead.id} style={{ borderBottom: '1px solid #f3f4f6', transition: 'background-color 0.2s' }} className="hover:bg-gray-50">
-                                        <td style={{ padding: '12px 16px' }}>
-                                            <span style={{
-                                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                                padding: '4px 12px', borderRadius: '999px',
-                                                fontSize: '12px', fontWeight: 700,
-                                                color: rankColor, backgroundColor: rankBg,
-                                                border: `1px solid ${rankColor}30`
-                                            }}>
-                                                {rank === 'Hot' && '🔥 '}
+                                    <div key={lead.id} role="row" className="grid grid-cols-[60px_60px_1.5fr_2.5fr_1fr_1.2fr_50px] group hover:bg-zinc-900/80 transition-colors items-start">
+                                        <div role="cell" className="py-4 px-2 pl-6">
+                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border ${rankStyle}`}>
+                                                {rankIcon}
                                                 {rank}
                                             </span>
-                                        </td>
-                                        <td style={{ padding: '12px 16px' }}>
-                                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#111827' }}>
+                                        </div>
+                                        <div role="cell" className="py-4 px-2">
+                                            <div className="text-base font-bold text-zinc-200 font-mono">
                                                 {lead.total_score || 0}
-                                                <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'normal', marginLeft: '2px' }}>pt</span>
+                                                <span className="text-xs text-zinc-600 font-normal ml-1">pt</span>
                                             </div>
-                                        </td>
-                                        <td style={{ padding: '12px 16px' }}>
-                                            <div style={{ fontWeight: 600, color: '#1f2937' }}>{leadInfo}</div>
-                                            <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>ID: {lead.id.slice(0, 8)}...</div>
-                                        </td>
-                                        <td style={{ padding: '12px 16px' }}>
-                                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                        </div>
+                                        <div role="cell" className="py-4 px-2 overflow-hidden">
+                                            <div className={`font-medium text-sm truncate ${hasName ? 'text-zinc-200' : 'text-zinc-500 italic'}`}>
+                                                {leadInfo}
+                                            </div>
+                                            <div className="text-xs text-zinc-600 font-mono mt-1.5 opacity-60 group-hover:opacity-100 transition-opacity space-y-1">
+                                                <div>ID: {lead.id.slice(0, 8)}</div>
+                                                {lead.ip_address && (
+                                                    <div className="flex items-center gap-1">
+                                                        <span>IP: {lead.ip_address}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div role="cell" className="py-4 px-2 overflow-hidden">
+                                            <div className="space-y-1.5 max-h-20 overflow-y-auto no-scrollbar">
+                                                {Object.entries(lead.data || {}).length === 0 ? (
+                                                    <span className="text-xs text-zinc-700">-</span>
+                                                ) : (
+                                                    Object.entries(lead.data || {}).map(([key, value]) => {
+                                                        const displayKey = key.startsWith('box-') ? '回答' : key;
+                                                        return (
+                                                            <div key={key} className="flex items-start gap-2 text-xs">
+                                                                <span className="text-zinc-500 shrink-0 font-medium">{displayKey}:</span>
+                                                                <span className="text-zinc-300 break-words line-clamp-2" title={String(value)}>{String(value)}</span>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div role="cell" className="py-4 px-2">
+                                            <div className="flex flex-wrap gap-2">
                                                 {flags.pasted && (
-                                                    <span title="テキストペースト検知 (準備済み/転載の可能性)" style={{ cursor: 'help', fontSize: '16px' }}>📋</span>
+                                                    <div title="テキストペースト検知" className="p-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-help">
+                                                        <Clipboard size={14} />
+                                                    </div>
                                                 )}
                                                 {flags.long_idle && (
-                                                    <span title="長時間の熟考あり (迷い/検討)" style={{ cursor: 'help', fontSize: '16px' }}>🤔</span>
+                                                    <div title="長時間の検討・迷い" className="p-1.5 rounded-md bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-help">
+                                                        <Hourglass size={14} />
+                                                    </div>
                                                 )}
                                                 {flags.rage && (
-                                                    <span title="レイジクリック検知 (ストレス/UI課題)" style={{ cursor: 'help', fontSize: '16px' }}>😡</span>
+                                                    <div title="レイジクリック検知 (ストレス)" className="p-1.5 rounded-md bg-red-900/20 text-red-400 hover:text-red-300 transition-colors cursor-help border border-red-500/20">
+                                                        <MousePointerClick size={14} />
+                                                    </div>
                                                 )}
-                                                {flags.mobile && (
-                                                    <span title="モバイルからのアクセス" style={{ cursor: 'help', fontSize: '16px' }}>📱</span>
-                                                )}
-                                                {!flags.pasted && !flags.long_idle && !flags.rage && !flags.mobile && (
-                                                    <span style={{ fontSize: '11px', color: '#d1d5db' }}>-</span>
+                                                {!flags.pasted && !flags.long_idle && !flags.rage && (
+                                                    <span className="text-xs text-zinc-700">-</span>
                                                 )}
                                             </div>
-                                        </td>
-                                        <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: '13px' }}>
-                                            <div>{new Date(lead.created_at).toLocaleString('ja-JP')}</div>
-                                            <div style={{ marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                {lead.device_category === 'mobile' ? '📱 Mobile' :
-                                                    lead.device_category === 'tablet' ? '📲 Tablet' : '💻 Desktop'}
+                                        </div>
+                                        <div role="cell" className="py-4 px-2">
+                                            <div className="text-sm text-zinc-400 font-medium">
+                                                {new Date(lead.created_at).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                             </div>
-                                        </td>
-                                        <td style={{ padding: '12px 16px' }}>
+                                            <div className="mt-1.5 flex items-center gap-2 text-xs text-zinc-500">
+                                                {lead.device_category === 'mobile' ? <Smartphone size={12} /> :
+                                                    lead.device_category === 'tablet' ? <Tablet size={12} /> : <Monitor size={12} />}
+                                                <span className="capitalize">{lead.device_category || 'Desktop'}</span>
+                                            </div>
+                                        </div>
+                                        <div role="cell" className="py-4 px-2 pr-4 text-right">
                                             <button
-                                                style={{
-                                                    border: '1px solid #dbeafe', background: '#eff6ff', color: '#2563eb',
-                                                    cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-                                                    padding: '6px 12px', borderRadius: '6px',
-                                                    transition: 'all 0.2s'
-                                                }}
+                                                className="group/btn p-2.5 rounded-full hover:bg-violet-500/10 text-zinc-600 hover:text-violet-400 transition-all active:scale-95 inline-flex"
                                                 onClick={() => setSelectedLead(lead)}
+                                                title="詳細ログを見る"
                                             >
-                                                行動ログを見る
+                                                <ChevronRight size={18} className="transition-transform group-hover/btn:translate-x-0.5" />
                                             </button>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    </div>
                                 );
                             })
                         )}
-                    </tbody>
-                </table>
+                    </div>
+                </div>
             </div>
 
             {selectedLead && (

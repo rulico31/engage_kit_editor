@@ -129,23 +129,25 @@ export const fetchProjectStats = async (projectId: string) => {
     const totalViews = pvCount || 0;
     const totalLeads = safeLeads.length;
 
+    // デバイス比率をPVから計算（leadsではなくpage_viewイベントから取得）
+    const { data: pvLogsForDevice } = await supabase
+        .from('analytics_logs')
+        .select('metadata')
+        .eq('project_id', projectId)
+        .eq('event_type', 'page_view');
+
     const devices = { desktop: 0, mobile: 0, tablet: 0 };
-    safeLeads.forEach(l => {
-        let type = 'desktop';
-        if (l.device_category === 'mobile') type = 'mobile';
-        else if (l.device_category === 'tablet') type = 'tablet';
-        else if (l.device_category === 'desktop') type = 'desktop';
-        else {
-            const lowerType = (l.device_type || '').toLowerCase();
-            if (lowerType.includes('mobile')) type = 'mobile';
-            else if (lowerType.includes('tablet')) type = 'tablet';
+    (pvLogsForDevice || []).forEach((log: any) => {
+        const deviceInfo = log.metadata?.device_info;
+        if (!deviceInfo) {
+            devices.desktop++; // device_infoがない場合はデフォルトでdesktop
+            return;
         }
 
-        if (devices[type as keyof typeof devices] !== undefined) {
-            devices[type as keyof typeof devices]++;
-        } else {
-            devices.desktop++;
-        }
+        const deviceType = deviceInfo.device_type;
+        if (deviceType === 'mobile') devices.mobile++;
+        else if (deviceType === 'tablet') devices.tablet++;
+        else devices.desktop++;
     });
 
     return {
@@ -160,6 +162,103 @@ export const fetchProjectStats = async (projectId: string) => {
         nodeStats: (nodeStats as NodeStats[]) || [],
         abStats: (abStats as ABTestStats[]) || [],
     };
+};
+
+export const fetchDailyStats = async (projectId: string) => {
+    if (!projectId || projectId.startsWith('local-')) return [];
+
+    const { data: dailyStats, error: dailyError } = await supabase
+        .from('analytics_daily_stats')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('date', { ascending: true });
+
+    if (dailyError) {
+        console.error('Error fetching daily stats:', dailyError);
+        return [];
+    }
+    return (dailyStats as DailyStats[]) || [];
+};
+
+export const fetchHourlyStats = async (projectId: string, targetDate?: Date) => {
+    if (!projectId || projectId.startsWith('local-')) {
+        return [];
+    }
+
+    // 対象日の設定 (指定がなければ今日)
+    const baseDate = targetDate ? new Date(targetDate) : new Date();
+    baseDate.setHours(0, 0, 0, 0); // 00:00:00
+
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(baseDate.getDate() + 1); // 翌日 00:00:00
+
+    // 1. PV & UU logs
+    const { data: logs, error } = await supabase
+        .from('analytics_logs')
+        .select('event_type, created_at, session_id')
+        .eq('project_id', projectId)
+        .gte('created_at', baseDate.toISOString())
+        .lt('created_at', nextDate.toISOString())
+        .in('event_type', ['page_view']);
+
+    if (error) {
+        console.error('Error fetching hourly logs:', error);
+        return [];
+    }
+
+    // 2. Leads (CV)
+    const { data: leads, error: leadError } = await supabase
+        .from('leads')
+        .select('created_at')
+        .eq('project_id', projectId)
+        .gte('created_at', baseDate.toISOString())
+        .lt('created_at', nextDate.toISOString());
+
+    if (leadError) {
+        console.error('Error fetching hourly leads:', leadError);
+        return [];
+    }
+
+    // 3. 集計 (時間ごと 00:00 - 23:00)
+    const statsMap = new Map<string, { pv: number; uuSet: Set<string>; cv: number }>();
+
+    // 初期化 (0時〜23時)
+    for (let i = 0; i < 24; i++) {
+        const key = `${String(i).padStart(2, '0')}:00`;
+        statsMap.set(key, { pv: 0, uuSet: new Set(), cv: 0 });
+    }
+
+    // PV & UU集計
+    (logs || []).forEach((log: any) => {
+        const d = new Date(log.created_at);
+        // UTC等の調整が必要だが、ここではシンプルに取得した時刻のHoursを使用
+        // ※ 本番ではタイムゾーン考慮が必要
+        const key = `${String(d.getHours()).padStart(2, '0')}:00`;
+        const entry = statsMap.get(key);
+        if (entry) {
+            entry.pv++;
+            if (log.session_id) entry.uuSet.add(log.session_id);
+        }
+    });
+
+    // CV集計
+    (leads || []).forEach((lead: any) => {
+        const d = new Date(lead.created_at);
+        const key = `${String(d.getHours()).padStart(2, '0')}:00`;
+        const entry = statsMap.get(key);
+        if (entry) {
+            entry.cv++;
+        }
+    });
+
+    // 配列に変換
+    return Array.from(statsMap.entries()).map(([time, val]) => ({
+        date: time, // HH:00
+        pv: val.pv,
+        uu: val.uuSet.size,
+        cv: val.cv,
+        cvr: val.pv > 0 ? (val.cv / val.pv) * 100 : 0
+    }));
 };
 
 export interface ThinkingTimeStat {
@@ -260,6 +359,10 @@ const normalizeBrowser = (browser: string | undefined): string => {
     if (browser.match(/Edge/i)) return 'Edge';
     return browser;
 };
+
+// 思考時間の閾値定数
+const THRESHOLD_INTUITIVE = 2500; // 2.5秒未満
+const THRESHOLD_HESITATION = 8000; // 8秒以上
 
 export const fetchExtendedStats = async (projectId: string, filters?: StatFilters): Promise<ExtendedStats> => {
     console.log('[Dashboard-Extended] fetchExtendedStats called with projectId:', projectId);
@@ -371,7 +474,20 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     }>();
 
     (interactionLogs || []).forEach((log: any) => {
-        const pattern = log.metadata?.thinking_pattern || 'normal';
+        // duration_ms から動的に判定（仕様: <2.5s=直感, 2.5-8s=通常, >8s=迷い）
+        const duration = log.metadata?.duration_ms || 0;
+
+        let pattern: 'intuitive' | 'normal' | 'hesitation' | 'noise' = 'normal';
+
+        if (duration > 0) {
+            if (duration < THRESHOLD_INTUITIVE) pattern = 'intuitive';
+            else if (duration > THRESHOLD_HESITATION) pattern = 'hesitation';
+            else pattern = 'normal';
+        } else {
+            // durationが取れていない場合はメタデータがあればそれを使用、なければノイズ扱い
+            pattern = log.metadata?.thinking_pattern || 'noise';
+        }
+
         if (thinkingTimeCounts[pattern] !== undefined) thinkingTimeCounts[pattern]++;
         if (pattern === 'noise') return;
         const nodeId = log.node_id;
@@ -389,7 +505,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
 
         current.hes += score;
         current.count++;
-        current.totalDuration += (log.metadata?.duration_ms || 0);
+        current.totalDuration += duration;
         inputMap.set(nodeId, current);
     });
 

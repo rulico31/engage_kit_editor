@@ -46,10 +46,16 @@ export interface BackgroundImage {
 export interface PlacedItemType {
   id: string;
   type: string;
+  name: string; // Added
+  x?: number; // Added (flattened)
+  y?: number; // Added (flattened)
+  width?: number; // Added (flattened)
+  height?: number; // Added (flattened)
   position: { x: number; y: number };
   size: { width: number; height: number };
   zIndex: number;
   data: {
+    text?: string; // Added
     label?: string;
     value?: string;
     src?: string;
@@ -70,6 +76,20 @@ export interface PlacedItemType {
 
     // B2B行動分析用スコア
     score?: number;
+
+    // Action (Button)
+    actionType?: 'none' | 'submit';
+    submitRedirectUrl?: string;
+
+    // Additional Properties for Input/Text
+    variableName?: string;
+    inputType?: 'text' | 'email' | 'tel' | 'number' | 'textarea';
+    enableCountryCode?: boolean;
+    countryCode?: string;
+    showBorder?: boolean;
+    isTransparent?: boolean;
+    isArtboardBackground?: boolean;
+    initialVisibility?: boolean;
   };
 }
 
