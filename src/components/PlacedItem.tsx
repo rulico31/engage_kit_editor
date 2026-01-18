@@ -75,7 +75,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         placeholder={item.data.placeholder || "入力してください"}
         value={inputValue}
         onCompositionStart={() => inputTracker.onCompositionStart()}
-        onCompositionEnd={(e) => inputTracker.onCompositionEnd(e.data)}
+        onCompositionEnd={() => inputTracker.onCompositionEnd()}
         onChange={(e) => {
           const newValue = e.target.value;
           setInputValue(newValue);
@@ -95,7 +95,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
           console.log('🔍 [PlacedItem] InputTracker report:', report);
 
           // Supabaseに入力修正データを記録
-          const shouldLog = inputValue.length > 0 || report.raw.correction_count > 0;
+          const shouldLog = inputValue.length > 0 || report.input_correction_count > 0;
 
           if (shouldLog) {
             console.log('🔍 [PlacedItem] Calling logAnalyticsEvent...', {
@@ -141,6 +141,8 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   return (
     <div
       className={itemClassName}
+      data-node-id={id}
+      data-node-type={name.split('-')[0] || 'unknown'}
       style={{
         position: "absolute",
         left: `${itemState.x}px`,

@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { usePageStore } from '../stores/usePageStore';
+import { usePreviewStore } from '../stores/usePreviewStore';
 
 import type { PlacedItemType } from '../types';
 
@@ -33,15 +34,64 @@ export const submitLeadData = async (
   }
 
   // 1. 最新のマスタデータとログを取得 (Storeから直接取得して整合性を担保)
-  // 1. 最新のマスタデータとログを取得
-  const state = usePageStore.getState();
-  const pageId = state.selectedPageId;
-  const placedItems = (pageId && state.pages[pageId]) ? state.pages[pageId].placedItems : (_placedItems || []);
+  const pageState = usePageStore.getState();
+  const previewState = usePreviewStore.getState();
+  const pageId = pageState.selectedPageId;
 
-  // NOTE: Analytics logs are now sent directly to DB, so we rely on what's passed or fetch if critical.
-  // For this implementation, we use the passed _analyticsLogs if available, or empty array.
-  // In a real scenario, we might want to fetch from DB or keep a short buffer in a store.
-  const analyticsLogs = _analyticsLogs || [];
+  // 全ページのアイテムを取得（スコア計算のため）
+  const allPlacedItems: PlacedItemType[] = [];
+  Object.values(pageState.pages).forEach(page => {
+    if (page && page.placedItems) {
+      allPlacedItems.push(...page.placedItems);
+    }
+  });
+
+  // フォールバック: 現在ページのアイテムのみ
+  const placedItems = allPlacedItems.length > 0 ? allPlacedItems :
+    ((pageId && pageState.pages[pageId]) ? pageState.pages[pageId].placedItems : (_placedItems || []));
+
+  // NOTE: Analytics logs are now sent directly to DB, so we fetch from DB to ensure accuracy.
+  // Get session_id to fetch relevant logs
+  let sessionId = sessionStorage.getItem('engage_session_id');
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    sessionStorage.setItem('engage_session_id', sessionId);
+  }
+
+  // 最後のリード送信時刻を取得（それ以降のログだけを検知対象とする）
+  const lastLeadSubmitTime = sessionStorage.getItem('engage_last_lead_submit');
+  const filterTimestamp = lastLeadSubmitTime || new Date(0).toISOString();
+
+  // Fetch analytics logs from DB for this session to detect behavior flags
+  // Only fetch logs created AFTER the last lead submission
+  let analyticsLogs: any[] = [];
+  try {
+    const { data: logs, error: logsError } = await supabase
+      .from('analytics_logs')
+      .select('event_type, metadata, created_at')
+      .eq('project_id', resolvedProjectId)
+      .eq('session_id', sessionId)
+      .in('event_type', ['input_paste', 'idle_hesitation', 'rage_click'])
+      .gt('created_at', filterTimestamp); // 前回送信以降のログのみ
+
+    if (logsError) {
+      console.warn('[Lead Submit] Failed to fetch analytics logs:', logsError);
+      analyticsLogs = _analyticsLogs || [];
+    } else {
+      analyticsLogs = logs || [];
+      if (import.meta.env.DEV) {
+        console.log('🔍 [Lead Submit] Fetched analytics logs:', {
+          sessionId,
+          filterTimestamp,
+          logCount: analyticsLogs.length,
+          eventTypes: analyticsLogs.map(l => l.event_type)
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[Lead Submit] Error fetching analytics logs:', err);
+    analyticsLogs = _analyticsLogs || [];
+  }
 
   // UTMパラメータの取得
   const utmParams = {
@@ -51,7 +101,13 @@ export const submitLeadData = async (
   };
 
   // 2. スコア再計算 (送信時計算モデル)
-  let totalScore = 0;
+  // ★ 重要: usePreviewStoreのvariablesから_system_total_scoreを取得
+  // logicEngine.tsでイベント発火時にここにスコアが蓄積される
+  const variablesScore = Number(previewState.variables?._system_total_score || 0);
+
+  // NOTE: dataパラメータにも_system_total_scoreが含まれる場合があるが、
+  // variablesScoreと同じ値なので二重カウントを避けるため使用しない
+  let totalScore = variablesScore;
 
   // 回答データ(data)の値と、アイテムIDを照合
   // dataがnull/undefinedの場合は空オブジェクトとして扱う
@@ -61,18 +117,27 @@ export const submitLeadData = async (
     const valuesToCheck = Array.isArray(value) ? value : [value];
 
     valuesToCheck.forEach(val => {
-      // 値(val)がアイテムIDと一致するものを探す
-      const item = placedItems.find(i => i.id === val);
+      // 値(val)がアイテムIDと一致するものを探す（全ページから検索）
+      const item = placedItems.find((i: PlacedItemType) => i.id === val);
       if (item && item.data.score) {
         totalScore += item.data.score;
       }
     });
   });
 
-  // 3. ランク判定
+  if (import.meta.env.DEV) {
+    console.log('📊 [Lead Submit] Score Calculation:', {
+      variablesScore,
+      itemBasedScore: totalScore - variablesScore,
+      finalScore: totalScore
+    });
+  }
+
+  // 3. ランク判定 (フォールバック用: DBトリガーでも計算されるが、即時反映のため)
   let rank = 'Cold';
-  if (totalScore >= 80) rank = 'Hot';
-  else if (totalScore >= 30) rank = 'Warm';
+  if (totalScore >= 76) rank = 'Super Hot';
+  else if (totalScore >= 51) rank = 'Hot';
+  else if (totalScore >= 26) rank = 'Warm';
 
   // 4. 行動フラグ生成 (JSONB)
   const behaviorFlags: any = {};
@@ -94,32 +159,41 @@ export const submitLeadData = async (
     behaviorFlags.mobile = true;
   }
 
-  // 5. DB保存
-  // session_idの取得または生成
-  let sessionId = sessionStorage.getItem('engage_session_id');
-  if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    sessionStorage.setItem('engage_session_id', sessionId);
+  if (import.meta.env.DEV) {
+    console.log('🚩 [Lead Submit] Behavior Flags:', behaviorFlags);
   }
+
+
+  // 5. DB保存
+  // session_id は既に上で取得済み
+
+
+
+  // IPアドレスの取得
+  const { getClientIpAddress } = await import('./IpAddressTracker');
+  const ipAddress = await getClientIpAddress();
 
   const { error } = await supabase.from('leads').insert({
     project_id: resolvedProjectId,
     session_id: sessionId, // Added: Required field
     data: data,
-    total_score: totalScore,
+    total_score: totalScore, // Legacy support
+    engagement_score: totalScore, // New standard
     maturity_rank: rank,
     behavior_flags: behaviorFlags,
     device_category: behaviorFlags.mobile ? 'mobile' : 'desktop',
     utm_source: utmParams.source,
     utm_medium: utmParams.medium,
     utm_campaign: utmParams.campaign,
-    // ip_address等はSupabase側で取得するか、Edge Functions経由が必要(ここでは省略)
+    ip_address: ipAddress, // IPアドレスを保存
   });
 
   if (error) {
     console.error('Lead submission failed:', error);
     throw error;
   } else {
+    // 送信成功時、現在時刻を記録（次回送信時のフィルタリングに使用）
+    sessionStorage.setItem('engage_last_lead_submit', new Date().toISOString());
     console.log('Lead submitted successfully:', { rank, totalScore, flags: behaviorFlags });
   }
 };

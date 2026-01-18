@@ -22,6 +22,8 @@ export interface LeadData {
     utm_source?: string;
     utm_medium?: string;
     utm_campaign?: string;
+    engagement_score?: number;
+    score_tier?: string;
 }
 
 export interface AnalyticsStats {
@@ -331,6 +333,22 @@ export interface ExtendedStats {
     advanced: AdvancedStats;
     rageClicks: RageClickStat[];
     hesitationStats: HesitationStat;
+    dropOffByItem: DropOffByItemStat[];
+    dropOffByType: DropOffByTypeStat[];
+}
+
+export interface DropOffByItemStat {
+    nodeId: string | null;
+    nodeName: string;
+    nodeType: string;
+    count: number;
+    percentage: number;
+}
+
+export interface DropOffByTypeStat {
+    nodeType: string;
+    count: number;
+    percentage: number;
 }
 
 export interface AdvancedStats {
@@ -379,7 +397,9 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
                 pageDwellTime: []
             },
             rageClicks: [],
-            hesitationStats: { rate: 0, hesitationSessions: 0, totalSessions: 0 }
+            hesitationStats: { rate: 0, hesitationSessions: 0, totalSessions: 0 },
+            dropOffByItem: [],
+            dropOffByType: []
         };
     }
 
@@ -692,6 +712,60 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     const engagementDistribution = Object.entries(scoreRanges).map(([range, count]) => ({ range, count }));
 
 
+    // 7. Drop-off Analysis (Exit Context)
+    let exitQuery = supabase.from('analytics_logs')
+        .select('metadata, created_at')
+        .eq('project_id', projectId)
+        .eq('event_type', 'exit_context');
+
+    exitQuery = applyFilters(exitQuery);
+    const { data: exitLogs } = await exitQuery;
+
+    const exitItemMap = new Map<string, { count: number; name: string; type: string }>();
+    const exitTypeMap = new Map<string, number>();
+    let totalExits = 0;
+
+    (exitLogs || []).forEach((log: any) => {
+        const meta = log.metadata;
+        if (!meta) return;
+        totalExits++;
+
+        const nodeId = meta.last_interacted_node || 'unknown';
+        const nodeType = meta.last_interacted_node_type || (nodeId === 'unknown' ? 'unknown' : 'other');
+
+        // Item Aggregation
+        // 名前解決のためにnodeIdを使いたいが、現状metadataにitem_nameが含まれていない可能性がある
+        // 既存の inputMap や rageMap から名前を推測するか、IDを表示する
+        let nodeName = nodeId;
+        // rageMapやinputMapから名前を探す簡易ロジック (他で取得済みの場合)
+        // ※ 確実な名前解決には join が必要だが、ここでは簡易的にIDを使用
+
+        const itemKey = nodeId;
+        const currentItem = exitItemMap.get(itemKey) || { count: 0, name: nodeName, type: nodeType };
+        currentItem.count++;
+        exitItemMap.set(itemKey, currentItem);
+
+        // Type Aggregation
+        const typeKey = nodeType;
+        exitTypeMap.set(typeKey, (exitTypeMap.get(typeKey) || 0) + 1);
+    });
+
+    const dropOffByItem: DropOffByItemStat[] = Array.from(exitItemMap.entries()).map(([nodeId, val]) => ({
+        nodeId: nodeId === 'unknown' ? null : nodeId,
+        nodeName: val.name, // 必要に応じて名前解決ロジックを強化
+        nodeType: val.type,
+        count: val.count,
+        percentage: totalExits > 0 ? (val.count / totalExits) * 100 : 0
+    })).sort((a, b) => b.count - a.count).slice(0, 10); // Top 10
+
+    const dropOffByType: DropOffByTypeStat[] = Array.from(exitTypeMap.entries()).map(([nodeType, count]) => ({
+        nodeType,
+        count,
+        percentage: totalExits > 0 ? (count / totalExits) * 100 : 0
+    })).sort((a, b) => b.count - a.count);
+
+
+
     // Hesitation Stats Aggregation
     const hesitationSessionsCount = hesitationSessions.size;
     const hesitationRate = totalSessions > 0 ? (hesitationSessionsCount / totalSessions) * 100 : 0;
@@ -707,7 +781,9 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
             rate: hesitationRate,
             hesitationSessions: hesitationSessionsCount,
             totalSessions: totalSessions
-        }
+        },
+        dropOffByItem,
+        dropOffByType
     };
 };
 

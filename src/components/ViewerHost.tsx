@@ -156,6 +156,10 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         initializeUTMTracking();
         const deviceInfo = initializeDeviceTracking();
 
+        // IP Address Pre-fetch (リード送信時の遅延を防ぐ)
+        const { prefetchIpAddress } = await import('../lib/IpAddressTracker');
+        prefetchIpAddress();
+
         // PV計測 (device_info を含める) - 重複防止ガード
         if (!hasLoggedPV.current) {
           hasLoggedPV.current = true;

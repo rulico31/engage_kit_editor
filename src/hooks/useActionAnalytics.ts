@@ -8,6 +8,7 @@ import { logAnalyticsEvent } from "../lib/analytics";
  */
 export const useActionAnalytics = (projectId: string | null, isEnabled: boolean) => {
     const lastInteractionRef = useRef<string | null>(null);
+    const lastInteractionTypeRef = useRef<string | null>(null);
 
     const interactionTimerRef = useRef<number>(Date.now());
 
@@ -21,8 +22,10 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             const nodeElement = target.closest('[data-node-id]');
             if (nodeElement) {
                 const nodeId = nodeElement.getAttribute('data-node-id');
+                const nodeType = nodeElement.getAttribute('data-node-type');
                 if (nodeId) {
                     lastInteractionRef.current = nodeId;
+                    lastInteractionTypeRef.current = nodeType || 'unknown';
                 }
             }
         };
@@ -83,6 +86,30 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             }
         };
 
+        // 3.5. ペースト検知
+        const handlePaste = (e: ClipboardEvent) => {
+            const target = e.target as HTMLElement;
+            const tagName = target.tagName.toLowerCase();
+
+            // 入力フィールドへのペーストのみ検知
+            if (tagName === 'input' || tagName === 'textarea' || target.isContentEditable) {
+                const nodeElement = target.closest('[data-node-id]');
+                const nodeId = nodeElement?.getAttribute('data-node-id') || null;
+
+                const pastedText = e.clipboardData?.getData('text') || '';
+                const textLength = pastedText.length;
+
+                console.log(`📋 Paste Detected! Target: ${nodeId || 'Unknown'}, Length: ${textLength}`);
+
+                logAnalyticsEvent('input_paste', {
+                    timestamp: Date.now(),
+                    target_node_id: nodeId,
+                    text_length: textLength,
+                    session_id: sessionStorage.getItem('engage_session_id')
+                }, projectId);
+            }
+        };
+
         // 4. 離脱時ログ送信 (Beacon API)
         const sendExitLog = () => {
             const analyticsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analytics-beacon`;
@@ -92,6 +119,7 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                 session_id: sessionStorage.getItem('engage_session_id'),
                 metadata: {
                     last_interacted_node: lastInteractionRef.current,
+                    last_interacted_node_type: lastInteractionTypeRef.current,
                     timestamp: Date.now()
                 }
             };
@@ -168,6 +196,9 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
         // Thinking Time Listener
         window.addEventListener('click', handleThinkingTime, { capture: true });
 
+        // Paste Listener
+        window.addEventListener('paste', handlePaste as EventListener, { capture: true });
+
         window.addEventListener('beforeunload', sendExitLog);
 
         const handleVisibility = () => {
@@ -186,6 +217,7 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             window.removeEventListener('click', handleRageClick, { capture: true });
             window.removeEventListener('touchstart', handleRageClick, { capture: true });
             window.removeEventListener('click', handleThinkingTime, { capture: true });
+            window.removeEventListener('paste', handlePaste as EventListener, { capture: true });
             window.removeEventListener('beforeunload', sendExitLog);
             document.removeEventListener('visibilitychange', handleVisibility);
         };

@@ -52,14 +52,25 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                             </tr>
                         ) : (
                             leads.map((lead) => {
-                                const rank = lead.maturity_rank || 'Cold';
+                                // 優先順位: score_tier (DBトリガー) > maturity_rank (JS計算) > 'Cold'
+                                let rank = lead.score_tier || lead.maturity_rank || 'Cold';
+
+                                // 表記揺れの吸収 (DBはsnake_case, JSはPascalCaseの場合があるため)
+                                if (rank === 'super_hot') rank = 'Super Hot';
+                                else if (rank === 'hot') rank = 'Hot';
+                                else if (rank === 'warm') rank = 'Warm';
+                                else if (rank === 'cold') rank = 'Cold';
 
                                 // Rank Styling
                                 let rankBadge = "bg-zinc-800/50 text-zinc-400 border-zinc-800";
                                 let rankIcon = null;
                                 let rowGlow = "";
 
-                                if (rank === 'Hot') {
+                                if (rank === 'Super Hot') {
+                                    rankBadge = "bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_15px_-5px_#a855f733]";
+                                    rankIcon = <Flame size={12} fill="currentColor" className="text-purple-500" />;
+                                    rowGlow = "shadow-[inset_3px_0_0_0_#a855f7]";
+                                } else if (rank === 'Hot') {
                                     rankBadge = "bg-red-500/10 text-red-500 border-red-500/20 shadow-[0_0_15px_-5px_#ef444433]";
                                     rankIcon = <Flame size={12} fill="currentColor" />;
                                     rowGlow = "shadow-[inset_3px_0_0_0_#ef4444]";
@@ -92,7 +103,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         {/* Score */}
                                         <td className="py-5 px-4 text-left align-middle">
                                             <div className="text-lg font-bold text-zinc-100 font-mono tracking-tighter">
-                                                {lead.total_score || 0}
+                                                {lead.engagement_score ?? lead.total_score ?? 0}
                                             </div>
                                         </td>
 
@@ -117,22 +128,32 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         {/* Sent Data */}
                                         <td className="py-5 px-4 align-middle text-left">
                                             <div className="flex flex-wrap gap-2">
-                                                {Object.entries(lead.data || {}).length === 0 ? (
-                                                    <span className="text-xs text-zinc-700 italic">No data</span>
-                                                ) : (
-                                                    Object.entries(lead.data || {}).slice(0, 2).map(([key, value]) => {
-                                                        const displayKey = key.startsWith('box-') ? '回答' : key;
-                                                        return (
-                                                            <div key={key} className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-900/50 border border-zinc-800 text-[10px] whitespace-nowrap max-w-[150px]">
-                                                                <span className="text-zinc-500 font-medium">{displayKey}:</span>
-                                                                <span className="text-zinc-300 truncate font-semibold">{String(value)}</span>
-                                                            </div>
-                                                        );
-                                                    })
-                                                )}
-                                                {Object.keys(lead.data || {}).length > 2 && (
-                                                    <span className="text-[10px] font-bold text-zinc-600 self-center px-1.5 py-0.5 rounded border border-zinc-800/50 bg-zinc-900/30">+{Object.keys(lead.data || {}).length - 2} items</span>
-                                                )}
+                                                {(() => {
+                                                    // _system_で始まるシステム変数をフィルタリング
+                                                    const filteredEntries = Object.entries(lead.data || {})
+                                                        .filter(([key]) => !key.startsWith('_system_'));
+
+                                                    if (filteredEntries.length === 0) {
+                                                        return <span className="text-xs text-zinc-700 italic">No data</span>;
+                                                    }
+
+                                                    return (
+                                                        <>
+                                                            {filteredEntries.slice(0, 2).map(([key, value]) => {
+                                                                const displayKey = key.startsWith('box-') ? '回答' : key;
+                                                                return (
+                                                                    <div key={key} className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-900/50 border border-zinc-800 text-[10px] whitespace-nowrap max-w-[150px]">
+                                                                        <span className="text-zinc-500 font-medium">{displayKey}:</span>
+                                                                        <span className="text-zinc-300 truncate font-semibold">{String(value)}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                            {filteredEntries.length > 2 && (
+                                                                <span className="text-[10px] font-bold text-zinc-600 self-center px-1.5 py-0.5 rounded border border-zinc-800/50 bg-zinc-900/30">+{filteredEntries.length - 2} items</span>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </td>
 
@@ -194,7 +215,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                         )}
                     </tbody>
                 </table>
-            </div>
+            </div >
 
             {selectedLead && (
                 <MicroJourneyModal
@@ -203,6 +224,6 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                     onClose={() => setSelectedLead(null)}
                 />
             )}
-        </div>
+        </div >
     );
 };

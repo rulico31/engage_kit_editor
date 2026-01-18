@@ -91,6 +91,7 @@ export interface PlacedItemType {
     isArtboardBackground?: boolean;
     initialVisibility?: boolean;
   };
+  style?: any; // Added to support direct style access
 }
 
 export interface VariableState {
@@ -98,6 +99,7 @@ export interface VariableState {
 }
 
 export interface PreviewState {
+  [itemId: string]: any; // Allow indexing by itemId
   currentPageId: string;
   variables: VariableState;
   history: string[]; // Page ID history

@@ -289,6 +289,10 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         console.log('🚀 One-Click Submit Triggered (Editor Preview)');
         e.stopPropagation(); // イベント伝播を止める
 
+        // ★★ 重要: スコア加算のためにまずclickイベントを発火
+        // これにより handleItemEvent 内で _system_total_score が加算される
+        onItemEvent("click", item.id);
+
         try {
           // 1. 変数の取得
           const variables = usePreviewStore.getState().variables; // ストアから直接取得

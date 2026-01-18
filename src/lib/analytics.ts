@@ -55,8 +55,8 @@ export const logAnalyticsEvent = async (
         project_id: pid,
         session_id: sessionId,
         event_type: eventType,
+        node_id: metadata.nodeId || null,  // 離脱要因分析用にnode_idカラムに保存
         metadata: metadata,
-        // node_id, page_id は metadata から抽出して保存してもよい
       });
 
     if (error) {

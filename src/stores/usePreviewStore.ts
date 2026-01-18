@@ -263,7 +263,36 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
     const { placedItems, allItemLogics } = currentPage;
 
-    // 古い計測終了コードは削除
+    // ★★ B2B Scoring: スコア加算はここで1回だけ行う（triggerEventループの前）
+    // これにより、複数のロジックグラフに対してtriggerEventが呼ばれても、スコアは1回だけ加算される
+    if (eventName === 'click') {
+      const targetItem = placedItems.find(i => i.id === originItemId);
+      if (targetItem && targetItem.data.score && typeof targetItem.data.score === 'number') {
+        const currentScore = (variablesRef.current._system_total_score as number) || 0;
+        const scoreToAdd = targetItem.data.score;
+        const newScore = currentScore + scoreToAdd;
+
+        console.log(`📈 [handleItemEvent] Score Update: ${currentScore} + ${scoreToAdd} = ${newScore}`);
+
+        variablesRef.current = {
+          ...variablesRef.current,
+          _system_total_score: newScore
+        };
+        set({ variables: variablesRef.current });
+
+        // スコア変更のアナリティクスログ
+        logAnalyticsEvent('score_change', {
+          nodeId: originItemId,
+          nodeType: 'item_interaction',
+          metadata: {
+            oldScore: currentScore,
+            newScore: newScore,
+            added: scoreToAdd,
+            itemLabel: targetItem.data?.text || targetItem.data?.label || targetItem.name
+          }
+        });
+      }
+    }
 
     Object.entries(allItemLogics).forEach(([logicOwnerId, targetGraph]) => {
       if (targetGraph && targetGraph.nodes.length > 0) {

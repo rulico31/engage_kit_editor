@@ -149,3 +149,128 @@
 .analytics-export-btn:active {
     transform: translateY(0);
 }
+
+/* Drop-off Factors Section */
+.analytics-section {
+    margin-top: 32px;
+}
+
+.section-title {
+    margin: 0 0 20px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    border-left: 4px solid #ef4444;
+    padding-left: 12px;
+}
+
+.dropoff-grid {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 24px;
+}
+
+.dropoff-card {
+    background: #2a2a2a;
+    padding: 24px;
+    border-radius: 8px;
+    border: 1px solid #444;
+}
+
+.dropoff-card h4 {
+    margin: 0 0 16px;
+    font-size: 14px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dropoff-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dropoff-table th {
+    text-align: left;
+    padding: 8px;
+    color: #666;
+    font-size: 12px;
+    border-bottom: 1px solid #444;
+}
+
+.dropoff-table td {
+    padding: 12px 8px;
+    font-size: 13px;
+    border-bottom: 1px solid #333;
+    color: #eee;
+}
+
+.dropoff-table tr:last-child td {
+    border-bottom: none;
+}
+
+.item-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #333;
+    color: #ccc;
+    font-size: 11px;
+}
+
+.type-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.type-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+}
+
+.type-label {
+    width: 80px;
+    color: #ccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.type-bar-wrapper {
+    flex: 1;
+    background: #1a1a1a;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.type-bar {
+    height: 100%;
+    background: #ef4444;
+    border-radius: 4px;
+}
+
+.type-count {
+    width: 80px;
+    text-align: right;
+    color: #888;
+    font-size: 12px;
+}
+
+.no-data {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+    font-size: 13px;
+    font-style: italic;
+}

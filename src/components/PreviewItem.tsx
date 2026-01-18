@@ -46,38 +46,28 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const handleClick = async () => {
     console.log("📍 PreviewItem clicked:", name, id);
 
+    // ★★ 重要: すべてのボタン/選択肢クリックでまずclickイベントを発火
+    // これにより logicEngine でスコア加算処理が実行される
+    if (!name.startsWith("テキスト入力欄")) {
+      onItemEvent("click", id);
+    }
+
     // ★ ワンクリック送信 (Simplified CV)
     if (item.data.actionType === 'submit') {
       console.log('🚀 One-Click Submit Triggered');
 
       try {
         // 1. データ収集 (variablesから)
-        // input_xxx という形式の変数、または variableName で指定された変数を集める
-        // 簡易実装: すべての変数を送る（不要なものも含まれる可能性があるが、まずはこれで）
         const submitData = { ...variables };
 
-        // セッションID
-        const sessionId = sessionStorage.getItem('engage_session_id');
+        // 2. submitLeadData を使用してリードを送信
+        // これにより _system_total_score が正しくDBに保存される
+        const { submitLeadData } = await import('../lib/leads');
 
-        // B2Bスコア計算 (今のところは実装しない、変数の内容のみ)
+        // projectIdはURLから取得される (leads.ts内部で処理)
+        await submitLeadData(submitData);
 
-        // Supabaseに保存
-        // projectIdが必要だが、PreviewItemには渡されていないかも？
-        // usePreviewStoreから取得できるか確認、あるいはpropsで渡す必要がある。
-        // いったん logAnalyticsEvent('lead_submit') を信頼して、データ保存はそちらに任せるか、
-        // あるいは logAnalyticsEvent を拡張して leads テーブルへの insert も行うか。
-        // 現状の logAnalyticsEvent は analytics_logs への保存のみ。
-        // ここでは直接 leads テーブルへ保存したいが、projectId が不明。
-        // ※ 暫定対応: logAnalyticsEvent を呼ぶ。 backend側で trigger で leads に入れる、等の仕組みがあればベストだが、
-        // 今はクライアント側で完結させるため、logAnalyticsEvent('lead_submit') を呼ぶ。
-
-        await logAnalyticsEvent('lead_submit', {
-          submitted_data: submitData,
-          source: 'one_click_submit',
-          button_id: id
-        });
-
-        console.log('✅ Lead Submitted via Analytics Log');
+        console.log('✅ Lead Submitted via submitLeadData');
 
         // リダイレクト処理
         if (item.data.submitRedirectUrl) {
@@ -91,11 +81,6 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         alert('送信に失敗しました。(Submission Failed)');
       }
       return;
-    }
-
-    // すべてのアイテムでクリックイベントを発火（入力欄以外）
-    if (!name.startsWith("テキスト入力欄")) {
-      onItemEvent("click", id);
     }
   };
 
