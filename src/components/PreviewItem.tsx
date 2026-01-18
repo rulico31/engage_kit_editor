@@ -332,6 +332,9 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   return (
     <div
       className={itemClassName}
+      data-node-id={id}
+      data-node-name={name}
+      data-node-type={item.type}
       style={{
         position: "absolute",
         left: `${x}px`,

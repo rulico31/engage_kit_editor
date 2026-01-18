@@ -9,6 +9,7 @@ import { logAnalyticsEvent } from "../lib/analytics";
 export const useActionAnalytics = (projectId: string | null, isEnabled: boolean) => {
     const lastInteractionRef = useRef<string | null>(null);
     const lastInteractionTypeRef = useRef<string | null>(null);
+    const lastInteractionNameRef = useRef<string | null>(null); // Added
 
     const interactionTimerRef = useRef<number>(Date.now());
 
@@ -23,9 +24,12 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             if (nodeElement) {
                 const nodeId = nodeElement.getAttribute('data-node-id');
                 const nodeType = nodeElement.getAttribute('data-node-type');
+                const nodeName = nodeElement.getAttribute('data-node-name'); // Added
+
                 if (nodeId) {
                     lastInteractionRef.current = nodeId;
                     lastInteractionTypeRef.current = nodeType || 'unknown';
+                    lastInteractionNameRef.current = nodeName || 'unknown'; // Added
                 }
             }
         };
@@ -62,14 +66,19 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                 const nodeElement = target.closest('[data-node-id]');
                 let targetNodeId = null;
                 let targetNodeType = null;
+                let targetNodeName = null; // Added
 
                 if (nodeElement) {
                     targetNodeId = nodeElement.getAttribute('data-node-id');
+                    targetNodeName = nodeElement.getAttribute('data-node-name'); // Added
                     if (targetNodeId) {
                         // IDからタイプを簡易推定 (例: image-123 -> image)
-                        const parts = targetNodeId.split('-');
-                        if (parts.length > 0) {
-                            targetNodeType = parts[0];
+                        targetNodeType = nodeElement.getAttribute('data-node-type');
+                        if (!targetNodeType) {
+                            const parts = targetNodeId.split('-');
+                            if (parts.length > 0) {
+                                targetNodeType = parts[0];
+                            }
                         }
                     }
                 }
@@ -79,7 +88,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                 logAnalyticsEvent('rage_click', {
                     timestamp: now,
                     target_node_id: targetNodeId,
-                    target_node_type: targetNodeType
+                    target_node_type: targetNodeType,
+                    item_name: targetNodeName // Added
                 }, projectId);
 
                 clickTimestamps = []; // リセット
@@ -95,6 +105,7 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             if (tagName === 'input' || tagName === 'textarea' || target.isContentEditable) {
                 const nodeElement = target.closest('[data-node-id]');
                 const nodeId = nodeElement?.getAttribute('data-node-id') || null;
+                const nodeName = nodeElement?.getAttribute('data-node-name') || null; // Added
 
                 const pastedText = e.clipboardData?.getData('text') || '';
                 const textLength = pastedText.length;
@@ -105,7 +116,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                     timestamp: Date.now(),
                     target_node_id: nodeId,
                     text_length: textLength,
-                    session_id: sessionStorage.getItem('engage_session_id')
+                    session_id: sessionStorage.getItem('engage_session_id'),
+                    item_name: nodeName // Added
                 }, projectId);
             }
         };
@@ -120,6 +132,7 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                 metadata: {
                     last_interacted_node: lastInteractionRef.current,
                     last_interacted_node_type: lastInteractionTypeRef.current,
+                    last_interacted_node_name: lastInteractionNameRef.current, // Added
                     timestamp: Date.now()
                 }
             };

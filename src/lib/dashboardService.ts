@@ -737,11 +737,17 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
         // 名前解決のためにnodeIdを使いたいが、現状metadataにitem_nameが含まれていない可能性がある
         // 既存の inputMap や rageMap から名前を推測するか、IDを表示する
         let nodeName = nodeId;
-        // rageMapやinputMapから名前を探す簡易ロジック (他で取得済みの場合)
-        // ※ 確実な名前解決には join が必要だが、ここでは簡易的にIDを使用
+        if (meta.last_interacted_node_name && meta.last_interacted_node_name !== 'unknown') {
+            nodeName = meta.last_interacted_node_name;
+        }
 
         const itemKey = nodeId;
         const currentItem = exitItemMap.get(itemKey) || { count: 0, name: nodeName, type: nodeType };
+        // 既存の名前がIDまたはunknownで、今回のログに有効な名前があれば更新する
+        if ((currentItem.name === nodeId || currentItem.name === 'unknown') && nodeName !== nodeId && nodeName !== 'unknown') {
+            currentItem.name = nodeName;
+        }
+
         currentItem.count++;
         exitItemMap.set(itemKey, currentItem);
 

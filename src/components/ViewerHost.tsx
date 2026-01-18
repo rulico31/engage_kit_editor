@@ -163,11 +163,15 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         // PV計測 (device_info を含める) - 重複防止ガード
         if (!hasLoggedPV.current) {
           hasLoggedPV.current = true;
+          // ページ名取得
+          const firstPageName = firstPageId ? normalizedPages[firstPageId]?.name : 'Unknown Page';
+
           logAnalyticsEvent('page_view', {
             pageId: firstPageId,
+            pageName: firstPageName, // ★ Added pageName
             device_info: deviceInfo
           }, projectId);
-          console.log('[ViewerHost] page_view logged');
+          console.log('[ViewerHost] page_view logged', { pageId: firstPageId, pageName: firstPageName });
         } else {
           console.log('[ViewerHost] page_view skipped (already logged)');
         }
