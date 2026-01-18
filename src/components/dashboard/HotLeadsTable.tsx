@@ -21,19 +21,20 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
             </h3>
 
             <div className="w-full overflow-x-auto rounded-lg border border-zinc-800/50 flex-1 custom-scrollbar">
-                <table className="w-full min-w-[1200px] text-sm text-left border-separate border-spacing-0" style={{ width: '100%' }}>
+                <table className="w-full min-w-[1200px] text-sm text-left border-separate border-spacing-0 table-fixed" style={{ width: '100%' }}>
                     {/* Table Header */}
                     <thead className="bg-zinc-900/80 text-zinc-500 sticky top-0 z-10 backdrop-blur-sm">
                         <tr>
-                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[120px]">ランク</th>
-                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap text-right w-[100px]">スコア</th>
-                            <th className="py-4 px-6 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap">リード情報</th>
-                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[25%]">行動インサイト</th>
-                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[150px]">リスク検知</th>
-                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[160px]">日時 / デバイス</th>
-                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap text-right w-[80px]">詳細</th>
+                            <th className="py-4 px-6 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[120px]" style={{ textAlign: 'left' }}>ランク</th>
+                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[100px]" style={{ textAlign: 'left' }}>スコア</th>
+                            <th className="py-4 px-6 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap" style={{ textAlign: 'left' }}>リード情報</th>
+                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[25%]" style={{ textAlign: 'left' }}>行動インサイト</th>
+                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[150px]" style={{ textAlign: 'left' }}>リスク検知</th>
+                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[160px]" style={{ textAlign: 'left' }}>日時 / デバイス</th>
+                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[80px]" style={{ textAlign: 'right' }}>詳細</th>
                         </tr>
                     </thead>
+
 
                     {/* Table Body */}
                     <tbody className="divide-y divide-zinc-800/50">
@@ -81,22 +82,22 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         onClick={() => setSelectedLead(lead)}
                                     >
                                         {/* Rank */}
-                                        <td className={`py-5 px-4 align-middle transition-all ${rowGlow}`}>
-                                            <span className={`inline-flex items-center justify-center gap-1.5 w-full py-2 rounded-md text-[10px] font-black border tracking-tighter ${rankBadge} whitespace-nowrap uppercase`}>
+                                        <td className={`py-5 px-6 align-middle transition-all text-left ${rowGlow}`}>
+                                            <span className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-black border tracking-tighter ${rankBadge} whitespace-nowrap uppercase`}>
                                                 {rankIcon}
                                                 {rank}
                                             </span>
                                         </td>
 
                                         {/* Score */}
-                                        <td className="py-5 px-4 text-right align-middle">
+                                        <td className="py-5 px-4 text-left align-middle">
                                             <div className="text-lg font-bold text-zinc-100 font-mono tracking-tighter">
                                                 {lead.total_score || 0}
                                             </div>
                                         </td>
 
                                         {/* Lead Info */}
-                                        <td className="py-5 px-6 align-middle">
+                                        <td className="py-5 px-6 align-middle text-left">
                                             <div className="flex items-center gap-4">
                                                 <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-sm font-bold border transition-colors ${hasName ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-zinc-900 text-zinc-600 border-zinc-800'}`}>
                                                     {leadInfo.slice(0, 1).toUpperCase()}
@@ -114,7 +115,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         </td>
 
                                         {/* Sent Data */}
-                                        <td className="py-5 px-4 align-middle">
+                                        <td className="py-5 px-4 align-middle text-left">
                                             <div className="flex flex-wrap gap-2">
                                                 {Object.entries(lead.data || {}).length === 0 ? (
                                                     <span className="text-xs text-zinc-700 italic">No data</span>
@@ -136,7 +137,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         </td>
 
                                         {/* Risk/Behavior Flags */}
-                                        <td className="py-5 px-4 align-middle">
+                                        <td className="py-5 px-4 align-middle text-left">
                                             <div className="flex flex-wrap gap-2">
                                                 {flags.rage && (
                                                     <div title="Rage Click Detected" className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-900/10 text-red-500 border border-red-500/20 whitespace-nowrap">
@@ -163,7 +164,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         </td>
 
                                         {/* Date/Device */}
-                                        <td className="py-5 px-4 align-middle whitespace-nowrap">
+                                        <td className="py-5 px-4 align-middle whitespace-nowrap text-left">
                                             <div className="flex flex-col gap-1.5">
                                                 <div className="text-[11px] text-zinc-300 font-bold bg-zinc-800/30 px-2 py-0.5 rounded inline-block w-fit">
                                                     {new Date(lead.created_at).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
@@ -173,6 +174,11 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                                         lead.device_category === 'tablet' ? <Tablet size={12} className="text-zinc-600" /> : <Monitor size={12} className="text-zinc-600" />}
                                                     <span>{lead.device_category || 'Desktop'}</span>
                                                 </div>
+                                                {lead.ip_address && (
+                                                    <div className="text-[10px] text-zinc-600 font-mono px-1">
+                                                        {lead.ip_address}
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
 
