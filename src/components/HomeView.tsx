@@ -5,6 +5,7 @@ import ConfirmModal from "./ConfirmModal";
 import { TemplateSelectionModal } from "./TemplateSelectionModal";
 import { useAuthStore } from "../stores/useAuthStore";
 import { AccountMenu } from "./Auth/AccountMenu";
+import LoadingOverlay from "./LoadingOverlay";
 
 interface HomeViewProps {
   onCreateProject: (name: string, initialData?: any) => void;
@@ -402,7 +403,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
         {/* プロジェクトリスト */}
         <div className="projects-grid">
           {isLoading ? (
-            <div className="loading-state">読み込み中...</div>
+            <LoadingOverlay message="プロジェクトを読み込み中..." />
           ) : projects.length === 0 ? (
             <div className="empty-state">
               <p>プロジェクトがまだありません</p>
@@ -507,13 +508,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
 
         {/* 全画面ローディングオーバーレイ */}
         {isProjectLoading && (
-          <div className="loading-overlay">
-            <div className="loading-content">
-              <div className="loading-logo">EngageKit</div>
-              <div className="loading-spinner"></div>
-              <div className="loading-text">Editorを起動中...</div>
-            </div>
-          </div>
+          <LoadingOverlay message="Editorを起動中..." />
         )}
 
         {/* テンプレート選択モーダル */}

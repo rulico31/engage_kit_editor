@@ -13,6 +13,7 @@ import "./GridPopover.css";
 import EmbedModal from "./EmbedModal";
 import { ProjectSettingsModal } from "./ProjectSettingsModal";
 import AuthLinkModal from "./Auth/AuthLinkModal"; // 追加
+import LoadingOverlay from "./LoadingOverlay";
 
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { useAuthStore } from "../stores/useAuthStore"; // 追加
@@ -26,7 +27,7 @@ interface EditorViewProps {
   projectName: string;
   onGoHome: () => void;
 
-  onPublish: () => void;
+  onPublish: () => void | Promise<void>;
 }
 
 const GridPopover: React.FC = () => {
@@ -101,6 +102,8 @@ const EditorView: React.FC<EditorViewProps> = ({
   const { user } = useAuthStore();
   const isAnonymous = user?.is_anonymous;
   const [isAuthLinkModalOpen, setIsAuthLinkModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // タブの自動同期（削除時のクローズ、Undo時の復元）
   useTabSync();
@@ -109,15 +112,36 @@ const EditorView: React.FC<EditorViewProps> = ({
   useActionAnalytics(currentProjectId, isPreviewing);
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
+      // 少し待機してローディングを見せる (UX向上)
+      await new Promise(resolve => setTimeout(resolve, 500));
       const success = await saveProject();
       if (success) {
-        alert("プロジェクトを保存しました");
+        // 保存成功時はアラートを出す前にローディングを消すか、あるいは出したままにするか。
+        // ここではアラートが出るので、その前にローディングを消す
+        setIsSaving(false);
+        // 少し遅らせてからアラートなどを出すとスムーズだが、既存のフローに従う
+        setTimeout(() => alert("プロジェクトを保存しました"), 10);
+      } else {
+        setIsSaving(false);
       }
-      // キャンセルの場合(success === false)は何も表示しない
     } catch (e) {
       console.error(e);
+      setIsSaving(false);
       alert("保存に失敗しました");
+    }
+  };
+
+
+  const handlePublishWrapper = async () => {
+    setIsPublishing(true);
+    try {
+      await Promise.resolve(onPublish());
+    } catch (error) {
+      console.error("Publish failed:", error);
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -239,7 +263,7 @@ const EditorView: React.FC<EditorViewProps> = ({
       let foundItemId: string | null = null;
       let isLogicNode = false;
 
-      for (const [pageId, page] of Object.entries(projectMeta.data.pages)) {
+      for (const [pageId, page] of Object.entries(projectMeta.data.pages as Record<string, any>)) {
         const item = page.placedItems.find((it: any) => it.id === nodeIdParam);
         if (item) {
           foundPageId = pageId;
@@ -295,7 +319,7 @@ const EditorView: React.FC<EditorViewProps> = ({
         onEnterFullscreen={handleEnterFullscreen}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        onPublish={() => handleProtectedAction(onPublish)}
+        onPublish={() => handleProtectedAction(handlePublishWrapper)}
         // onPublish={onPublish}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
@@ -419,6 +443,12 @@ const EditorView: React.FC<EditorViewProps> = ({
       {isAuthLinkModalOpen && (
         <AuthLinkModal
           onClose={() => setIsAuthLinkModalOpen(false)}
+        />
+      )}
+
+      {(isSaving || isPublishing) && (
+        <LoadingOverlay
+          message={isSaving ? "プロジェクトを保存中..." : "公開準備中..."}
         />
       )}
     </div>

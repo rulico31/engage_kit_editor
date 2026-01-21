@@ -83,6 +83,7 @@ export interface PlacedItemType {
 
     // Additional Properties for Input/Text
     variableName?: string;
+    customName?: string; // カスタム名 (Dashboard等での表示用)
     inputType?: 'text' | 'email' | 'tel' | 'number' | 'textarea';
     enableCountryCode?: boolean;
     countryCode?: string;
@@ -90,6 +91,11 @@ export interface PlacedItemType {
     isTransparent?: boolean;
     isArtboardBackground?: boolean;
     initialVisibility?: boolean;
+
+    // Image Crop Data
+    originalSrc?: string;
+    crop?: any; // ReactCrop type
+    zoom?: number;
   };
   style?: any; // Added to support direct style access
 }

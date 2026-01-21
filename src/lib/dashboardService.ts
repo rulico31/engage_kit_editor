@@ -55,6 +55,7 @@ export interface ABTestStats {
 export const getNodeLabel = (node: any): string => {
     if (!node || !node.data) return "削除されたアイテム";
     const data = node.data;
+    if (data.customName) return data.customName;
     if (data.adminLabel) return data.adminLabel;
     if (data.label) return data.label;
     if (data.question) return data.question;

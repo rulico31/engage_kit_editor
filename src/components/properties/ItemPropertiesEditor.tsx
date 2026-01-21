@@ -1,6 +1,8 @@
 import React from "react";
+import { useState } from "react";
 import type { PlacedItemType } from "../../types";
 import { AccordionSection } from "./SharedComponents";
+import ImageCropModal from "../ImageCropModal";
 import {
     Type,
     MousePointerClick,
@@ -8,10 +10,10 @@ import {
     List,
     Box,
     LayoutTemplate,
-    Hash,
+
     Maximize,
     Move,
-    Palette,
+
     ChartBar, // For B2B Score
     Layers
 } from "lucide-react";
@@ -26,6 +28,8 @@ interface Props {
 }
 
 export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) => {
+    const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+
     // 共通の更新ハンドラ (data配下のプロパティ更新用)
     const handleDataChange = (key: string, value: any) => {
         onItemUpdate(item.id, {
@@ -101,6 +105,25 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                 </span>
             </div>
 
+            {/* General Settings */}
+            <AccordionSection title="GENERAL" defaultOpen={true}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div>
+                        <div style={labelStyle}>Custom Name</div>
+                        <input
+                            type="text"
+                            value={item.data?.customName || ""}
+                            onChange={(e) => handleDataChange("customName", e.target.value)}
+                            className="prop-input"
+                            placeholder="Display name for dashboard..."
+                        />
+                        <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+                            Used for identification in analytics.
+                        </div>
+                    </div>
+                </div>
+            </AccordionSection>
+
             {/* Transform (Layout) */}
             <AccordionSection title="LAYOUT" defaultOpen={true}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -122,7 +145,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                         <div>
                             <div style={labelStyle}>Y Position</div>
                             <div style={{ position: 'relative' }}>
-                                <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
+                                <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
                                     type="number"
                                     value={getY()}
@@ -152,7 +175,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                         <div>
                             <div style={labelStyle}>Height</div>
                             <div style={{ position: 'relative' }}>
-                                <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
+                                <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
                                     type="number"
                                     value={getHeight()}
@@ -183,6 +206,123 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 placeholder="Enter text..."
                             />
                         </div>
+                    )}
+
+                    {/* Image Import */}
+                    {item.type === 'image' && (
+                        <div>
+                            <div style={labelStyle}>Image Source</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {/* File Upload Button */}
+                                <label className="prop-button" style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                    background: '#333',
+                                    border: '1px solid #444',
+                                    padding: '8px',
+                                    borderRadius: '4px',
+                                    color: '#eee',
+                                    fontSize: '12px'
+                                }}>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onload = (ev) => {
+                                                    const result = ev.target?.result as string;
+                                                    handleDataChange("src", result);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        style={{ display: 'none' }}
+                                    />
+                                    <span>Upload Image</span>
+                                </label>
+
+                                {/* URL Input fallback */}
+                                <input
+                                    type="text"
+                                    value={item.data?.src || ""}
+                                    onChange={(e) => handleDataChange("src", e.target.value)}
+                                    className="prop-input"
+                                    placeholder="https://..."
+                                />
+                            </div>
+
+                            {/* Preview Thumbnail */}
+                            {item.data?.src && (
+                                <div style={{
+                                    marginTop: '8px',
+                                    border: '1px solid #333',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden',
+                                    background: '#111',
+                                    height: '100px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    position: 'relative'
+                                }}>
+                                    <img
+                                        src={item.data.src}
+                                        alt="Preview"
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '100%',
+                                            objectFit: 'contain'
+                                        }}
+                                    />
+                                    {/* Crop Button Overlay */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        bottom: 5,
+                                        right: 5,
+                                        background: 'rgba(0,0,0,0.7)',
+                                        borderRadius: '4px',
+                                        padding: '4px',
+                                    }}>
+                                        <button
+                                            className="prop-button"
+                                            onClick={() => setIsCropModalOpen(true)}
+                                            style={{ fontSize: '10px', padding: '4px 8px', height: 'auto' }}
+                                        >
+                                            ✂️ Crop
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Image Crop Modal */}
+                    {item.type === 'image' && item.data?.src && (
+                        <ImageCropModal
+                            isOpen={isCropModalOpen}
+                            imageSrc={item.data.originalSrc || item.data.src}
+                            initialCrop={item.data.crop}
+                            initialZoom={item.data.zoom}
+                            onComplete={(croppedUrl, { crop, zoom }) => {
+                                onItemUpdate(item.id, {
+                                    data: {
+                                        ...item.data,
+                                        // Save original if not exists
+                                        originalSrc: item.data.originalSrc || item.data.src,
+                                        src: croppedUrl,
+                                        crop,
+                                        zoom
+                                    }
+                                }, { addToHistory: true });
+                                setIsCropModalOpen(false);
+                            }}
+                            onCancel={() => setIsCropModalOpen(false)}
+                        />
                     )}
 
                     {/* Placeholder */}

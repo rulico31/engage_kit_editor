@@ -209,7 +209,7 @@ const DashboardView: React.FC = () => {
 
         if (foundNode) return ""; // 内部ロジックノードはリストに表示しない
         if (foundItem) {
-            const label = foundItem.displayName || foundItem.name || foundItem.type;
+            const label = foundItem.data?.customName || foundItem.displayName || foundItem.name || foundItem.type;
             const mockNode = {
                 id: foundItem.id,
                 type: foundItem.type,
