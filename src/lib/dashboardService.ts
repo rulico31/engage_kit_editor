@@ -254,14 +254,36 @@ export const fetchHourlyStats = async (projectId: string, targetDate?: Date) => 
         }
     });
 
+    // 現在時刻の取得
+    const now = new Date();
+    const isToday = baseDate.getFullYear() === now.getFullYear() &&
+        baseDate.getMonth() === now.getMonth() &&
+        baseDate.getDate() === now.getDate();
+    const currentHour = now.getHours();
+
     // 配列に変換
-    return Array.from(statsMap.entries()).map(([time, val]) => ({
-        date: time, // HH:00
-        pv: val.pv,
-        uu: val.uuSet.size,
-        cv: val.cv,
-        cvr: val.pv > 0 ? (val.cv / val.pv) * 100 : 0
-    }));
+    return Array.from(statsMap.entries()).map(([time, val]) => {
+        const hour = parseInt(time.split(':')[0], 10);
+
+        // 未来の時間は null を返す (グラフを描画しない)
+        if (isToday && hour > currentHour) {
+            return {
+                date: time,
+                pv: null,
+                uu: null,
+                cv: null,
+                cvr: null
+            };
+        }
+
+        return {
+            date: time, // HH:00
+            pv: val.pv,
+            uu: val.uuSet.size,
+            cv: val.cv,
+            cvr: val.pv > 0 ? (val.cv / val.pv) * 100 : 0
+        };
+    });
 };
 
 export interface ThinkingTimeStat {
@@ -462,7 +484,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     // 2. 入力心理データの取得
     let inputQuery = supabase
         .from('analytics_logs')
-        .select('node_id, metadata, created_at, device_info')
+        .select('node_id, metadata, created_at')
         .eq('project_id', projectId)
         .eq('event_type', 'input_analysis');
 
@@ -479,7 +501,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     // 3. 思考時間データの取得
     let interactionQuery = supabase
         .from('analytics_logs')
-        .select('node_id, metadata, created_at, device_info, session_id, event_type')
+        .select('node_id, metadata, created_at, session_id, event_type')
         .eq('project_id', projectId)
         .eq('event_type', 'interaction');
 
@@ -584,7 +606,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     }).sort((a, b) => b.count - a.count);
 
     // 5. Advanced Stats (Device, Page Dwell, Score Flow)
-    let pvQuery = supabase.from('analytics_logs').select('session_id, device_info, created_at').eq('project_id', projectId).eq('event_type', 'page_view');
+    let pvQuery = supabase.from('analytics_logs').select('session_id, metadata, created_at').eq('project_id', projectId).eq('event_type', 'page_view');
     pvQuery = applyFilters(pvQuery);
     const { data: pvLogs } = await pvQuery;
 
@@ -611,7 +633,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     (pvLogs || []).forEach((log: any) => {
         if (processedSessions.has(log.session_id)) return;
         processedSessions.add(log.session_id);
-        const info = log.device_info || {};
+        const info = log.metadata?.device_info || {};
         const osName = normalizeOS(info.os_name);
         const browserName = normalizeBrowser(info.browser_name);
         if (!osStats[osName]) osStats[osName] = { sessions: 0, conversions: 0 };

@@ -23,7 +23,7 @@ import {
 import "./DashboardView.css";
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    BarChart, Bar, Cell, PieChart, Pie
+    BarChart, Bar, Cell, PieChart, Pie, ComposedChart, Area
 } from 'recharts';
 import { KPICard } from "./dashboard/KPICard";
 import { ThinkingTimeChart } from "./dashboard/ThinkingTimeChart";
@@ -225,17 +225,50 @@ const DashboardView: React.FC = () => {
     }, [projectMeta]);
 
     const groupedStats = useMemo(() => {
-        if (!nodeStats.length) return [];
+        // if (!nodeStats.length) return []; // 統計がなくてもアイテムがあれば表示したいため削除
 
         if (groupingMode === 'node') {
-            return nodeStats
-                .map(ns => ({
-                    id: ns.node_id,
-                    name: getNodeDisplayName(ns.node_id),
-                    interaction_count: ns.interaction_count,
-                    unique_users: ns.unique_users
-                }))
-                .filter(item => item.name !== "");
+            const nodeMap = new Map<string, { name: string; interactions: number; uu: number }>();
+
+            // 1. 全アイテムを走査して初期化
+            if (projectMeta?.data?.pages) {
+                Object.values(projectMeta.data.pages).forEach((pageRaw: any) => {
+                    const page = pageRaw as PageWithLogics;
+                    page.placedItems.forEach(item => {
+                        const name = getNodeDisplayName(item.id);
+                        if (name) {
+                            nodeMap.set(item.id, { name, interactions: 0, uu: 0 });
+                        }
+                    });
+                });
+            }
+
+            // 2. 統計データを反映
+            nodeStats.forEach(ns => {
+                // 既存のリストにあれば更新、なければ追加（ロジックノードなどの場合）
+                // ただし getNodeDisplayName で名前が取れない（空文字）場合は除外される
+                const existing = nodeMap.get(ns.node_id);
+                if (existing) {
+                    existing.interactions = ns.interaction_count;
+                    existing.uu = ns.unique_users;
+                } else {
+                    const name = getNodeDisplayName(ns.node_id);
+                    if (name) {
+                        nodeMap.set(ns.node_id, {
+                            name,
+                            interactions: ns.interaction_count,
+                            uu: ns.unique_users
+                        });
+                    }
+                }
+            });
+
+            return Array.from(nodeMap.entries()).map(([itemId, item]) => ({
+                id: itemId, // アイテムIDを一意なキーとして使用
+                name: item.name,
+                interaction_count: item.interactions,
+                unique_users: item.uu
+            }));
         }
 
         if (groupingMode === 'page') {
@@ -268,14 +301,16 @@ const DashboardView: React.FC = () => {
                     pageName = projectMeta.data.pages[parentPageId].name || '無題のページ';
                     found = true;
                 }
-                if (!found) pageName = 'その他';
 
-                const current = pageMap.get(pageName) || { name: pageName, interactions: 0, uu: 0 };
-                pageMap.set(pageName, {
-                    name: pageName,
-                    interactions: current.interactions + ns.interaction_count,
-                    uu: current.uu + ns.unique_users
-                });
+                // ページが見つからない場合は集計から除外（「その他」を表示しない）
+                if (found) {
+                    const current = pageMap.get(pageName) || { name: pageName, interactions: 0, uu: 0 };
+                    pageMap.set(pageName, {
+                        name: pageName,
+                        interactions: current.interactions + ns.interaction_count,
+                        uu: current.uu + ns.unique_users
+                    });
+                }
             });
             return Array.from(pageMap.values()).map(p => ({
                 id: p.name, name: p.name, interaction_count: p.interactions, unique_users: p.uu
@@ -284,17 +319,43 @@ const DashboardView: React.FC = () => {
 
         if (groupingMode === 'type') {
             const typeMap = new Map<string, { interactions: number; uu: number }>();
-            const typeNameMap: Record<string, string> = {
-                'ボタン': 'ボタン', '画像': '画像', 'テキスト': 'テキスト',
-                'テキスト入力': 'テキスト入力', 'ページ遷移': 'ページノード'
+
+            // 英語のtypeから日本語表記へのマッピング
+            const typeLabelMap: Record<string, string> = {
+                'button': 'ボタン',
+                'image': '画像',
+                'text': 'テキスト',
+                'input': 'テキスト入力',
+                'textarea': 'テキストエリア',
+                'choice': '選択肢',
+                'video': '動画',
+                'embed': '埋め込み',
+                // 必要に応じて追加
             };
 
+            // 1. プロジェクト内の全アイテムを走査して初期化（データがなくても表示するため）
+            if (projectMeta?.data?.pages) {
+                Object.values(projectMeta.data.pages).forEach((pageRaw: any) => {
+                    const page = pageRaw as PageWithLogics;
+                    page.placedItems.forEach(item => {
+                        // マッピングにある正当なタイプ、または未知のタイプでもキーとして使用
+                        const typeKey = typeLabelMap[item.type] || item.type;
+                        if (!typeMap.has(typeKey)) {
+                            typeMap.set(typeKey, { interactions: 0, uu: 0 });
+                        }
+                    });
+                });
+            }
+
+            // 2. 統計データを加算
             nodeStats.forEach(ns => {
-                let typeName = '不明';
+                let typeName = null;
                 if (projectMeta?.data?.pages) {
                     for (const pageRaw of Object.values(projectMeta.data.pages)) {
                         const page = pageRaw as PageWithLogics;
                         let parentItem = page.placedItems.find((i: PlacedItemType) => i.id === ns.node_id);
+
+                        // ロジックノードの場合、親アイテムを探す
                         if (!parentItem && page.allItemLogics) {
                             for (const [itemId, graphRaw] of Object.entries(page.allItemLogics)) {
                                 const graph = graphRaw as NodeGraph;
@@ -304,19 +365,23 @@ const DashboardView: React.FC = () => {
                                 }
                             }
                         }
+
                         if (parentItem) {
-                            typeName = parentItem.name || parentItem.type;
-                            typeName = typeNameMap[typeName] || typeName;
+                            // 日本語名に変換
+                            typeName = typeLabelMap[parentItem.type] || parentItem.type;
                             break;
                         }
                     }
                 }
 
-                const current = typeMap.get(typeName) || { interactions: 0, uu: 0 };
-                typeMap.set(typeName, {
-                    interactions: current.interactions + ns.interaction_count,
-                    uu: current.uu + ns.unique_users
-                });
+                // アイテムが見つかった場合のみ加算（不明なデータは除外）
+                if (typeName) {
+                    const current = typeMap.get(typeName) || { interactions: 0, uu: 0 };
+                    typeMap.set(typeName, {
+                        interactions: current.interactions + ns.interaction_count,
+                        uu: current.uu + ns.unique_users
+                    });
+                }
             });
 
             return Array.from(typeMap.entries()).map(([name, data]) => ({
@@ -595,9 +660,9 @@ const DashboardView: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <span className="flex items-center gap-1 text-xs text-zinc-400"><div className="w-2 h-2 rounded-full bg-[#8884d8]"></div> PV</span>
-                            <span className="flex items-center gap-1 text-xs text-zinc-400"><div className="w-2 h-2 rounded-full bg-[#82ca9d]"></div> UU</span>
-                            <span className="flex items-center gap-1 text-xs text-zinc-400"><div className="w-2 h-2 rounded-full bg-[#ff7300]"></div> CV</span>
+                            <span className="flex items-center gap-1 text-xs text-zinc-400"><div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div> PV</span>
+                            <span className="flex items-center gap-1 text-xs text-zinc-400"><div className="w-2 h-2 rounded-full bg-[#8b5cf6]"></div> UU</span>
+                            <span className="flex items-center gap-1 text-xs text-zinc-400"><div className="w-2 h-2 rounded-full bg-[#10b981]"></div> CV</span>
                         </div>
                     </div>
                     <div className="flex-1 min-h-0">
@@ -620,8 +685,14 @@ const DashboardView: React.FC = () => {
                             return (
                                 <div style={{ width: '100%', height: 400 }}>
                                     <ResponsiveContainer width="100%" height={400}>
-                                        <LineChart data={dailyStats} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <ComposedChart data={dailyStats} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorPv" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
                                             <XAxis
                                                 dataKey="date"
                                                 stroke="#71717a"
@@ -652,9 +723,9 @@ const DashboardView: React.FC = () => {
                                                         const cy = y + height / 2;
                                                         return (
                                                             <text x={cx} y={cy} transform={`rotate(-90, ${cx}, ${cy})`} textAnchor="middle" fontSize={12}>
-                                                                <tspan fill="#8884d8" fontWeight="bold">PV</tspan>
+                                                                <tspan fill="#3b82f6" fontWeight="bold">PV</tspan>
                                                                 <tspan fill="#71717a"> / </tspan>
-                                                                <tspan fill="#82ca9d" fontWeight="bold">UU</tspan>
+                                                                <tspan fill="#8b5cf6" fontWeight="bold">UU</tspan>
                                                             </text>
                                                         );
                                                     }
@@ -663,12 +734,12 @@ const DashboardView: React.FC = () => {
                                             <YAxis
                                                 yAxisId="right"
                                                 orientation="right"
-                                                stroke="#ff7300"
+                                                stroke="#10b981"
                                                 fontSize={12}
                                                 tickLine={false}
                                                 axisLine={false}
                                                 allowDecimals={false}
-                                                label={{ value: 'CV', angle: 90, position: 'insideRight', style: { fill: '#ff7300', fontSize: '12px', fontWeight: 'bold' }, offset: 0 }}
+                                                label={{ value: 'CV', angle: 90, position: 'insideRight', style: { fill: '#10b981', fontSize: '12px', fontWeight: 'bold' }, offset: 0 }}
                                             />
                                             <Tooltip
                                                 contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46', color: '#fff' }}
@@ -679,10 +750,10 @@ const DashboardView: React.FC = () => {
                                                     return `${d.getMonth() + 1}/${d.getDate()}`;
                                                 }}
                                             />
-                                            <Line yAxisId="left" type="monotone" dataKey="pv" stroke="#8884d8" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                                            <Line yAxisId="left" type="monotone" dataKey="uu" stroke="#82ca9d" strokeWidth={2} dot={false} />
-                                            <Line yAxisId="right" type="monotone" dataKey="cv" stroke="#ff7300" strokeWidth={2} />
-                                        </LineChart>
+                                            <Area yAxisId="left" type="monotone" dataKey="pv" stroke="#3b82f6" fillOpacity={1} fill="url(#colorPv)" name="PV" strokeWidth={2} dot={{ r: 4, fill: '#18181b', stroke: '#3b82f6', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#18181b', strokeWidth: 2 }} />
+                                            <Line yAxisId="left" type="monotone" dataKey="uu" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#18181b', strokeWidth: 2 }} activeDot={{ r: 6 }} name="UU" />
+                                            <Line yAxisId="right" type="monotone" dataKey="cv" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#18181b', strokeWidth: 2 }} name="CV" />
+                                        </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>
                             );
@@ -784,8 +855,8 @@ const DashboardView: React.FC = () => {
                                     <YAxis dataKey="name" type="category" stroke="#71717a" fontSize={12} width={80} />
                                     <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }} itemStyle={{ color: '#fff' }} />
                                     <Legend />
-                                    <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#8884d8" radius={[0, 4, 4, 0]} barSize={20} />
-                                    <Bar dataKey="mod_cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
+                                    <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                                    <Bar dataKey="cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -795,12 +866,12 @@ const DashboardView: React.FC = () => {
                         <div style={{ height: 300 }}>
                             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                                 <BarChart data={deviceStats.browser} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#27272a" />
                                     <XAxis type="number" stroke="#71717a" fontSize={12} />
                                     <YAxis dataKey="name" type="category" stroke="#71717a" fontSize={12} width={80} />
                                     <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }} itemStyle={{ color: '#fff' }} />
                                     <Legend />
-                                    <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#82ca9d" radius={[0, 4, 4, 0]} barSize={20} />
+                                    <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
                                     <Bar dataKey="cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>

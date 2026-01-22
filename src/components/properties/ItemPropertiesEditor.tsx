@@ -66,71 +66,44 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
         }
     };
 
-    const labelStyle: React.CSSProperties = {
-        fontSize: '10px',
-        fontWeight: 600,
-        color: '#888',
-        marginBottom: '4px',
-        letterSpacing: '0.05em',
-        textTransform: 'uppercase'
-    };
+
 
     return (
         <div className="properties-container">
             {/* Header */}
-            <div style={{
-                padding: '12px 16px',
-                borderBottom: '1px solid #333',
-                background: '#252526',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#aaa', display: 'flex' }}>{getTypeIcon()}</span>
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#eee', textTransform: 'capitalize' }}>
-                        {item.type} Item
-                    </span>
+            {/* Header */}
+            <div className="prop-group" style={{ padding: '16px 16px 0 16px', marginBottom: 20 }}>
+                <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#fff' }}>アイテム設定</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#aaa' }}>
+                    <span style={{ display: 'flex' }}>{getTypeIcon()}</span>
+                    <span>{item.type.toUpperCase()} - {item.id.slice(0, 6)}</span>
                 </div>
-                <span style={{
-                    fontSize: '10px',
-                    color: '#666',
-                    background: '#1a1a1a',
-                    padding: '3px 6px',
-                    borderRadius: '4px',
-                    fontFamily: 'monospace',
-                    border: '1px solid #333'
-                }}>
-                    {item.id.slice(0, 6)}
-                </span>
             </div>
 
             {/* General Settings */}
-            <AccordionSection title="GENERAL" defaultOpen={true}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <div>
-                        <div style={labelStyle}>Custom Name</div>
-                        <input
-                            type="text"
-                            value={item.data?.customName || ""}
-                            onChange={(e) => handleDataChange("customName", e.target.value)}
-                            className="prop-input"
-                            placeholder="Display name for dashboard..."
-                        />
-                        <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
-                            Used for identification in analytics.
-                        </div>
+            <AccordionSection title="基本設定 (General)" defaultOpen={true}>
+                <div className="prop-group">
+                    <div className="prop-label">カスタム名 (Custom Name)</div>
+                    <input
+                        type="text"
+                        value={item.data?.customName || ""}
+                        onChange={(e) => handleDataChange("customName", e.target.value)}
+                        className="prop-input"
+                        placeholder="ダッシュボード表示用..."
+                    />
+                    <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+                        分析画面で識別するための名前です
                     </div>
                 </div>
             </AccordionSection>
 
             {/* Transform (Layout) */}
-            <AccordionSection title="LAYOUT" defaultOpen={true}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <AccordionSection title="レイアウト (Layout)" defaultOpen={true}>
+                <div className="prop-group">
                     {/* Position X/Y */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
                         <div>
-                            <div style={labelStyle}>X Position</div>
+                            <div className="prop-label">X座標</div>
                             <div style={{ position: 'relative' }}>
                                 <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                                 <input
@@ -143,7 +116,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                             </div>
                         </div>
                         <div>
-                            <div style={labelStyle}>Y Position</div>
+                            <div className="prop-label">Y座標</div>
                             <div style={{ position: 'relative' }}>
                                 <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
@@ -160,7 +133,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                     {/* Size W/H */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                         <div>
-                            <div style={labelStyle}>Width</div>
+                            <div className="prop-label">幅 (Width)</div>
                             <div style={{ position: 'relative' }}>
                                 <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                                 <input
@@ -173,7 +146,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                             </div>
                         </div>
                         <div>
-                            <div style={labelStyle}>Height</div>
+                            <div className="prop-label">高さ (Height)</div>
                             <div style={{ position: 'relative' }}>
                                 <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
@@ -190,28 +163,28 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
             </AccordionSection>
 
             {/* Content */}
-            <AccordionSection title="CONTENT" defaultOpen={true}>
+            <AccordionSection title="コンテンツ (Content)" defaultOpen={true}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                     {/* Text / Label */}
                     {(item.type === 'button' || item.type === 'text' || item.type === 'choice') && (
-                        <div>
-                            <div style={labelStyle}>Text Content</div>
+                        <div className="prop-group">
+                            <div className="prop-label">テキスト内容</div>
                             <textarea
                                 value={item.data?.label || item.data?.text || ""}
                                 onChange={(e) => handleDataChange("text", e.target.value)}
                                 className="prop-textarea"
                                 rows={2}
                                 style={{ resize: 'vertical', minHeight: '60px' }}
-                                placeholder="Enter text..."
+                                placeholder="テキストを入力..."
                             />
                         </div>
                     )}
 
                     {/* Image Import */}
                     {item.type === 'image' && (
-                        <div>
-                            <div style={labelStyle}>Image Source</div>
+                        <div className="prop-group">
+                            <div className="prop-label">画像ソース</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                 {/* File Upload Button */}
                                 <label className="prop-button" style={{
@@ -243,7 +216,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                         }}
                                         style={{ display: 'none' }}
                                     />
-                                    <span>Upload Image</span>
+                                    <span>画像をアップロード</span>
                                 </label>
 
                                 {/* URL Input fallback */}
@@ -327,14 +300,14 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
 
                     {/* Placeholder */}
                     {(item.type === 'input' || item.type === 'textarea') && (
-                        <div>
-                            <div style={labelStyle}>Placeholder</div>
+                        <div className="prop-group">
+                            <div className="prop-label">プレースホルダー</div>
                             <input
                                 type="text"
                                 value={item.data?.placeholder || ""}
                                 onChange={(e) => handleDataChange("placeholder", e.target.value)}
                                 className="prop-input"
-                                placeholder="Helper text..."
+                                placeholder="入力例..."
                             />
                         </div>
                     )}
@@ -350,7 +323,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a78bfa' }}>
                                     <ChartBar size={14} />
-                                    <span style={{ fontSize: '11px', fontWeight: 600 }}>Engagement Score</span>
+                                    <span style={{ fontSize: '11px', fontWeight: 600 }}>エンゲージメントスコア</span>
                                 </div>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -364,7 +337,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <span style={{ fontSize: '11px', color: '#888' }}>points</span>
                             </div>
                             <div style={{ fontSize: '10px', color: '#666', marginTop: '6px' }}>
-                                Added to total score when selected
+                                選択時に加算されるスコア
                             </div>
                         </div>
                     )}
@@ -378,7 +351,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                     checked={item.data?.required || false}
                                     onChange={(e) => handleDataChange("required", e.target.checked)}
                                 />
-                                <span style={{ fontSize: '12px' }}>Required Field</span>
+                                <span style={{ fontSize: '12px' }}>必須項目にする</span>
                             </label>
                         </div>
                     )}
@@ -387,11 +360,11 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
 
             {/* ACTION (Button Only) */}
             {item.type === 'button' && (
-                <AccordionSection title="ACTION" defaultOpen={true}>
+                <AccordionSection title="アクション (Action)" defaultOpen={true}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {/* Action Type */}
-                        <div>
-                            <div style={labelStyle}>Click Action</div>
+                        <div className="prop-group">
+                            <div className="prop-label">クリック時の動作</div>
                             <select
                                 value={item.data?.actionType || 'none'}
                                 onChange={(e) => handleDataChange("actionType", e.target.value)}
@@ -405,8 +378,8 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                     borderRadius: '4px'
                                 }}
                             >
-                                <option value="none">Node Flow (Default)</option>
-                                <option value="submit">Submit Form</option>
+                                <option value="none">ノードフロー (デフォルト)</option>
+                                <option value="submit">フォーム送信</option>
                             </select>
                         </div>
 
@@ -419,7 +392,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 border: '1px solid #444'
                             }}>
                                 <div style={{ marginBottom: '8px' }}>
-                                    <div style={labelStyle}>Redirect URL (Optional)</div>
+                                    <div className="prop-label">リダイレクトURL (任意)</div>
                                     <input
                                         type="text"
                                         value={item.data?.submitRedirectUrl || ""}
@@ -428,7 +401,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                         placeholder="https://example.com/thanks"
                                     />
                                     <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
-                                        Leave empty to show default success message.
+                                        空欄の場合、デフォルトの完了メッセージを表示します
                                     </div>
                                 </div>
                             </div>
@@ -438,12 +411,12 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
             )}
 
             {/* Design / Appearance */}
-            <AccordionSection title="APPEARANCE" defaultOpen={true}>
+            <AccordionSection title="外観 (Appearance)" defaultOpen={true}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
                     {/* Background Color */}
-                    <div>
-                        <div style={labelStyle}>Background Color</div>
+                    <div className="prop-group">
+                        <div className="prop-label">背景色 (Background Color)</div>
                         <div className="prop-color-picker-wrapper">
                             <input
                                 type="color"
@@ -462,8 +435,8 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                     </div>
 
                     {/* Z-Index */}
-                    <div>
-                        <div style={labelStyle}>Stacking Order (Z-Index)</div>
+                    <div className="prop-group">
+                        <div className="prop-label">重ね順 (Z-Index)</div>
                         <div style={{ position: 'relative' }}>
                             <Layers size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                             <input

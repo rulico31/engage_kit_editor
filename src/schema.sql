@@ -157,20 +157,20 @@ create or replace view analytics_daily_stats as
 with daily_pv as (
   select
     project_id,
-    date_trunc('day', created_at) as date,
+    date_trunc('day', created_at at time zone 'Asia/Tokyo') as date,
     count(*) as pv,
     count(distinct session_id) as uu
   from analytics_logs
   where event_type = 'page_view'
-  group by project_id, date_trunc('day', created_at)
+  group by project_id, date_trunc('day', created_at at time zone 'Asia/Tokyo')
 ),
 daily_cv as (
   select
     project_id,
-    date_trunc('day', created_at) as date,
+    date_trunc('day', created_at at time zone 'Asia/Tokyo') as date,
     count(*) as cv
   from leads
-  group by project_id, date_trunc('day', created_at)
+  group by project_id, date_trunc('day', created_at at time zone 'Asia/Tokyo')
 )
 select
   coalesce(pv.project_id, cv.project_id) as project_id,
