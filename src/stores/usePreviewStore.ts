@@ -75,7 +75,7 @@ interface PreviewStoreState {
   setVariables: (newVars: VariableState | ((prev: VariableState) => VariableState)) => void;
 
   // ページ遷移リクエスト処理
-  handlePageChangeRequest: (pageId: string) => void;
+  handlePageChangeRequest: (pageId: string, options?: { skipHistory?: boolean }) => void;
   handleVariableChangeFromItem: (variableName: string, value: any) => void;
   handleItemEvent: (eventName: string, itemId: string) => void;
 
@@ -171,7 +171,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     set({ variables: variablesRef.current });
   },
 
-  handlePageChangeRequest: (targetPageId) => {
+  handlePageChangeRequest: (targetPageId, options = {}) => {
     const { pages } = usePageStore.getState();
     const targetPageData = pages[targetPageId];
 
@@ -181,6 +181,11 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     }
 
     usePageStore.getState().setSelectedPageId(targetPageId);
+
+    // ★ 履歴記録 (戻る操作以外の場合)
+    if (!options?.skipHistory) {
+      get().recordNavigation(targetPageId);
+    }
 
     const initialPS: PreviewState = { currentPageId: targetPageId, isFinished: false };
     targetPageData.placedItems.forEach(item => {
@@ -429,7 +434,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
     // ページ遷移
     if (toEntry.pageId !== fromEntry.pageId) {
-      get().handlePageChangeRequest(toEntry.pageId);
+      get().handlePageChangeRequest(toEntry.pageId, { skipHistory: true });
     }
 
     set({ currentHistoryIndex: newIndex });

@@ -53,6 +53,9 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const loadFromData = usePageStore((state) => state.loadFromData);
   const setPreviewState = usePreviewStore((state) => state.setPreviewState);
   const previewState = usePreviewStore((state) => state.previewState);
+  const currentHistoryIndex = usePreviewStore((state) => state.currentHistoryIndex);
+
+  console.log('[ViewerHost] Top-Level Log -> currentHistoryIndex:', currentHistoryIndex);
 
   // Store data
   const pages = usePageStore((state) => state.pages);
@@ -149,6 +152,13 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
             history: [firstPageId],
             ...initialItemStates
           } as any);
+
+          // 履歴インデックスの初期化を明示的に行う
+          usePreviewStore.setState({
+            navigationHistory: [{ pageId: firstPageId, visitedAt: Date.now() }],
+            currentHistoryIndex: 0
+          });
+
           console.log('[ViewerHost] Preview state set with item visibility');
         }
 
@@ -306,6 +316,51 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
       {/* 無料プラン等の場合のみ表示 (ロジック実装時は条件分岐) */}
       <PoweredByBadge />
+
+      {/* Debug Info (To be removed) */}
+      <div style={{ position: 'fixed', bottom: 40, right: 10, fontSize: 10, color: 'red', zIndex: 10000, background: 'white' }}>
+        Idx: {currentHistoryIndex}
+      </div>
+
+      {/* 戻るボタン (履歴がある場合のみ表示) */}
+      {currentHistoryIndex > 0 && (
+        <button
+          onClick={() => usePreviewStore.getState().goBack()}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            zIndex: 9999,
+            padding: '10px 20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid #e4e4e7',
+            borderRadius: '30px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: '#18181b',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            backdropFilter: 'blur(8px)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.12)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+          <span style={{ paddingTop: '1px' }}>戻る</span>
+        </button>
+      )}
     </div>
   );
 };
