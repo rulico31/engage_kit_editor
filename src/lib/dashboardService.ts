@@ -481,17 +481,18 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
         };
     }).sort((a, b) => b.count - a.count);
 
-    // 2. 入力心理データの取得
+    // 2. 入力心理データの取得 (input_correction)
     let inputQuery = supabase
         .from('analytics_logs')
         .select('node_id, metadata, created_at')
         .eq('project_id', projectId)
-        .eq('event_type', 'input_analysis');
+        .in('event_type', ['input_analysis', 'input_correction']); // 旧データも互換性のため維持
 
     inputQuery = applyFilters(inputQuery);
     const { data: inputLogs, error: inputError } = await inputQuery;
 
     if (inputError) console.error('Error fetching input logs:', inputError);
+    console.log('[DashboardService] Fetched input logs (input_analysis + input_correction):', inputLogs?.length || 0, inputLogs);
 
     const inputNodeIds = new Set<string>();
     (inputLogs || []).forEach((log: any) => {
@@ -517,8 +518,11 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     }>();
 
     (interactionLogs || []).forEach((log: any) => {
-        // duration_ms から動的に判定（仕様: <2.5s=直感, 2.5-8s=通常, >8s=迷い）
-        const duration = log.metadata?.duration_ms || 0;
+        // duration_ms from dynamic judgment (spec: <2.5s=intuitive, 2.5-8s=normal, >8s=hesitation)
+        // 注意: logAnalyticsEventの構造上、duration_msはmetadata.metadata.duration_msに格納されている
+        const nestedMeta = log.metadata?.metadata || {};
+        const duration = nestedMeta.duration_ms || log.metadata?.duration_ms || 0;
+        const nodeName = nestedMeta.node_name || log.metadata?.node_name || log.node_id;
 
         let pattern: 'intuitive' | 'normal' | 'hesitation' | 'noise' = 'normal';
 
@@ -528,16 +532,16 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
             else pattern = 'normal';
         } else {
             // durationが取れていない場合はメタデータがあればそれを使用、なければノイズ扱い
-            pattern = log.metadata?.thinking_pattern || 'noise';
+            pattern = nestedMeta.thinking_pattern || log.metadata?.thinking_pattern || 'noise';
         }
 
         if (thinkingTimeCounts[pattern] !== undefined) thinkingTimeCounts[pattern]++;
         if (pattern === 'noise') return;
         const nodeId = log.node_id;
-        if (!nodeId || inputNodeIds.has(nodeId)) return;
+        if (!nodeId) return; // inputNodeIds check removed to allow merging
 
         const current = inputMap.get(nodeId) || {
-            name: log.metadata?.node_name || nodeId,
+            name: nodeName,
             exp: 0, rev: 0, conf: 0, hes: 0, count: 0,
             totalDuration: 0
         };
@@ -562,19 +566,33 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     (inputLogs || []).forEach((log: any) => {
         const nodeId = log.node_id;
         const meta = log.metadata;
-        const metrics = meta?.metrics;
-        if (!metrics) return;
+        if (!meta) return;
+
         const current = inputMap.get(nodeId) || {
             name: meta.item_name || nodeId,
             exp: 0, rev: 0, conf: 0, hes: 0, count: 0,
             totalDuration: 0
         };
-        current.exp += (metrics.exploration || 0);
-        current.rev += (metrics.reversal || 0);
-        current.conf += (metrics.confidence || 0);
-        current.hes += (metrics.hesitation_score || 0);
+
+        // Old Format (input_analysis with metrics)
+        if (meta.metrics) {
+            const metrics = meta.metrics;
+            current.exp += (metrics.exploration || 0);
+            current.rev += (metrics.reversal || 0);
+            current.conf += (metrics.confidence || 0);
+            current.hes += (metrics.hesitation_score || 0);
+            current.totalDuration += (meta.raw?.input_duration_ms || 0);
+        }
+        // New Format (input_correction flat)
+        else {
+            // input_correction_count を reversal (書き直し) として扱う
+            const corrections = meta.input_correction_count || 0;
+            current.rev += corrections > 0 ? 1 : 0; // 修正があればreversalカウント
+            current.hes += corrections * 10; // 修正回数に応じて迷いスコア加算
+        }
+
         current.count++;
-        current.totalDuration += (meta.raw?.input_duration_ms || 0);
+
         inputMap.set(nodeId, current);
     });
 
@@ -589,15 +607,31 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
         avgDuration: (val.totalDuration / val.count) / 1000
     })).sort((a, b) => b.avgHesitation - a.avgHesitation);
 
+    console.log('[DashboardService] Final inputStats (for matrix):', inputStats);
+
     // 4. バックトラッキングの取得
+    // Debug: まずフィルタなしで件数を確認
+    const { count: totalBacktracks } = await supabase
+        .from('analytics_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', projectId)
+        .eq('event_type', 'backtracking');
+    console.log('[DashboardService] Total Unfiltered Backtracks in DB:', totalBacktracks);
+
     let backtrackQuery = supabase.from('analytics_logs').select('metadata, created_at').eq('project_id', projectId).eq('event_type', 'backtracking');
     backtrackQuery = applyFilters(backtrackQuery);
     const { data: backtrackLogs } = await backtrackQuery;
+
+    console.log('[DashboardService] Filtered Backtrack Logs:', backtrackLogs);
+
     const backtrackMap = new Map<string, number>();
     (backtrackLogs || []).forEach((log: any) => {
         const from = log.metadata?.from_page_name || 'Unknown';
         const to = log.metadata?.to_page_name || 'Unknown';
         const key = `${from} → ${to}`;
+
+        console.log(`[DashboardService] Processing Backtrack: ${key}`, log.metadata); // ★ Debug Log
+
         backtrackMap.set(key, (backtrackMap.get(key) || 0) + 1);
     });
     const backtrackStats: BacktrackStat[] = Array.from(backtrackMap.entries()).map(([key, count]) => {
@@ -660,8 +694,11 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     const nodeScoreMap = new Map<string, { totalDelta: number; count: number; name: string }>();
     (scoreLogs || []).forEach((log: any) => {
         const nodeId = log.node_id;
-        const delta = log.metadata?.delta || 0;
-        const name = log.metadata?.node_name || nodeId;
+        // ネストされたメタデータ構造に対応 (delta vs added)
+        const nestedMeta = log.metadata?.metadata || {};
+        const delta = nestedMeta.added || log.metadata?.delta || 0;
+        const name = nestedMeta.itemLabel || nestedMeta.node_name || log.metadata?.node_name || nodeId;
+
         const current = nodeScoreMap.get(nodeId) || { totalDelta: 0, count: 0, name };
         current.totalDelta += delta;
         current.count++;

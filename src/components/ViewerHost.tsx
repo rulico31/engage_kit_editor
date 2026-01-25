@@ -159,6 +159,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
             currentHistoryIndex: 0
           });
 
+          // プロジェクトIDを明示的にセット
+          if (projectId) {
+            usePreviewStore.getState().setProjectId(projectId);
+          }
+
           console.log('[ViewerHost] Preview state set with item visibility');
         }
 

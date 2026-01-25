@@ -906,11 +906,11 @@ const DashboardView: React.FC = () => {
 
                 {/* Navigation & Heatmaps */}
                 <div className="bento-grid">
-                    <div className="col-span-6 bento-card">
+                    <div className="col-span-6 bento-card" style={{ minHeight: '350px' }}>
                         <div className="card-title">バックトラック (戻る行動)</div>
                         <BacktrackHeatmap data={extendedStats?.backtracks || []} />
                     </div>
-                    <div className="col-span-6 bento-card">
+                    <div className="col-span-6 bento-card" style={{ minHeight: '350px' }}>
                         <div className="card-title">エンゲージメント分布</div>
                         <EngagementDistribution data={extendedStats?.engagementDistribution || []} />
                     </div>

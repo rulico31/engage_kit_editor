@@ -152,7 +152,11 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
         };
 
         // 5. 思考時間(Thinking Time)計測
-
+        // ★ NOTE: 削除理由 - この機能は usePreviewStore.handleItemEvent で同等の計測を行っており、
+        //   ここで重複送信すると「ページロードからの時間」と「前回操作からの時間」が混在してしまう。
+        //   usePreviewStore側はinitPreview()でタイマーリセットされるため正確な計測が可能。
+        //   ViewerHostではuseActionAnalyticsを使うが、interaction計測はViewerHost側で行う。
+        /*
         const handleThinkingTime = (e: MouseEvent | TouchEvent) => {
             // クリック時のみ計測 (タッチはtouchstartでなくclickで統一するか、重複排除が必要)
             // ここではclickのみを対象とする
@@ -193,6 +197,7 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                 }
             }, projectId);
         };
+        */
 
         // イベントリスナー登録 (Capture phase)
         window.addEventListener('mousemove', handleInteraction, { capture: true });
@@ -206,8 +211,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
         window.addEventListener('click', handleRageClick, { capture: true });
         window.addEventListener('touchstart', handleRageClick, { capture: true });
 
-        // Thinking Time Listener
-        window.addEventListener('click', handleThinkingTime, { capture: true });
+        // Thinking Time Listener (Disabled - see note above)
+        // window.addEventListener('click', handleThinkingTime, { capture: true });
 
         // Paste Listener
         window.addEventListener('paste', handlePaste as EventListener, { capture: true });
@@ -229,7 +234,7 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             window.removeEventListener('click', resetIdleTimer, { capture: true });
             window.removeEventListener('click', handleRageClick, { capture: true });
             window.removeEventListener('touchstart', handleRageClick, { capture: true });
-            window.removeEventListener('click', handleThinkingTime, { capture: true });
+            // window.removeEventListener('click', handleThinkingTime, { capture: true });
             window.removeEventListener('paste', handlePaste as EventListener, { capture: true });
             window.removeEventListener('beforeunload', sendExitLog);
             document.removeEventListener('visibilitychange', handleVisibility);

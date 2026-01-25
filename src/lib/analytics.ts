@@ -11,7 +11,9 @@ export type AnalyticsEventType =
   | 'idle_hesitation'    // B2B: 熟考・停止
   | 'rage_click'         // B2B: イライラ
   | 'interaction'        // B2B: 汎用インタラクション (Thinking Time計測用)
-  | 'exit_context';      // B2B: 離脱時の状況
+  | 'exit_context'       // B2B: 離脱時の状況
+  | 'backtracking'       // B2B: 戻る行動
+  | 'score_change';      // B2B: スコア変動
 
 export interface AnalyticsEvent {
   project_id: string;
@@ -60,7 +62,9 @@ export const logAnalyticsEvent = async (
       });
 
     if (error) {
-      console.error('Failed to log analytics event:', error);
+      console.error('Failed to log analytics event - Details:', JSON.stringify(error, null, 2));
+    } else {
+      console.log(`[Analytics] Successfully inserted: ${eventType}`);
     }
   } catch (err) {
     console.error('Analytics logging error:', err);

@@ -242,6 +242,10 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       // 入力または修正があった場合のみログ送信
       const hasInput = inputValue.length > 0;
       const hasCorrection = report.input_correction_count > 0;
+      // usePreviewStore.projectId はエディタプレビューでは設定されないため、useProjectStoreから取得
+      const projectId = useProjectStore.getState().currentProjectId || usePreviewStore.getState().projectId || undefined;
+
+      console.log('🔍 [ArtboardItem] handleBlur - projectId:', projectId, 'hasInput:', hasInput, 'hasCorrection:', hasCorrection);
 
       if (hasInput || hasCorrection) {
         console.log('🔍 [ArtboardItem] Sending input_correction log...');
@@ -253,7 +257,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
             ...report, // フラットな構造を展開
             item_name: item.name,
           }
-        }).then(() => {
+        }, projectId).then(() => {
           console.log('✅ [ArtboardItem] Log sent successfully');
         }).catch(err => {
           console.error('❌ [ArtboardItem] Log failed:', err);
@@ -268,7 +272,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
             item_name: item.name,
             timestamp: Date.now()
           }
-        });
+        }, projectId);
       }
 
       const isValid = validate(inputValue);
@@ -277,6 +281,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       }
     }
   };
+
 
   // イベントハンドラ
   // イベントハンドラ
