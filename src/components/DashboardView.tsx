@@ -10,8 +10,11 @@ import {
     fetchProjectStats,
     fetchDailyStats,
     fetchExtendedStats,
-    fetchHourlyStats, // Added
+    fetchHourlyStats,
+    fetchRawLogs,
     downloadLeadsAsCSV,
+    downloadRawLogsAsCSV,
+    downloadSummaryStatsAsCSV, // Added
     type LeadData,
     type AnalyticsStats,
     type DailyStats,
@@ -440,13 +443,66 @@ const DashboardView: React.FC = () => {
         }
     }, [projectMeta, setSelectedPageId, handleItemSelect, setViewMode, setPendingFocusNodeId]);
 
-    const handleExportClick = () => {
-        setShowExportModal(true);
+    const handleExportClick = async () => {
+        console.log("Export clicked. Fetching specific logs...");
+
+        // 1. Download Leads CSV (if any)
+        if (leads.length > 0) {
+            const today = new Date();
+            const endDateStr = today.toISOString().slice(0, 10);
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - dateRangeFilter);
+            const startDateStr = startDate.toISOString().slice(0, 10);
+
+            downloadLeadsAsCSV(leads, {
+                fileName: `leads_${startDateStr}_to_${endDateStr}.csv`
+            });
+        }
+
+        // 2. Download Raw Logs CSV (Always try)
         const today = new Date();
-        const lastMonth = new Date();
-        lastMonth.setDate(today.getDate() - 30);
-        if (!exportStartDate) setExportStartDate(lastMonth.toISOString().slice(0, 10));
-        if (!exportEndDate) setExportEndDate(today.toISOString().slice(0, 10));
+        const startDate = new Date();
+        startDate.setDate(today.getDate() - dateRangeFilter);
+
+        try {
+            if (!currentProjectId) {
+                console.error("No Project ID found");
+                return;
+            }
+            const rawLogs = await fetchRawLogs(currentProjectId, startDate, today);
+            console.log("Raw Logs fetched:", rawLogs.length);
+
+            if (rawLogs.length > 0) {
+                const endDateStr = today.toISOString().slice(0, 10);
+                const startDateStr = startDate.toISOString().slice(0, 10);
+                downloadRawLogsAsCSV(rawLogs, `raw_logs_${startDateStr}_to_${endDateStr}.csv`);
+            } else {
+                if (leads.length === 0) {
+                    // Data might still exist in stats
+                }
+            }
+
+            // 3. Download Summary Stats CSV (Always, if stats exist)
+            if (stats) {
+                const endDateStr = today.toISOString().slice(0, 10);
+                const startDateStr = startDate.toISOString().slice(0, 10);
+                downloadSummaryStatsAsCSV(stats, dailyStats, nodeStats, `summary_stats_${startDateStr}_to_${endDateStr}.csv`);
+            }
+
+            // Alert with complete summary
+            setTimeout(() => {
+                let msg = 'エクスポート完了\n\n';
+                if (stats) msg += '・統計サマリー (PV/CV/CVR等)\n';
+                if (rawLogs.length > 0) msg += `・行動ログ (Raw): ${rawLogs.length}件\n`;
+                if (leads.length > 0) msg += `・獲得リード (CV): ${leads.length}件\n`;
+                msg += '\nファイルをダウンロードしました。';
+                alert(msg);
+            }, 1000);
+
+        } catch (e) {
+            console.error("Export failed", e);
+            alert("エクスポート中にエラーが発生しました。");
+        }
     };
 
     const executeExport = () => {
@@ -487,63 +543,76 @@ const DashboardView: React.FC = () => {
 
     // --- Render Sections ---
 
-    const renderOverviewStats = () => (
-        <div className="bento-grid mb-6">
-            <div className="col-span-3">
-                <KPICard
-                    title="総ビュー数 (PV)"
-                    value={stats?.totalViews.toLocaleString() || "0"}
-                />
-            </div>
-            <div className="col-span-3">
-                <KPICard
-                    title="獲得リード数 (CV)"
-                    value={stats?.totalLeads.toLocaleString() || "0"}
-                />
-            </div>
-            <div className="col-span-3">
-                <KPICard
-                    title="完了率 (CVR)"
-                    value={(stats?.conversionRate.toFixed(1) || "0.0")}
-                    unit="%"
-                />
-            </div>
-            {/* Device Ratio Donut */}
-            <div className="col-span-3 bento-card flex flex-col items-center justify-center relative p-4">
-                <h3 className="absolute top-4 left-4 text-xs text-zinc-500 font-medium">デバイス比率</h3>
-                <div style={{ width: '100%', height: 120 }}>
-                    <ResponsiveContainer width="100%" height={120}>
-                        <PieChart>
-                            <Pie
-                                data={deviceData}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={35}
-                                outerRadius={50}
-                                paddingAngle={5}
-                                dataKey="value"
-                            >
-                                {deviceData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                            </Pie>
-                            <Tooltip contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', fontSize: '12px' }} itemStyle={{ color: '#fff' }} />
-                        </PieChart>
-                    </ResponsiveContainer>
+    const renderOverviewStats = () => {
+        const hasData = stats !== null;
+        const noDataText = "データがありません";
+
+        return (
+            <div className="bento-grid mb-6">
+                <div className="col-span-3">
+                    <KPICard
+                        title="総ビュー数 (PV)"
+                        value={hasData ? stats.totalViews.toLocaleString() : noDataText}
+                    />
                 </div>
-                <div className="flex gap-4 text-xs text-zinc-400 mt-2">
-                    <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                        <span>モバイル: {deviceData[0].value}%</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span>パソコン: {deviceData[1].value}%</span>
-                    </div>
+                <div className="col-span-3">
+                    <KPICard
+                        title="獲得リード数 (CV)"
+                        value={hasData ? stats.totalLeads.toLocaleString() : noDataText}
+                    />
+                </div>
+                <div className="col-span-3">
+                    <KPICard
+                        title="完了率 (CVR)"
+                        value={hasData ? stats.conversionRate.toFixed(1) : noDataText}
+                        unit={hasData ? "%" : undefined}
+                    />
+                </div>
+                {/* Device Ratio Donut */}
+                <div className="col-span-3 bento-card flex flex-col items-center justify-center relative p-4">
+                    <h3 className="absolute top-4 left-4 text-xs text-zinc-500 font-medium">デバイス比率</h3>
+                    {hasData ? (
+                        <>
+                            <div style={{ width: '100%', height: 120 }}>
+                                <ResponsiveContainer width="100%" height={120}>
+                                    <PieChart>
+                                        <Pie
+                                            data={deviceData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={35}
+                                            outerRadius={50}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {deviceData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip contentStyle={{ backgroundColor: '#27272a', borderColor: '#3f3f46', fontSize: '12px' }} itemStyle={{ color: '#fff' }} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div className="flex gap-4 text-xs text-zinc-400 mt-2">
+                                <div className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                    <span>モバイル: {hasData ? ((deviceData[0].value / (deviceData[0].value + deviceData[1].value || 1)) * 100).toFixed(1) : '0.0'}%</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span>パソコン: {hasData ? ((deviceData[1].value / (deviceData[0].value + deviceData[1].value || 1)) * 100).toFixed(1) : '0.0'}%</span>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+                            {noDataText}
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     const renderOverviewTab = () => (
         <div className="animate-fade-in space-y-6">
@@ -655,8 +724,6 @@ const DashboardView: React.FC = () => {
                                         />
                                     </div>
                                 )}
-
-
                             </div>
                         </div>
                         <div className="flex gap-2">
@@ -915,6 +982,16 @@ const DashboardView: React.FC = () => {
                         <EngagementDistribution data={extendedStats?.engagementDistribution || []} />
                     </div>
                 </div>
+
+                {/* Psychometrics Analysis (Added) */}
+                <div className="bento-grid">
+                    <div className="col-span-12 bento-card">
+                        <PsychometricsChart data={(extendedStats?.inputAnalytics || []).map(item => ({
+                            ...item,
+                            nodeName: getNodeDisplayName(item.nodeId) || item.nodeName
+                        }))} />
+                    </div>
+                </div>
             </div>
         );
     };
@@ -968,11 +1045,7 @@ const DashboardView: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Psychometrics */}
-                <div className="bento-card">
-                    <div className="card-title">サイコグラフィック特性 (回答傾向)</div>
-                    <PsychometricsChart data={extendedStats?.inputAnalytics || []} />
-                </div>
+
             </div>
         );
     };
@@ -985,11 +1058,12 @@ const DashboardView: React.FC = () => {
                     <p>プロジェクトのパフォーマンスとユーザーインサイト</p>
                 </div>
                 <div className="dashboard-actions">
-                    <div className="date-range-filter">
+                    <div className="control-group">
+                        <Calendar size={16} className="text-zinc-400" />
                         <select
+                            className="filter-select border-none bg-transparent p-0 focus:ring-0"
                             value={dateRangeFilter}
                             onChange={(e) => setDateRangeFilter(Number(e.target.value))}
-                            className="filter-select"
                         >
                             <option value="7">過去7日間</option>
                             <option value="30">過去30日間</option>
@@ -1009,19 +1083,19 @@ const DashboardView: React.FC = () => {
                         className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
                         onClick={() => setActiveTab('overview')}
                     >
-                        Overview
+                        全体サマリー
                     </button>
                     <button
                         className={`tab-btn ${activeTab === 'behavior' ? 'active' : ''}`}
                         onClick={() => setActiveTab('behavior')}
                     >
-                        Behavior Analysis
+                        ユーザー行動分析
                     </button>
                     <button
                         className={`tab-btn ${activeTab === 'content' ? 'active' : ''}`}
                         onClick={() => setActiveTab('content')}
                     >
-                        Content Insights
+                        コンテンツ別分析
                     </button>
                 </div>
             </div>
@@ -1040,22 +1114,32 @@ const DashboardView: React.FC = () => {
 
             {/* Export Modal (Simplified for view) */}
             {showExportModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-zinc-900 border border-zinc-700 p-6 rounded-lg w-96 shadow-2xl">
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+                    <div className="bg-zinc-900 border border-zinc-700 p-6 rounded-lg w-96 shadow-2xl relative" onClick={e => e.stopPropagation()}>
                         <h3 className="text-lg font-bold text-white mb-4">CSVエクスポート</h3>
                         <div className="space-y-4 mb-6">
                             <div>
                                 <label className="block text-xs text-zinc-400 mb-1">開始日</label>
-                                <input type="date" value={exportStartDate} onChange={e => setExportStartDate(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 text-white p-2 rounded" />
+                                <input
+                                    type="date"
+                                    value={exportStartDate}
+                                    onChange={e => setExportStartDate(e.target.value)}
+                                    className="w-full bg-zinc-800 border border-zinc-700 text-white p-2 rounded focus:outline-none focus:border-blue-500"
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs text-zinc-400 mb-1">終了日</label>
-                                <input type="date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 text-white p-2 rounded" />
+                                <input
+                                    type="date"
+                                    value={exportEndDate}
+                                    onChange={e => setExportEndDate(e.target.value)}
+                                    className="w-full bg-zinc-800 border border-zinc-700 text-white p-2 rounded focus:outline-none focus:border-blue-500"
+                                />
                             </div>
                         </div>
                         <div className="flex justify-end gap-2">
-                            <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-zinc-400 hover:text-white">キャンセル</button>
-                            <button onClick={executeExport} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500">ダウンロード</button>
+                            <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-zinc-400 hover:text-white transition-colors">キャンセル</button>
+                            <button onClick={executeExport} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors">ダウンロード</button>
                         </div>
                     </div>
                 </div>

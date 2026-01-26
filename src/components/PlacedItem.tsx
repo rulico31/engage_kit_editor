@@ -160,7 +160,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
         // 枠線の制御（入力欄はCSSで制御するためここではborder指定をスキップする場合もあるが、一貫性のため残す）
         border: (item.data.showBorder === false) ? 'none' : undefined,
-        backgroundColor: (item.data.isTransparent) ? 'transparent' : ((item.style as any)?.backgroundColor || undefined),
+        backgroundColor: (item.data.isTransparent) ? 'transparent' : (item.data?.backgroundColor || (item.style as any)?.backgroundColor || undefined),
         // @ts-ignore
         borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
         overflow: 'hidden',

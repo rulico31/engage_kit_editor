@@ -7,28 +7,44 @@ interface PsychometricsChartProps {
 }
 
 export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) => {
-    if (!data || data.length === 0) {
-        return <div className="chart-no-data">データがありません</div>;
-    }
+    const hasData = data && data.length > 0;
 
     // 平均スコアの計算（全アイテム）
-    const totalItems = data.length;
-    const avgScores = {
-        exploration: data.reduce((a, b) => a + b.avgExploration, 0) / totalItems,
-        reversal: data.reduce((a, b) => a + b.avgReversal, 0) / totalItems,
-        confidence: data.reduce((a, b) => a + b.avgConfidence, 0) / totalItems,
-        hesitation: data.reduce((a, b) => a + b.avgHesitation, 0) / totalItems,
+    let avgScores = {
+        exploration: 0,
+        reversal: 0,
+        confidence: 0,
+        hesitation: 0,
     };
 
-    const chartData = [
-        { name: '探索 (Exploration)', score: avgScores.exploration, fill: '#FF9800' },
-        { name: '転換 (Reversal)', score: avgScores.reversal, fill: '#F44336' },
-        { name: '確信 (Confidence)', score: avgScores.confidence, fill: '#4CAF50' },
-        { name: '総合迷い (Hesitation)', score: avgScores.hesitation, fill: '#607D8B' },
+    let chartData = [
+        { name: '探索 (Exploration)', score: 0, fill: '#FF9800' },
+        { name: '転換 (Reversal)', score: 0, fill: '#F44336' },
+        { name: '確信 (Confidence)', score: 0, fill: '#4CAF50' },
+        { name: '総合迷い (Hesitation)', score: 0, fill: '#607D8B' },
     ];
 
-    // 迷いスコアが高い順トップ5
-    const topHesitations = [...data].sort((a, b) => b.avgHesitation - a.avgHesitation).slice(0, 5);
+    let topHesitations: InputAnalyticsStat[] = [];
+
+    if (hasData) {
+        const totalItems = data.length;
+        avgScores = {
+            exploration: data.reduce((a, b) => a + b.avgExploration, 0) / totalItems,
+            reversal: data.reduce((a, b) => a + b.avgReversal, 0) / totalItems,
+            confidence: data.reduce((a, b) => a + b.avgConfidence, 0) / totalItems,
+            hesitation: data.reduce((a, b) => a + b.avgHesitation, 0) / totalItems,
+        };
+
+        chartData = [
+            { name: '探索 (Exploration)', score: avgScores.exploration, fill: '#FF9800' },
+            { name: '転換 (Reversal)', score: avgScores.reversal, fill: '#F44336' },
+            { name: '確信 (Confidence)', score: avgScores.confidence, fill: '#4CAF50' },
+            { name: '総合迷い (Hesitation)', score: avgScores.hesitation, fill: '#607D8B' },
+        ];
+
+        // 迷いスコアが高い順トップ5
+        topHesitations = [...data].sort((a, b) => b.avgHesitation - a.avgHesitation).slice(0, 5);
+    }
 
     return (
         <div className="chart-wrapper">
@@ -40,18 +56,35 @@ export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) 
                     <p className="chart-description-text" style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '8px' }}>
                         ※探索・転換・確信・迷いの4指標で、ユーザーの回答時の心理状態を可視化します。
                     </p>
-                    <div style={{ width: '100%', height: 250 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" domain={[0, 100]} />
-                                <YAxis dataKey="name" type="category" width={120} style={{ fontSize: '12px' }} />
-                                <Tooltip formatter={(value: number) => value.toFixed(1)} />
-                                <Bar dataKey="score" fill="#8884d8" barSize={20}>
-                                    {/* 個別色指定はdata内で指定してもBarChartの仕様上Cellが必要だが、単純化のため単色またはCellマップ */}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div style={{ width: '100%', height: 250, position: 'relative' }}>
+                        {hasData ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" domain={[0, 100]} />
+                                    <YAxis dataKey="name" type="category" width={120} style={{ fontSize: '12px' }} />
+                                    <Tooltip
+                                        formatter={(value: number) => value.toFixed(1)}
+                                        contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }}
+                                        itemStyle={{ color: '#fff' }}
+                                    />
+                                    <Bar dataKey="score" fill="#8884d8" barSize={20}>
+                                        {/* 個別色指定はdata内で指定してもBarChartの仕様上Cellが必要だが、単純化のため単色またはCellマップ */}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                height: '100%',
+                                color: '#71717a',
+                                fontSize: '14px'
+                            }}>
+                                データがありません
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -62,21 +95,37 @@ export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) 
                             <tr>
                                 <th>項目名</th>
                                 <th>迷い指数</th>
+                                <th>サンプル数</th>
                                 <th>転換(修正回数)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {topHesitations.map((item) => (
-                                <tr key={item.nodeId}>
-                                    <td title={item.nodeName}>{item.nodeName}</td>
-                                    <td>
-                                        <span className={`score-badge ${item.avgHesitation > 60 ? 'high' : item.avgHesitation > 30 ? 'mid' : 'low'}`}>
-                                            {item.avgHesitation.toFixed(0)}
-                                        </span>
+                            {hasData && topHesitations.length > 0 ? (
+                                topHesitations.map((item) => (
+                                    <tr key={item.nodeId}>
+                                        <td title={item.nodeName}>{item.nodeName}</td>
+                                        <td>
+                                            <span className={`score-badge ${item.avgHesitation > 60 ? 'high' : item.avgHesitation > 30 ? 'mid' : 'low'}`}>
+                                                {item.avgHesitation.toFixed(0)}
+                                            </span>
+                                        </td>
+                                        <td style={{ color: '#a1a1aa' }}>
+                                            {item.sampleCount}
+                                        </td>
+                                        <td>
+                                            {(item.nodeType === 'text_input' || item.nodeName.includes('テキスト'))
+                                                ? (item.rawReversalCount !== undefined ? item.rawReversalCount.toFixed(1) : (item.avgReversal / 20).toFixed(1))
+                                                : '-'}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} style={{ textAlign: 'center', color: '#71717a', padding: '20px' }}>
+                                        データがありません
                                     </td>
-                                    <td>{item.avgReversal.toFixed(1)}</td>
                                 </tr>
-                            ))}
+                            )}
                         </tbody>
                     </table>
                     <p className="chart-hint">※「転換」が高い項目は、回答方針を変えたか、書きにくさを感じている（書き直しが多い）箇所です。</p>

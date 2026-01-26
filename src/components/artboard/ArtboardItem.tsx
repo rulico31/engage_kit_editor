@@ -94,8 +94,11 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   // 背景色（isTransparentがtrueの場合は強制的にtransparent）
   if (item.data?.isTransparent === true) {
     containerStyle.backgroundColor = 'transparent';
+  } else if (item.data?.backgroundColor) {
+    // プロパティパネルで設定された背景色 (data.backgroundColor)
+    containerStyle.backgroundColor = item.data.backgroundColor;
   } else if (item.style?.backgroundColor) {
-    // 個別に背景色が設定されている場合
+    // 個別に背景色が設定されている場合 (style.backgroundColor - legacy fallback)
     containerStyle.backgroundColor = item.style.backgroundColor;
   }
 
@@ -165,6 +168,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState(item.data?.countryCode || "+81");
   const [inputTracker] = useState(() => new InputTracker()); // InputTracker初期化
+  const focusTimeRef = useRef<number>(0); // 滞在時間計測用
 
   useEffect(() => {
     if (isPreviewing) {
@@ -243,11 +247,23 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       const hasInput = inputValue.length > 0;
       const hasCorrection = report.input_correction_count > 0;
       // usePreviewStore.projectId はエディタプレビューでは設定されないため、useProjectStoreから取得
-      const projectId = useProjectStore.getState().currentProjectId || usePreviewStore.getState().projectId || undefined;
+      // usePreviewStore.projectId はエディタプレビューでは設定されないため、useProjectStoreから取得 + URLフォールバック
+      let projectId = useProjectStore.getState().currentProjectId || usePreviewStore.getState().projectId || undefined;
 
-      console.log('🔍 [ArtboardItem] handleBlur - projectId:', projectId, 'hasInput:', hasInput, 'hasCorrection:', hasCorrection);
+      if (!projectId) {
+        const params = new URLSearchParams(window.location.search);
+        projectId = params.get('project_id') || undefined;
+      }
 
-      if (hasInput || hasCorrection) {
+      // ★ 滞在時間 (Duration) の計算
+      const now = Date.now();
+      const durationMs = (focusTimeRef.current > 0) ? (now - focusTimeRef.current) : 0;
+      focusTimeRef.current = 0; // リセット
+
+      console.log('🔍 [ArtboardItem] handleBlur - projectId:', projectId, 'hasInput:', hasInput, 'hasCorrection:', hasCorrection, 'duration:', durationMs);
+
+      // 入力がある、修正がある、または一定時間以上滞在した場合にログ送信
+      if (hasInput || hasCorrection || durationMs > 2000) {
         console.log('🔍 [ArtboardItem] Sending input_correction log...');
         // @ts-ignore - input_analysis was invalid, changed to input_correction
         logAnalyticsEvent('input_correction', {
@@ -256,6 +272,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
           metadata: {
             ...report, // フラットな構造を展開
             item_name: item.name,
+            duration_ms: durationMs, // ★ 滞在時間を追加
           }
         }, projectId).then(() => {
           console.log('✅ [ArtboardItem] Log sent successfully');
@@ -305,7 +322,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
 
           // 2. Project IDの取得 (URL or Store)
           // Editorの場合はURLに project_id がある場合が多い、または store から
-          let projectId = useProjectStore.getState().currentProjectId;
+          let projectId: string | undefined = useProjectStore.getState().currentProjectId || undefined;
           if (!projectId) {
             const params = new URLSearchParams(window.location.search);
             projectId = params.get('project_id') || undefined;
@@ -455,6 +472,11 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
             }
           }}
           onBlur={handleBlur}
+          onFocus={() => {
+            if (isPreviewing) {
+              focusTimeRef.current = Date.now();
+            }
+          }}
           onClick={(e) => {
             if (!isPreviewing) {
               e.stopPropagation();

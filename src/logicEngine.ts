@@ -171,10 +171,10 @@ export const onConfirmationResult = (
   context: LogicRuntimeContext
 ) => {
   if (import.meta.env.DEV) {
-    console.log('📋 確認画面の結果を処理', {
-      nodeId,
-      result
-    });
+    // console.log('📋 確認画面の結果を処理', {
+    //   nodeId,
+    //   result
+    // });
   }
 
   // モーダルを閉じる
@@ -238,13 +238,13 @@ export const triggerEvent = (
   const { nodes, edges } = currentPageGraph;
 
   if (import.meta.env.DEV) {
-    console.log('🔔 イベント発火', {
-      eventName,
-      targetItemId,
-      logicOwnerId,
-      totalNodes: nodes.length,
-      totalEdges: edges.length
-    });
+    // console.log('🔔 イベント発火', {
+    //   eventName,
+    //   targetItemId,
+    //   logicOwnerId,
+    //   totalNodes: nodes.length,
+    //   totalEdges: edges.length
+    // });
   }
 
   // 1. 「待機中」のフローを再開させる
@@ -279,10 +279,10 @@ export const triggerEvent = (
   });
 
   if (import.meta.env.DEV) {
-    console.log('🎯 見つかったイベントノード', {
-      count: startingNodes.length,
-      nodes: startingNodes.map(n => ({ id: n.id, label: n.data.label }))
-    });
+    // console.log('🎯 見つかったイベントノード', {
+    //   count: startingNodes.length,
+    //   nodes: startingNodes.map(n => ({ id: n.id, label: n.data.label }))
+    // });
   }
 
   if (startingNodes.length > 0) {

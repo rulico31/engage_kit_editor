@@ -562,3 +562,42 @@
   height: 100%;
   color: #888;
 }
+
+/* Added for header controls alignment */
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.control-group:hover {
+  border-color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.control-group:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.filter-select {
+  /* Override default filter-select for inside control-group if needed, 
+     but the utility classes in TSX (border-none etc) should handle it. 
+     Keeping this mainly for the standalone filter-select if used elsewhere. */
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* Ensure options have dark background (browser dependent) */
+.filter-select option {
+  background-color: #18181b;
+  color: #fff;
+}

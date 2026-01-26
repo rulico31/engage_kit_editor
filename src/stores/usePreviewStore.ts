@@ -301,6 +301,14 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
           }
         }
 
+
+        // Fix for missing projectId: Try getting from URL if store is empty
+        let projectId = useProjectStore.getState().currentProjectId || get().projectId || undefined;
+        if (!projectId) {
+          const params = new URLSearchParams(window.location.search);
+          projectId = params.get('project_id') || undefined;
+        }
+
         logAnalyticsEvent('interaction', {
           nodeId: originItemId,
           nodeType: 'interaction', // イベントタイプとして使用
@@ -312,7 +320,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
             page_name: currentPage.name,
             node_name: nodeName,
           }
-        }, useProjectStore.getState().currentProjectId || get().projectId || undefined); // ★ Editor用にuseProjectStoreを優先
+        }, projectId); // ★ Editor/Preview両対応
       }
     }
 

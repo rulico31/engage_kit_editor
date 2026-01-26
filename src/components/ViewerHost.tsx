@@ -312,6 +312,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
                 setPreviewState={setPreviewState}
                 allItemLogics={allItemLogics}
                 isMobile={false}
+                projectId={projectId || undefined} // Pass projectId
               />
             </ViewerErrorBoundary>
 

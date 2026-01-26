@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./PreviewItem.css";
 import { usePreviewStore } from "../stores/usePreviewStore";
+import { useProjectStore } from "../stores/useProjectStore"; // Added
 import { InputTracker } from "../lib/InputTracker";
 import { logAnalyticsEvent } from "../lib/analytics";
 
@@ -13,12 +14,14 @@ interface PreviewItemProps {
   allItemLogics: Record<string, NodeGraph>;
   isMobile?: boolean;
   setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void;
+  projectId?: string; // Added prop
 }
 
 const PreviewItem: React.FC<PreviewItemProps> = ({
   item,
   previewState,
   setPreviewState,
+  projectId: propProjectId, // Rename to avoid conflict with local variable if any, or just use it
 }) => {
   const { id, name } = item;
   const itemState = previewState[id];
@@ -178,43 +181,53 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     }
   }, [inputValue, error, item.data.inputType, item.data.required]);
 
+  // 滞在時間計測用
+  const focusTimeRef = React.useRef<number>(0);
+
+  const handleFocus = () => {
+    focusTimeRef.current = Date.now();
+  };
+
   const handleBlur = () => {
+    const now = Date.now();
+    // フォーカス時間がない場合は0 (一瞬で外れた場合など)
+    const durationMs = focusTimeRef.current > 0 ? now - focusTimeRef.current : 0;
+    focusTimeRef.current = 0; // リセット
+
     console.log('🔍 [PreviewItem] handleBlur called', {
       id,
       name,
       inputValue,
+      durationMs, // Log duration
       inputTrackerState: inputTracker
     });
 
     // InputTrackerのレポートを取得してログ記録（バリデーション結果に関係なく記録）
     const report = inputTracker.getReport(inputValue);
-    console.log('🔍 [PreviewItem] InputTracker report:', report);
 
     // ★ Supabaseに入力修正データを記録
     const hasInput = inputValue.length > 0;
     const hasCorrection = report.input_correction_count > 0;
 
-    if (hasInput || hasCorrection) {
-      console.log('🔍 [PreviewItem] Calling logAnalyticsEvent...', {
-        eventType: 'input_correction',
-        nodeId: id
-      });
+    // usePreviewStore.projectId はエディタプレビューでは設定されないため、useProjectStoreから取得 + URLフォールバック
+    let projectId = propProjectId || useProjectStore.getState().currentProjectId || usePreviewStore.getState().projectId || undefined;
+    if (!projectId) {
+      const params = new URLSearchParams(window.location.search);
+      projectId = params.get('project_id') || undefined;
+    }
 
+    if (hasInput || hasCorrection || durationMs > 2000) { // ArtboardItemと条件を統一 (2秒以上滞在も記録)
       logAnalyticsEvent('input_correction', {
         nodeId: id,
         nodeType: 'text_input',
         metadata: {
           ...report,
           item_name: name,
+          duration_ms: durationMs, // ★ 追加: 滞在時間を記録
         }
-      }).then(() => {
-        console.log('✅ [PreviewItem] logAnalyticsEvent promise resolved');
-      }).catch(err => {
-        console.error('❌ [PreviewItem] logAnalyticsEvent failed:', err);
-      });
+      }, projectId);
     } else {
       // 入力放棄 (Focusしたのに何もせずBlur)
-      console.log('⚠️ [PreviewItem] Input Abandonment detected');
       logAnalyticsEvent('input_abandonment', {
         nodeId: id,
         nodeType: 'text_input',
@@ -222,7 +235,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
           item_name: name,
           timestamp: Date.now()
         }
-      });
+      }, projectId);
     }
 
     // バリデーションを実行し、成功した場合のみ完了イベントを発火
@@ -317,6 +330,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
             }
           }}
           onBlur={handleBlur}
+          onFocus={handleFocus} // Track focus start time
           onClick={(e) => e.stopPropagation()}
         />
       </>
@@ -354,11 +368,11 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         // 枠線の制御
         border: (item.data.showBorder === false) ? 'none' : undefined,
 
-        // 背景色: 透明 -> 個別設定
+        // 背景色: 透明 -> data.backgroundColor -> style.backgroundColor
         // @ts-ignore
         backgroundColor: (item.data.isTransparent)
           ? 'transparent'
-          : ((item.style as any)?.backgroundColor || undefined),
+          : (item.data?.backgroundColor || (item.style as any)?.backgroundColor || undefined),
 
         // テーマ変数の適用
         fontFamily: 'var(--theme-font-family, inherit)',

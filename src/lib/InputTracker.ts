@@ -18,7 +18,7 @@ export class InputTracker {
     }
 
     onKeyDown(e: KeyboardEvent, value: string) {
-        if (this.isComposing) return;
+        // if (this.isComposing) return; // IME入力中も含めて削除操作としてカウントする
 
         // 削除操作（Backspace/Delete）をカウント＝推敲・書き直し
         if (e.key === 'Backspace' || e.key === 'Delete') {

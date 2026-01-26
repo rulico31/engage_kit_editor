@@ -414,6 +414,21 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
             <AccordionSection title="外観 (Appearance)" defaultOpen={true}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
+                    {/* Background Transparency Checkbox */}
+                    <div className="prop-group">
+                        <label className="prop-checkbox-row">
+                            <input
+                                type="checkbox"
+                                checked={item.data?.isTransparent || false}
+                                onChange={(e) => handleDataChange("isTransparent", e.target.checked)}
+                            />
+                            <span style={{ fontSize: '12px' }}>背景を透明化</span>
+                        </label>
+                        <div style={{ fontSize: '10px', color: '#666', marginTop: '4px', marginLeft: '20px' }}>
+                            有効にすると背景色より優先されます
+                        </div>
+                    </div>
+
                     {/* Background Color */}
                     <div className="prop-group">
                         <div className="prop-label">背景色 (Background Color)</div>
@@ -423,14 +438,33 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 value={item.data?.backgroundColor || "#ffffff"}
                                 onChange={(e) => handleDataChange("backgroundColor", e.target.value)}
                                 className="prop-color-picker"
+                                disabled={item.data?.isTransparent || false}
+                                style={{ opacity: item.data?.isTransparent ? 0.5 : 1 }}
                             />
                             <input
                                 type="text"
                                 value={item.data?.backgroundColor || ""}
                                 onChange={(e) => handleDataChange("backgroundColor", e.target.value)}
                                 className="prop-input"
-                                style={{ fontFamily: 'monospace' }}
+                                style={{ fontFamily: 'monospace', opacity: item.data?.isTransparent ? 0.5 : 1 }}
+                                disabled={item.data?.isTransparent || false}
+                                placeholder={item.data?.isTransparent ? "透明化が有効" : "#ffffff"}
                             />
+                        </div>
+                    </div>
+
+                    {/* Border Visibility Checkbox */}
+                    <div className="prop-group">
+                        <label className="prop-checkbox-row">
+                            <input
+                                type="checkbox"
+                                checked={item.data?.showBorder !== false} // デフォルトtrue (未定義の場合も表示)
+                                onChange={(e) => handleDataChange("showBorder", e.target.checked)}
+                            />
+                            <span style={{ fontSize: '12px' }}>枠線を表示</span>
+                        </label>
+                        <div style={{ fontSize: '10px', color: '#666', marginTop: '4px', marginLeft: '20px' }}>
+                            チェックを外すと枠線が非表示になります
                         </div>
                     </div>
 
