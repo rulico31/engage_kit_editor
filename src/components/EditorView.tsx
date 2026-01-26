@@ -325,7 +325,7 @@ const EditorView: React.FC<EditorViewProps> = ({
       />
 
       <div className="editor-workspace-vertical" ref={workspaceRef}>
-        {viewMode === "dashboard" ? (
+        {viewMode === "dashboard" && !isPreviewing ? (
           <div className="workspace-section dashboard-section" style={{ width: '100%', height: '100%' }}>
             <DashboardView />
           </div>
