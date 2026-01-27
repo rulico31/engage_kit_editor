@@ -38,7 +38,7 @@ interface ProjectStoreState {
   saveProject: (dataOverrides?: Partial<ProjectData>) => Promise<boolean>;
   resetProject: () => void;
   updateCloudId: (cloudId: string) => void;
-  publishProject: () => Promise<ValidationResult | boolean>;
+  publishProject: (force?: boolean) => Promise<ValidationResult | boolean>;
   unpublishProject: () => Promise<boolean>;
   updateProjectName: (name: string) => void;
   updateTheme: (theme: ThemeConfig) => void;
@@ -174,7 +174,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
 
 
   // --- プロジェクト公開 ---
-  publishProject: async (): Promise<ValidationResult | boolean> => {
+  publishProject: async (force = false): Promise<ValidationResult | boolean> => {
     const { currentProjectId, projectMeta } = get();
     if (!currentProjectId) return false;
 
@@ -189,16 +189,16 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       cloud_id: projectMeta?.cloud_id
     };
 
-    const validationResult = ValidationService.validate(dataToPublish);
+    // forceがfalseの場合はバリデーションを実行
+    if (!force) {
+      const validationResult = ValidationService.validate(dataToPublish);
 
-    if (!validationResult.isValid) {
-      console.error('Validation failed:', validationResult);
-      set({ isLoading: false });
-      return validationResult;
-    }
-
-    if (validationResult.warnings.length > 0) {
-      console.warn('Validation warnings:', validationResult.warnings);
+      //警告がある場合は、結果を返す（公開をブロックしないが、UIで確認を求める）
+      if (validationResult.warnings.length > 0) {
+        console.warn('Validation warnings:', validationResult.warnings);
+        set({ isLoading: false });
+        return validationResult;
+      }
     }
 
 

@@ -48,20 +48,29 @@ Deno.serve(async (req: Request) => {
         const response = await fetch(url, fetchOptions)
 
         // レスポンスを取得
-        let responseData
         const contentType = response.headers.get('content-type')
+        let responseData
 
-        if (contentType && contentType.includes('application/json')) {
-            responseData = await response.text()
-        } else {
-            responseData = await response.text()
+        // Parse response body based on content type
+        const textData = await response.text()
+
+        try {
+            // Try to parse as JSON regardless of header (some APIs are sloppy)
+            responseData = JSON.parse(textData)
+        } catch (e) {
+            // Not JSON, return as wrapped object
+            console.log('⚠️ Response is not JSON, wrapping as object')
+            responseData = {
+                raw_response: textData,
+                status: response.status
+            }
         }
 
-        console.log('✅ Response from external API:', response.status, responseData.substring(0, 100))
+        console.log('✅ Response from external API:', response.status, typeof responseData)
 
         // クライアントへ結果を返す
-        return new Response(responseData, {
-            status: 200, // 常に200を返す（外部APIのエラーもデータとして返す）
+        return new Response(JSON.stringify(responseData), {
+            status: 200, // 常に200を返す
             headers: {
                 ...corsHeaders,
                 'Content-Type': 'application/json',

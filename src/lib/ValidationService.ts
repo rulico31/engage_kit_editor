@@ -21,18 +21,22 @@ export interface ValidationResult {
 export class ValidationService {
     /**
      * プロジェクトデータを検証し、公開に適しているかチェックする
+     * 注意: すべての問題は「警告」として扱われ、公開をブロックしません
      */
     static validate(projectData: ProjectData): ValidationResult {
-        const errors: ValidationIssue[] = [];
         const warnings: ValidationIssue[] = [];
 
+        // pagesをRecord<string, any>として扱う（型の不整合を回避）
+        const pages = projectData.pages as any as Record<string, any>;
+
         // 各ページを検証
-        Object.entries(projectData.pages).forEach(([pageId, pageData]) => {
+        Object.entries(pages).forEach(([pageId, pageData]) => {
             // 各アイテムのロジックを検証
-            Object.entries(pageData.allItemLogics || {}).forEach(([itemId, nodeGraph]) => {
-                // 1. 孤立ノードのチェック
-                const orphanedNodes = this.findOrphanedNodes(nodeGraph);
-                orphanedNodes.forEach(nodeId => {
+            const allItemLogics = (pageData as any).allItemLogics || {};
+            Object.entries(allItemLogics).forEach(([itemId, nodeGraph]) => {
+                // 1. 孤立ノードのチェック（イベントノードから到達できないノード）
+                const orphanedNodes = this.findOrphanedNodes(nodeGraph as NodeGraph);
+                orphanedNodes.forEach((nodeId: string) => {
                     warnings.push({
                         type: 'warning',
                         category: 'orphaned_node',
@@ -43,11 +47,24 @@ export class ValidationService {
                     });
                 });
 
-                // 2. リンク切れのチェック
-                const brokenLinks = this.findBrokenLinks(nodeGraph, projectData, pageId);
+                // 2. 未接続ノードのチェック（エッジで他のノードと接続されていない）
+                const disconnectedNodes = this.findDisconnectedNodes(nodeGraph as NodeGraph);
+                disconnectedNodes.forEach((nodeId: string) => {
+                    warnings.push({
+                        type: 'warning',
+                        category: 'orphaned_node',
+                        message: `未接続のノードが検出されました（他のノードと線で繋がっていません）`,
+                        nodeId,
+                        itemId,
+                        pageId
+                    });
+                });
+
+                // 3. リンク切れのチェック
+                const brokenLinks = this.findBrokenLinks(nodeGraph as NodeGraph, projectData, pageId);
                 brokenLinks.forEach(issue => {
-                    errors.push({
-                        type: 'error',
+                    warnings.push({
+                        type: 'warning',
                         category: 'broken_link',
                         message: issue.message,
                         nodeId: issue.nodeId,
@@ -56,11 +73,11 @@ export class ValidationService {
                     });
                 });
 
-                // 3. 必須設定のチェック
-                const missingConfigs = this.findMissingConfigurations(nodeGraph);
+                // 4. 必須設定のチェック
+                const missingConfigs = this.findMissingConfigurations(nodeGraph as NodeGraph);
                 missingConfigs.forEach(issue => {
-                    errors.push({
-                        type: 'error',
+                    warnings.push({
+                        type: 'warning',
                         category: 'missing_config',
                         message: issue.message,
                         nodeId: issue.nodeId,
@@ -69,11 +86,11 @@ export class ValidationService {
                     });
                 });
 
-                // 4. 無限ループ（危険なサイクル）のチェック
-                const loops = this.detectInfiniteLoops(nodeGraph);
-                loops.forEach(nodeId => {
-                    errors.push({
-                        type: 'error',
+                // 5. 無限ループ（危険なサイクル）のチェック
+                const loops = this.detectInfiniteLoops(nodeGraph as NodeGraph);
+                loops.forEach((nodeId: string) => {
+                    warnings.push({
+                        type: 'warning',
                         category: 'other',
                         message: `無限ループの可能性があります。ユーザー操作を待たないノードだけでループが形成されています。`,
                         nodeId,
@@ -85,8 +102,8 @@ export class ValidationService {
         });
 
         return {
-            isValid: errors.length === 0,
-            errors,
+            isValid: true, // 常にtrue（警告は公開をブロックしない）
+            errors: [], // エラーは廃止
             warnings
         };
     }
@@ -127,6 +144,28 @@ export class ValidationService {
         // 到達できないノードが孤立ノード
         return nodes
             .filter(n => !reachable.has(n.id))
+            .map(n => n.id);
+    }
+
+    /**
+     * 未接続ノード（エッジで他のノードと接続されていないノード）を検出
+     * イベントノードは除外（イベントノードは起点なので接続がなくても問題ない）
+     */
+    private static findDisconnectedNodes(nodeGraph: NodeGraph): string[] {
+        const { nodes, edges } = nodeGraph;
+
+        return nodes
+            .filter(node => {
+                // イベントノードは除外
+                if (node.type === 'eventNode') return false;
+
+                // このノードに接続されているエッジがあるかチェック
+                const hasIncomingEdge = edges.some(e => e.target === node.id);
+                const hasOutgoingEdge = edges.some(e => e.source === node.id);
+
+                // 入力も出力もエッジがない場合は未接続
+                return !hasIncomingEdge && !hasOutgoingEdge;
+            })
             .map(n => n.id);
     }
 
@@ -209,6 +248,70 @@ export class ValidationService {
         const { nodes } = nodeGraph;
 
         nodes.forEach(node => {
+            // ページ遷移ノード: targetPageIdが必須
+            if (node.type === 'pageNode') {
+                const targetPageId = node.data.targetPageId;
+                if (!targetPageId || targetPageId.trim() === '') {
+                    issues.push({
+                        nodeId: node.id,
+                        message: `ページ遷移ノードに遷移先ページが設定されていません`
+                    });
+                }
+            }
+
+            // アクションノード: targetItemIdが必要（一部のモードでは不要）
+            if (node.type === 'actionNode') {
+                const mode = node.data.mode;
+                const targetItemId = node.data.targetItemId;
+
+                // toggle/show/hide モードではtargetItemIdが必須
+                if (['toggle', 'show', 'hide'].includes(mode)) {
+                    if (!targetItemId || targetItemId.trim() === '') {
+                        issues.push({
+                            nodeId: node.id,
+                            message: `アクションノードに対象アイテムが設定されていません`
+                        });
+                    }
+                }
+            }
+
+            // 条件分岐ノード: conditionまたはtargetItemIdが必要
+            if (node.type === 'ifNode') {
+                const condition = node.data.condition;
+                if (!condition || condition.trim() === '') {
+                    issues.push({
+                        nodeId: node.id,
+                        message: `条件分岐ノードに条件が設定されていません`
+                    });
+                }
+            }
+
+            // 変数設定ノード: variableName, operation, valueが必須
+            if (node.type === 'setVariableNode') {
+                const variableName = node.data.variableName;
+                const operation = node.data.operation;
+                const value = node.data.value;
+
+                if (!variableName || variableName.trim() === '') {
+                    issues.push({
+                        nodeId: node.id,
+                        message: `変数設定ノードに変数名が設定されていません`
+                    });
+                }
+                if (!operation) {
+                    issues.push({
+                        nodeId: node.id,
+                        message: `変数設定ノードに操作が設定されていません`
+                    });
+                }
+                if (value === undefined || value === null || value === '') {
+                    issues.push({
+                        nodeId: node.id,
+                        message: `変数設定ノードに値が設定されていません`
+                    });
+                }
+            }
+
             // 外部APIノード: URLが必須
             if (node.type === 'externalApiNode') {
                 const url = node.data.url;
@@ -220,8 +323,16 @@ export class ValidationService {
                 }
             }
 
-            // フォーム送信ノード: 現在は特に必須設定なし（変数があればOK）
-            // 将来的にバリデーション追加可能
+            // アニメーションノード: targetItemIdが必要
+            if (node.type === 'animateNode') {
+                const targetItemId = node.data.targetItemId;
+                if (!targetItemId || targetItemId.trim() === '') {
+                    issues.push({
+                        nodeId: node.id,
+                        message: `アニメーションノードに対象アイテムが設定されていません`
+                    });
+                }
+            }
         });
 
         return issues;

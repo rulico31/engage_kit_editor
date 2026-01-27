@@ -3,6 +3,7 @@ import { useProjectStore } from '../stores/useProjectStore';
 
 import type { ValidationResult } from '../lib/ValidationService';
 import './ProjectSettingsModal.css';
+import { PublishWarningModal } from "./PublishWarningModal";
 
 interface ProjectSettingsModalProps {
     onClose: () => void;
@@ -27,12 +28,13 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
     const [isPublishing, setIsPublishing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+    const [showWarningModal, setShowWarningModal] = useState(false);
 
 
 
     // 公開URLの生成
     const publicUrl = currentProjectId
-        ? `${window.location.origin}/view/${currentProjectId}`
+        ? `${window.location.origin} /view/${currentProjectId} `
         : '';
 
     const handleCopyUrl = async () => {
@@ -75,6 +77,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
     const handlePublish = async () => {
         setIsPublishing(true);
         setValidationResult(null); // リセット
+        setShowWarningModal(false); // リセット
 
         try {
             // 公開前に最新の設定を保存・適用
@@ -86,10 +89,40 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
 
             const result = await publishProject();
 
-            // 検証結果が返された場合(エラーあり)
+            // 検証結果が返された場合（警告あり）
             if (typeof result === 'object' && 'isValid' in result) {
                 setValidationResult(result);
+                // 警告がある場合はモーダルを表示
+                if (result.warnings && result.warnings.length > 0) {
+                    setShowWarningModal(true);
+                } else {
+                    // 警告がない場合は通常通り公開完了
+                    alert('プロジェクトを公開しました');
+                }
             } else if (result === true) {
+                alert('プロジェクトを公開しました');
+                setValidationResult(null);
+            } else {
+                alert('公開に失敗しました');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('公開中にエラーが発生しました');
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
+    // 警告を無視して強制的に公開
+    const handleForcePublish = async () => {
+        setIsPublishing(true);
+        setShowWarningModal(false);
+
+        try {
+            // forceフラグを有効にして公開
+            const result = await publishProject(true);
+
+            if (result === true) {
                 alert('プロジェクトを公開しました');
                 setValidationResult(null);
             } else {
@@ -181,7 +214,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
                     <div className="settings-section">
                         <label className="settings-label">公開ステータス</label>
                         <div className="settings-status-row">
-                            <span className={`status-badge ${projectMeta?.is_published ? 'published' : 'draft'}`}>
+                            <span className={`status - badge ${projectMeta?.is_published ? 'published' : 'draft'} `}>
                                 {projectMeta?.is_published ? '公開中' : '非公開'}
                             </span>
                             {!projectMeta?.is_published && (
@@ -264,6 +297,15 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
                     </button>
                 </div>
             </div>
+
+            {/* 警告モーダル */}
+            {showWarningModal && validationResult && (
+                <PublishWarningModal
+                    validationResult={validationResult}
+                    onClose={() => setShowWarningModal(false)}
+                    onProceed={handleForcePublish}
+                />
+            )}
         </div>
     );
 };

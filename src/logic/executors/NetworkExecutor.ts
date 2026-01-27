@@ -1,5 +1,6 @@
 import type { NodeExecutor, ExecutionParams } from "../NodeExecutor";
 import { useDebugLogStore } from "../../stores/useDebugLogStore";
+import { supabase } from "../../lib/supabaseClient";
 
 export class NetworkExecutor implements NodeExecutor {
     async execute(params: ExecutionParams): Promise<void> {
@@ -24,29 +25,53 @@ export class NetworkExecutor implements NodeExecutor {
 
             try {
                 const currentVars = getVariables();
-                const options: any = { method };
+
+                // Construct payload for the proxy
+                let bodyData = undefined;
+                let headers = {};
 
                 if (method !== 'GET' && method !== 'HEAD') {
-                    options.headers = { 'Content-Type': 'application/json' };
-                    options.body = JSON.stringify(currentVars);
+                    headers = { 'Content-Type': 'application/json' };
+                    bodyData = currentVars; // Send all variables as body
                 }
 
                 useDebugLogStore.getState().addLog({
                     level: 'info',
-                    message: `🌐 API送信: ${method} ${url} `,
-                    details: { url, method, body: options.body ? JSON.parse(options.body) : undefined, headers: options.headers }
+                    message: `🌐 API送信 (Proxy経由): ${method} ${url}`,
+                    details: { url, method, body: bodyData }
                 });
 
-                const responseData = await context.fetchApi(url, options);
+                // Call Supabase Edge Function 'external-api-proxy'
+                const { data, error } = await supabase.functions.invoke('external-api-proxy', {
+                    body: {
+                        url: url,
+                        method: method,
+                        headers: headers,
+                        body: bodyData
+                    }
+                });
+
+                if (error) {
+                    throw new Error(`Proxy error: ${error.message || String(error)}`);
+                }
+
+                // Proxy returns the response data directly in 'data'
+                const responseData = data;
+
+                // Check if proxy returned an error object
+                if (responseData && typeof responseData === 'object' && 'error' in responseData) {
+                    throw new Error(`External API error: ${responseData.error}`);
+                }
 
                 useDebugLogStore.getState().addLog({
                     level: 'success',
-                    message: `✅ API成功: ${url} `,
+                    message: `✅ API成功: ${url}`,
                     details: { responseData }
                 });
+                console.log('✅ API Proxy Response:', responseData);
 
                 if (variableName) {
-                    // Re-fetch variables to ensure we have the latest state (though it shouldn't have changed much)
+                    // Re-fetch variables to ensure we have the latest state
                     const latestVars = getVariables();
                     setVariables({ ...latestVars, [variableName]: responseData });
                 }
@@ -65,7 +90,7 @@ export class NetworkExecutor implements NodeExecutor {
                 console.error("API fetch error:", e);
                 useDebugLogStore.getState().addLog({
                     level: 'error',
-                    message: `❌ API失敗: ${url} `,
+                    message: `❌ API失敗: ${url}`,
                     details: { url, method, error: e.message || String(e), stack: e.stack }
                 });
 

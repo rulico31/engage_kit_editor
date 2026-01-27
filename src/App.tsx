@@ -8,11 +8,14 @@ import ViewerHost from "./components/ViewerHost";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 import PublishModal from "./components/PublishModal";
+import { PublishWarningModal } from "./components/PublishWarningModal";
 import { useProjectStore } from "./stores/useProjectStore";
 import { useSelectionStore } from "./stores/useSelectionStore";
 import { usePageStore } from "./stores/usePageStore";
 import { useAuthStore } from "./stores/useAuthStore";
 import { ToastContainer } from "./components/UI/Toast";
+import { ValidationService } from "./lib/ValidationService";
+import type { ValidationResult } from "./lib/ValidationService";
 import "./App.css";
 
 type AppRoute = "home" | "editor" | "viewer";
@@ -24,6 +27,8 @@ const App: React.FC = () => {
 
 
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [isValidationWarningOpen, setIsValidationWarningOpen] = useState(false);
 
   const { currentProjectId, projectMeta, createProject, loadProject, saveProject } = useProjectStore((state) => ({
     currentProjectId: state.currentProjectId,
@@ -225,37 +230,55 @@ const App: React.FC = () => {
 
 
   const handlePublish = async () => {
-    // 公開前バリデーション: イベントノードの存在チェック
-    const state = usePageStore.getState();
-    const errorMessages: string[] = [];
+    // 1. プロジェクトデータの構築 (バリデーション用)
+    const { pages, pageOrder } = usePageStore.getState();
+    const { projectMeta } = useProjectStore.getState();
 
-    Object.values(state.pages).forEach(page => {
-      Object.entries(page.allItemLogics).forEach(([itemId, graph]) => {
-        // ノードが存在するが、イベントノードが一つもない場合を検出
-        if (graph.nodes.length > 0) {
-          const hasEventNode = graph.nodes.some(n => n.type === 'eventNode');
-          if (!hasEventNode) {
-            const item = page.placedItems.find(i => i.id === itemId);
-            const itemName = item ? (item.data.text || item.name) : "不明なアイテム";
-            errorMessages.push(`・ページ「${page.name}」のアイテム「${itemName}」にロジックがありますが、開始イベント（クリックなど）が設定されていません。`);
-          }
-        }
-      });
-    });
+    const projectData = {
+      projectName: projectMeta?.name || "無題",
+      pages,
+      pageOrder,
+      variables: {}, // バリデーションに影響しないため空でOK
+      cloud_id: projectMeta?.cloud_id
+    } as any; // ValidationServiceは主にpagesを見るため、厳密な型合わせは省略
 
-    if (errorMessages.length > 0) {
-      alert("公開できません。以下のロジックエラーを修正してください：\n\n" + errorMessages.join("\n"));
+    // 2. ValidationServiceによる包括的チェック
+    console.log('🧪 [handlePublish] Calling ValidationService.validate()...');
+    const result = ValidationService.validate(projectData);
+    console.log('📋 [handlePublish] Validation Result:', result);
+
+    // 警告がある場合は警告モーダルを表示
+    if (result.warnings.length > 0) {
+      console.warn("⚠️ Validation warnings detected:", result.warnings);
+      setValidationResult(result);
+      setIsValidationWarningOpen(true);
       return;
     }
 
-    // 保存してからモーダルを開く (ID確定のため)
+    // 警告がない場合は直接公開処理へ
+    console.log('✅ [handlePublish] No validation warnings!');
+    proceedToPublish();
+  };
+
+  const proceedToPublish = async () => {
     try {
       await saveProject();
+      setIsValidationWarningOpen(false);
       setIsPublishModalOpen(true);
     } catch (e) {
       console.error(e);
       alert("保存に失敗しました");
     }
+  };
+
+  const handleProceedWithWarnings = () => {
+    console.log('⚠️ User chose to proceed despite warnings');
+    proceedToPublish();
+  };
+
+  const handleCloseValidationWarning = () => {
+    setIsValidationWarningOpen(false);
+    setValidationResult(null);
   };
 
   return (
@@ -278,6 +301,15 @@ const App: React.FC = () => {
             />
 
 
+
+            {isValidationWarningOpen && validationResult && (
+              <PublishWarningModal
+                validationResult={validationResult}
+                projectData={{ pages: usePageStore.getState().pages }}
+                onClose={handleCloseValidationWarning}
+                onProceed={handleProceedWithWarnings}
+              />
+            )}
 
             {isPublishModalOpen && (
               <PublishModal

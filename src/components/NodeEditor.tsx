@@ -68,6 +68,8 @@ const NodeEditorContent: React.FC = () => {
 
   // 右クリックメニューの状態
   const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
+  // エッジ削除用の右クリックメニュー
+  const [edgeContextMenu, setEdgeContextMenu] = React.useState<{ x: number; y: number; edgeId: string } | null>(null);
 
   // ストアからデータを個別に取得（再レンダリング最適化）
   const pages = usePageStore((state) => state.pages);
@@ -95,8 +97,8 @@ const NodeEditorContent: React.FC = () => {
 
   // Watch for focus requests - Moved after currentGraph definition
   React.useEffect(() => {
-    if (pendingFocusNodeId && currentGraph.nodes.some(n => n.id === pendingFocusNodeId)) {
-      const node = currentGraph.nodes.find(n => n.id === pendingFocusNodeId);
+    if (pendingFocusNodeId && currentGraph.nodes.some((n: any) => n.id === pendingFocusNodeId)) {
+      const node = currentGraph.nodes.find((n: any) => n.id === pendingFocusNodeId);
       if (node) {
         console.log('[NodeEditor] Focusing node:', pendingFocusNodeId);
         // Center and zoom
@@ -150,6 +152,39 @@ const NodeEditorContent: React.FC = () => {
     (changes: EdgeChange[]) => {
       const nextEdges = applyEdgeChanges(changes, currentGraph.edges);
       updateGraph(currentGraph.nodes, nextEdges);
+    },
+    [currentGraph.nodes, currentGraph.edges, updateGraph]
+  );
+
+  // ノード削除ハンドラー（明示的に削除を制御）
+  const onNodesDelete = useCallback(
+    (deletedNodes: Node[]) => {
+      console.log('🗑️ onNodesDelete called:', deletedNodes.map(n => n.id));
+      // ノードを削除（接続エッジも自動的に削除される）
+      const remainingNodes = currentGraph.nodes.filter(
+        (node: Node) => !deletedNodes.some(dn => dn.id === node.id)
+      );
+      // 削除されたノードに接続されているエッジも削除
+      const remainingEdges = currentGraph.edges.filter(
+        (edge: Edge) => !deletedNodes.some(dn => dn.id === edge.source || dn.id === edge.target)
+      );
+      updateGraph(remainingNodes, remainingEdges);
+      usePageStore.getState().commitHistory();
+    },
+    [currentGraph.nodes, currentGraph.edges, updateGraph]
+  );
+
+  // エッジ削除ハンドラー（エッジのみ削除、ノードは残す）
+  const onEdgesDelete = useCallback(
+    (deletedEdges: Edge[]) => {
+      console.log('🗑️ onEdgesDelete called:', deletedEdges.map(e => e.id));
+      // エッジのみを削除（ノードは削除しない）
+      const remainingEdges = currentGraph.edges.filter(
+        (edge: Edge) => !deletedEdges.some(de => de.id === edge.id)
+      );
+      // ノードはそのまま（削除しない）
+      updateGraph(currentGraph.nodes, remainingEdges);
+      usePageStore.getState().commitHistory();
     },
     [currentGraph.nodes, currentGraph.edges, updateGraph]
   );
@@ -334,6 +369,30 @@ const NodeEditorContent: React.FC = () => {
     selectItem(newNode.id, 'node', 'コメント');
   }, [contextMenu, currentGraph.nodes, currentGraph.edges, updateGraph, selectItem, reactFlowInstance]);
 
+  // エッジ削除ハンドラー
+  const handleDeleteEdge = useCallback(() => {
+    if (!edgeContextMenu) return;
+
+    console.log('🗑️ Deleting edge:', edgeContextMenu.edgeId);
+
+    // エッジを削除
+    const nextEdges = currentGraph.edges.filter((edge: Edge) => edge.id !== edgeContextMenu.edgeId);
+    updateGraph(currentGraph.nodes, nextEdges);
+    usePageStore.getState().commitHistory();
+
+    // メニューを閉じる
+    setEdgeContextMenu(null);
+  }, [edgeContextMenu, currentGraph.nodes, currentGraph.edges, updateGraph]);
+
+  // エッジ右クリックハンドラー
+  const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    console.log('🔗 Edge right-clicked:', edge.id);
+    setEdgeContextMenu({ x: event.clientX, y: event.clientY, edgeId: edge.id });
+    // ノード用のコンテキストメニューは閉じる
+    setContextMenu(null);
+  }, []);
+
   if (!activeLogicGraphId) {
     return (
       <div className="node-editor-placeholder">
@@ -357,17 +416,21 @@ const NodeEditorContent: React.FC = () => {
           edges={currentGraph.edges} // Storeの値を直接使用
           onNodesChange={onNodesChange} // 変更を直接Storeへ反映
           onEdgesChange={onEdgesChange} // 変更を直接Storeへ反映
+          onNodesDelete={onNodesDelete} // ノード削除時のハンドラー
+          onEdgesDelete={onEdgesDelete} // エッジ削除時のハンドラー
           onConnect={onConnect}
           onNodeClick={onNodeClick}
+          onEdgeContextMenu={onEdgeContextMenu} // エッジ右クリックで削除メニュー
           onPaneClick={onPaneClick}
           onPaneContextMenu={onPaneContextMenu}
           nodeTypes={nodeTypes}
+          deleteKeyCode={['Backspace', 'Delete']} // Delete/Backspaceキーでも削除可能
           fitView
         >
           <Background />
         </ReactFlow>
 
-        {/* 右クリックメニュー */}
+        {/* 右クリックメニュー（ノード用） */}
         {contextMenu && (
           <>
             {/* 背景クリックで閉じるための透明なレイヤー */}
@@ -386,6 +449,30 @@ const NodeEditorContent: React.FC = () => {
                 onClick={handleAddComment}
               >
                 <span>💬 コメントを追加</span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* 右クリックメニュー（エッジ削除用） */}
+        {edgeContextMenu && (
+          <>
+            {/* 背景クリックで閉じるための透明なレイヤー */}
+            <div
+              style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 9998 }}
+              onClick={() => setEdgeContextMenu(null)}
+              onContextMenu={(e) => { e.preventDefault(); setEdgeContextMenu(null); }}
+            />
+            <div
+              className="node-editor-context-menu"
+              style={{ top: edgeContextMenu.y, left: edgeContextMenu.x }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                className="node-editor-context-menu-item"
+                onClick={handleDeleteEdge}
+              >
+                <span>🗑️ エッジを削除</span>
               </div>
             </div>
           </>
