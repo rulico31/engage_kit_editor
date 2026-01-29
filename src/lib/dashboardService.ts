@@ -394,6 +394,8 @@ export interface RageClickStat {
     targetNodeId: string | null;
     targetNodeType: string | null;
     nodeName: string;
+    pageId?: string;
+    pageName?: string;
     count: number;
 }
 
@@ -506,47 +508,65 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
 
     if (frustrationError) console.error('Error fetching frustration logs:', frustrationError);
 
-    const rageMap = new Map<string, { count: number; type: string | null; name: string | null }>();
+    const rageMap = new Map<string, {
+        count: number;
+        type: string | null;
+        name: string | null;
+        pageId: string | null;
+        pageName: string | null;
+        targetId: string | null;
+    }>();
     const hesitationSessions = new Set<string>();
 
     (frustrationLogs || []).forEach((log: any) => {
         if (log.event_type === 'rage_click') {
             const targetId = log.metadata?.target_node_id || null;
-            const key = targetId || 'empty_space';
+            const pageId = log.metadata?.page_id || null;
+            // キーをページIDとターゲットIDの組み合わせにする
+            const key = `${pageId || 'unknown'}_${targetId || 'empty'}`;
+
             const current = rageMap.get(key) || {
                 count: 0,
                 type: log.metadata?.target_node_type || null,
-                name: null
+                name: null,
+                pageId: pageId,
+                pageName: log.metadata?.page_name || null,
+                targetId: targetId
             };
             current.count++;
             if (log.metadata?.item_name) current.name = log.metadata.item_name;
+            // ページ名がログにあれば更新（最新のものを優先等のロジックがあればここに入れるが、基本ログ依存）
+            if (log.metadata?.page_name) current.pageName = log.metadata.page_name;
+
             rageMap.set(key, current);
         } else if (log.event_type === 'idle_hesitation') {
             if (log.session_id) hesitationSessions.add(log.session_id);
         }
     });
 
-    const rageClicks: RageClickStat[] = Array.from(rageMap.entries()).map(([key, val]) => {
-        const isEmpty = key === 'empty_space';
+    const rageClicks: RageClickStat[] = Array.from(rageMap.values()).map((val) => {
+        const isEmpty = !val.targetId;
         let displayName: string;
 
         if (isEmpty) {
-            displayName = '空白エリア (Empty Space)';
+            displayName = '空白エリア';
         } else if (val.name) {
             // カスタム名（item_name）が設定されている場合は最優先で表示
             displayName = val.name;
         } else if (val.type) {
             // カスタム名がなくノードタイプがある場合
-            displayName = `${val.type} (${key.slice(-4)})`;
+            displayName = `${val.type} (${(val.targetId || '').slice(-4)})`;
         } else {
             // それ以外は削除された要素として表示
-            displayName = `削除された要素 (${key.slice(-4)})`;
+            displayName = `削除された要素 (${(val.targetId || '').slice(-4)})`;
         }
 
         return {
-            targetNodeId: isEmpty ? null : key,
+            targetNodeId: val.targetId,
             targetNodeType: val.type,
             nodeName: displayName,
+            pageId: val.pageId || undefined,
+            pageName: val.pageName || undefined,
             count: val.count
         };
     }).sort((a, b) => b.count - a.count);

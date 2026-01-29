@@ -22,6 +22,7 @@ import { usePageStore } from "../stores/usePageStore";
 import { useSelectionStore } from "../stores/useSelectionStore";
 import { useTabSync } from "../hooks/useTabSync";
 import { useActionAnalytics } from "../hooks/useActionAnalytics";
+import { usePreviewStore } from "../stores/usePreviewStore";
 
 interface EditorViewProps {
   projectName: string;
@@ -109,7 +110,18 @@ const EditorView: React.FC<EditorViewProps> = ({
   useTabSync();
 
   // Previewモード時の行動分析 (Rage Click, Hesitation等)
-  useActionAnalytics(currentProjectId, isPreviewing);
+  // EditorViewでもPreview中はページ情報を渡す
+  const { previewState } = usePreviewStore(state => ({
+    previewState: state.previewState
+  }));
+  const { pages } = usePageStore(state => ({
+    pages: state.pages
+  }));
+
+  const currentPageId = isPreviewing ? previewState?.currentPageId : null;
+  const currentPageName = currentPageId ? pages[currentPageId]?.name : null;
+
+  useActionAnalytics(currentProjectId, isPreviewing, currentPageId, currentPageName);
 
   const handleSave = async () => {
     setIsSaving(true);

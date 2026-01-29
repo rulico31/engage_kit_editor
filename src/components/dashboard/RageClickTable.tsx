@@ -39,11 +39,7 @@ export const RageClickTable: React.FC<Props> = ({ data }) => {
                         <tr key={`${item.targetNodeId}-${idx}`} className="hover:bg-zinc-800/50 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-200">
                                 {item.nodeName}
-                                {item.targetNodeId === null && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-400/10 text-yellow-400 border border-yellow-400/20">
-                                        Empty Space
-                                    </span>
-                                )}
+
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-500">
                                 {item.targetNodeType || 'background'}

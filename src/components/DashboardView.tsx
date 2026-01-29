@@ -832,7 +832,8 @@ const DashboardView: React.FC = () => {
             {/* Secondary Stats Row */}
             <div className="bento-grid">
                 {/* Interaction Table */}
-                <div className="col-span-8 bento-card">
+                {/* Interaction Table */}
+                <div className={`${abStats.length > 0 ? 'col-span-8' : 'col-span-12'} bento-card`}>
                     <div className="flex items-center justify-between mb-4 flex-wrap gap-y-2">
                         <div className="card-title mb-0">離脱要因分析</div>
                         <div className="stats-group-tabs">
@@ -846,9 +847,9 @@ const DashboardView: React.FC = () => {
                         <table className="leads-table">
                             <thead>
                                 <tr>
-                                    <th>{groupingMode === 'node' ? 'アイテム名' : groupingMode === 'page' ? 'ページ名' : 'アイテム種類'}</th>
-                                    <th>インタラクション</th>
-                                    <th>UU</th>
+                                    <th style={{ width: '40%' }}>{groupingMode === 'node' ? 'アイテム名' : groupingMode === 'page' ? 'ページ名' : 'アイテム種類'}</th>
+                                    <th style={{ width: '40%' }}>インタラクション</th>
+                                    <th style={{ width: '20%', textAlign: 'right' }}>UU</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1012,7 +1013,46 @@ const DashboardView: React.FC = () => {
                     </div>
                     <div className="col-span-8 bento-card">
                         <div className="card-title">Rage Click 発生箇所 (イライラ)</div>
-                        <RageClickTable data={extendedStats?.rageClicks || []} />
+                        <RageClickTable data={(extendedStats?.rageClicks || []).map(item => {
+                            // 1. ノード名: プロジェクトデータがあればそちらのカスタム名（getNodeDisplayName）を優先
+                            // ただし、空白エリアの場合は targetNodeId が null なので getNodeDisplayName は使えない想定だが、念のためチェック
+                            let finalName = item.nodeName;
+                            if (item.targetNodeId) {
+                                const liveName = getNodeDisplayName(item.targetNodeId);
+                                if (liveName && liveName !== item.targetNodeId && liveName !== "削除されたアイテム") {
+                                    finalName = liveName;
+                                }
+                            }
+
+                            // 2. ページ名の解決と付与
+                            // ログにあるページ名(item.pageName)か、プロジェクト構造からページID(item.pageId)で名前を探す
+                            let pageName = item.pageName;
+                            if (!pageName && item.pageId && projectMeta?.data?.pages) {
+                                const p = projectMeta.data.pages[item.pageId];
+                                if (p) pageName = p.name;
+                            }
+
+                            // 表示形式の調整
+                            if (!item.targetNodeId) {
+                                // 空白エリアの場合
+                                if (pageName) {
+                                    finalName = `${pageName}：空白エリア`;
+                                } else {
+                                    finalName = "空白エリア";
+                                }
+                            } else {
+                                // 通常アイテムの場合も、ページ名を補足した方が親切かもしれないが、
+                                // 要望は「空白エリアとなっているが、これをページごとに分けて」なので、
+                                // 少なくとも空白エリアは分ける。
+                                // 他のアイテムも一意性を高めるならページ名があってもいいが、
+                                // ここでは空白エリアの対応を主とする。
+                            }
+
+                            return {
+                                ...item,
+                                nodeName: finalName
+                            };
+                        })} />
                     </div>
                 </div>
 

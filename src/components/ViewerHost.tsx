@@ -222,7 +222,10 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   }, [projectId, loadFromData, setPreviewState]);
 
   // ■ 行動分析監視ロジック (Smart Action Analytics)
-  useActionAnalytics(projectId, true);
+  // usePreviewStore から現在のページ情報を取得
+  const currentId = previewState.currentPageId;
+  const currentName = currentId ? pages[currentId]?.name : null;
+  useActionAnalytics(projectId, true, currentId, currentName);
 
 
   // レイアウト計算

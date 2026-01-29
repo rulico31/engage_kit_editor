@@ -5,8 +5,10 @@ import { logAnalyticsEvent } from "../lib/analytics";
  * レイジクリック、ヘジテーション、離脱、インタラクション追跡を行うフック
  * @param projectId プロジェクトID
  * @param isEnabled 有効化フラグ (Previewモード時のみtrueにする等)
+ * @param pageId 現在のページID (Optional)
+ * @param pageName 現在のページ名 (Optional)
  */
-export const useActionAnalytics = (projectId: string | null, isEnabled: boolean) => {
+export const useActionAnalytics = (projectId: string | null, isEnabled: boolean, pageId?: string | null, pageName?: string | null) => {
     const lastInteractionRef = useRef<string | null>(null);
     const lastInteractionTypeRef = useRef<string | null>(null);
     const lastInteractionNameRef = useRef<string | null>(null); // Added
@@ -43,7 +45,9 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                 const sessionId = sessionStorage.getItem('engage_session_id');
                 logAnalyticsEvent('idle_hesitation', {
                     duration: 20,
-                    session_id: sessionId
+                    session_id: sessionId,
+                    page_id: pageId,
+                    page_name: pageName
                 }, projectId);
                 console.log('[Analytics] idle_hesitation triggered after 20s inactivity');
             }, 20000);
@@ -89,7 +93,9 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                     timestamp: now,
                     target_node_id: targetNodeId,
                     target_node_type: targetNodeType,
-                    item_name: targetNodeName // Added
+                    item_name: targetNodeName, // Added
+                    page_id: pageId,
+                    page_name: pageName
                 }, projectId);
 
                 clickTimestamps = []; // リセット
@@ -117,13 +123,20 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                     target_node_id: nodeId,
                     text_length: textLength,
                     session_id: sessionStorage.getItem('engage_session_id'),
-                    item_name: nodeName // Added
+                    item_name: nodeName, // Added
+                    page_id: pageId,
+                    page_name: pageName
                 }, projectId);
             }
         };
 
         // 4. 離脱時ログ送信 (Beacon API)
         const sendExitLog = () => {
+            // Beaconなどはページコンテキストが必要ならここで追加するが、
+            // ページ移動時に unmount されるので、その時点の pageId が使われるはず。
+            // ただしSPA遷移などでコンポーネントが生き残る場合は注意。
+            // ここでは依存配列に pageId が入るので再生成される。
+
             const analyticsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analytics-beacon`;
             const payload = {
                 event_type: 'exit_context',
@@ -133,6 +146,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                     last_interacted_node: lastInteractionRef.current,
                     last_interacted_node_type: lastInteractionTypeRef.current,
                     last_interacted_node_name: lastInteractionNameRef.current, // Added
+                    page_id: pageId,
+                    page_name: pageName,
                     timestamp: Date.now()
                 }
             };
@@ -243,5 +258,5 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             window.removeEventListener('beforeunload', sendExitLog);
             document.removeEventListener('visibilitychange', handleVisibility);
         };
-    }, [projectId, isEnabled]);
+    }, [projectId, isEnabled, pageId, pageName]);
 };
