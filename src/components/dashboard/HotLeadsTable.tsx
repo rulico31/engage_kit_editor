@@ -42,15 +42,15 @@ const PopoverCell = ({ label, value }: { label: string; value: string }) => {
     }
 
     return (
-        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-900/50 border border-zinc-800 text-[10px] whitespace-nowrap max-w-[150px]">
-            <span className="text-zinc-500 font-medium">{label}:</span>
-            <span className="text-zinc-300 font-semibold" title={value}>
-                {displayValue}
+        <div className="flex items-center justify-between gap-2.5 w-full text-[10px]">
+            <span className="text-zinc-500 font-medium shrink-0">{label}</span>
+            <span className="text-zinc-300 font-semibold truncate text-right min-w-0 flex-1 inline-flex items-center justify-end" title={value}>
+                <span className="truncate">{displayValue}</span>
                 {isTruncated && (
                     <button
                         onClick={handleClick}
-                        className="ml-1.5 inline-flex items-center justify-center px-1.5 h-6 rounded bg-zinc-600 text-white border border-zinc-500 hover:bg-zinc-500 hover:text-white hover:border-zinc-400 transition-all text-xs font-black tracking-widest leading-none pb-1 cursor-pointer shadow-sm active:translate-y-px"
-                        style={{ backgroundColor: '#27272a', color: '#ffffff', border: '1px solid #52525b', borderRadius: '6px', padding: '2px 8px', height: 'auto' }}
+                        className="ml-1.5 inline-flex items-center justify-center rounded bg-zinc-600 text-white border border-zinc-500 hover:bg-zinc-500 hover:text-white hover:border-zinc-400 transition-all text-xs font-black tracking-widest leading-none cursor-pointer shadow-sm active:translate-y-px"
+                        style={{ backgroundColor: '#27272a', color: '#ffffff', border: '1px solid #52525b', borderRadius: '6px', padding: '2px 8px', height: '18px' }}
                     >
                         すべて見る
                     </button>
@@ -179,23 +179,27 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
 
                                         {/* Sent Data */}
                                         <td className="py-5 px-4 align-middle text-left">
-                                            <div className="flex flex-wrap gap-2">
+                                            <div className="flex flex-col w-full">
                                                 {(() => {
                                                     // _system_で始まるシステム変数をフィルタリング
                                                     const filteredEntries = Object.entries(lead.data || {})
                                                         .filter(([key]) => !key.startsWith('_system_'));
 
                                                     if (filteredEntries.length === 0) {
-                                                        return <span className="text-xs text-zinc-700 italic">No data</span>;
+                                                        return <div className="py-2 border-b border-zinc-800 last:border-0"><span className="text-xs text-zinc-700 italic">No data</span></div>;
                                                     }
 
                                                     return (
                                                         <>
                                                             {filteredEntries.slice(0, 2).map(([key, value]) => (
-                                                                <PopoverCell key={key} label={key.startsWith('box-') ? '回答' : key} value={String(value)} />
+                                                                <div key={key} className="py-2 border-b border-zinc-800 last:border-0">
+                                                                    <PopoverCell label={key.startsWith('box-') ? '回答' : key} value={String(value)} />
+                                                                </div>
                                                             ))}
                                                             {filteredEntries.length > 2 && (
-                                                                <span className="text-[10px] font-bold text-zinc-600 self-center px-1.5 py-0.5 rounded border border-zinc-800/50 bg-zinc-900/30">+{filteredEntries.length - 2} items</span>
+                                                                <div className="py-2 text-center border-b border-zinc-800 last:border-0">
+                                                                    <span className="text-[10px] font-bold text-zinc-600 px-1.5 py-0.5 rounded border border-zinc-800/50 bg-zinc-900/30">+{filteredEntries.length - 2} items</span>
+                                                                </div>
                                                             )}
                                                         </>
                                                     );
