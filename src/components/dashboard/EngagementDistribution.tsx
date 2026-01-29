@@ -28,7 +28,7 @@ export const EngagementDistribution: React.FC<EngagementDistributionProps> = ({ 
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="range" style={{ fontSize: '12px' }} />
                         <YAxis allowDecimals={false} />
-                        <Tooltip />
+                        <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }} itemStyle={{ color: '#fff' }} cursor={{ fill: 'transparent' }} />
                         <Bar dataKey="count" name="人数" radius={[4, 4, 0, 0]}>
                             {data.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[entry.range as keyof typeof COLORS] || '#8884d8'} />

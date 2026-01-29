@@ -1,12 +1,15 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { type InputAnalyticsStat } from '../../lib/dashboardService';
+import { DashboardDetailModal } from './DashboardDetailModal';
+import { useState } from 'react';
 
 interface PsychometricsChartProps {
     data: InputAnalyticsStat[];
 }
 
 export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) => {
+    const [showModal, setShowModal] = useState(false);
     const hasData = data && data.length > 0;
 
     // 平均スコアの計算（全アイテム）
@@ -89,7 +92,9 @@ export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) 
                 </div>
 
                 <div className="chart-col">
-                    <h4 className="chart-subtitle">⚠️ 迷いが発生している入力項目 TOP 5</h4>
+                    <h4 className="chart-subtitle flex items-center justify-between">
+                        <span>⚠️ 迷いが発生している入力項目 TOP 5</span>
+                    </h4>
                     <table className="simple-table">
                         <thead>
                             <tr>
@@ -129,8 +134,36 @@ export const PsychometricsChart: React.FC<PsychometricsChartProps> = ({ data }) 
                         </tbody>
                     </table>
                     <p className="chart-hint">※「転換」が高い項目は、回答方針を変えたか、書きにくさを感じている（書き直しが多い）箇所です。</p>
+                    {hasData && (
+                        <div className="mt-4 flex justify-start">
+                            <button
+                                onClick={() => setShowModal(true)}
+                                style={{
+                                    backgroundColor: '#27272a',
+                                    color: '#ffffff',
+                                    border: '1px solid #3f3f46',
+                                    padding: '6px 16px',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    cursor: 'pointer'
+                                }}
+                                className="font-medium hover:opacity-80 transition-opacity"
+                            >
+                                すべて見る
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
+
+
+            <DashboardDetailModal
+                title="迷いが発生している入力項目 (全件)"
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                data={data} // 全データを渡す
+                type="hesitation"
+            />
+        </div >
     );
 };

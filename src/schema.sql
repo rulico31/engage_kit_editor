@@ -198,6 +198,19 @@ from analytics_logs
 where node_id is not null
 group by project_id, node_id;
 
+-- (2) ノード別統計
+drop view if exists analytics_node_stats cascade;
+create or replace view analytics_node_stats as
+select
+  project_id,
+  node_id,
+  count(*) as interaction_count,
+  count(distinct session_id) as unique_users
+from analytics_logs
+where node_id is not null
+  and event_type in ('interaction', 'click', 'lead_submit', 'input_correction') -- ユーザー操作のみに限定
+group by project_id, node_id;
+
 
 -- (3) A/Bテスト統計
 drop view if exists analytics_ab_test_stats cascade;

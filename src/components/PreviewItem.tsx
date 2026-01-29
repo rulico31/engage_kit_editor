@@ -7,6 +7,7 @@ import { usePreviewStore } from "../stores/usePreviewStore";
 import { useProjectStore } from "../stores/useProjectStore"; // Added
 import { InputTracker } from "../lib/InputTracker";
 import { logAnalyticsEvent } from "../lib/analytics";
+import { validateInput } from "../lib/validation";
 
 interface PreviewItemProps {
   item: PlacedItemType;
@@ -91,9 +92,39 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   let content: React.ReactNode = null;
 
-  const isAutoHeight = !name.startsWith("画像") && !id.startsWith("group");
-  const isInput = name.startsWith("テキスト入力欄");
-  const isButton = name.includes("ボタン");
+  // Debug: Track element size
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const isAutoHeight = !name.startsWith("画像") && !id.startsWith("group") && !name.startsWith("テキスト入力欄") && item.type !== 'input';
+  const isInput = name.startsWith("テキスト入力欄") || item.type === 'input';
+  const isButton = name.includes("ボタン") || item.type === 'button';
+
+  useEffect(() => {
+    if (isInput) {
+      const root = rootRef.current;
+      const input = inputRef.current;
+
+      console.log('📏 [PreviewItem] Layout Debug:', {
+        id,
+        name,
+        inputValueLength: inputValue.length,
+        root: root ? {
+          clientHeight: root.clientHeight,
+          scrollHeight: root.scrollHeight,
+          overflow: root.style.overflow,
+          computedOverflow: window.getComputedStyle(root).overflow
+        } : null,
+        input: input ? {
+          clientHeight: input.clientHeight,
+          scrollHeight: input.scrollHeight,
+          scrollTop: input.scrollTop,
+          computedOverflowY: window.getComputedStyle(input).overflowY,
+          computedWhiteSpace: window.getComputedStyle(input).whiteSpace
+        } : null
+      });
+    }
+  }, [id, name, isInput, inputValue]);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -105,55 +136,18 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   }, [itemState?.error]);
 
   const validate = (val: string) => {
-    let newError: string | null = null;
-    const trimmed = val ? val.trim() : "";
-
-    // 1. 必須チェック
-    if (item.data.required && !trimmed) {
-      newError = "必須項目です";
-    }
-    // 2. 入力タイプ別チェック
-    else if (trimmed) {
-      if (item.data.inputType === 'email') {
-        // メールアドレスの形式チェック（ドメインチェック強化）
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(trimmed)) {
-          newError = "メールアドレスの形式が正しくありません";
-        } else {
-          // ドメイン部分の検証
-          const domain = trimmed.split('@')[1];
-          if (!domain || domain.length < 3 || !domain.includes('.')) {
-            newError = "有効なドメイン名を含むメールアドレスを入力してください";
-          }
-        }
-      } else if (item.data.inputType === 'tel') {
-        // 電話番号の検証（国コード対応）
-        if (item.data.enableCountryCode) {
-          // 国コード選択が有効な場合は数字のみ許可（ハイフンは任意）
-          const telRegex = /^[0-9\-\s]{8,}$/;
-          if (!telRegex.test(trimmed)) {
-            newError = "電話番号は8桁以上の数字で入力してください";
-          }
-        } else {
-          // 国コード選択が無効な場合は通常の電話番号形式
-          const telRegex = /^[0-9\-]{10,}$/;
-          if (!telRegex.test(trimmed)) {
-            newError = "電話番号の形式が正しくありません";
-          }
-        }
-      } else if (item.data.inputType === 'number') {
-        if (isNaN(Number(trimmed))) {
-          newError = "数値を入力してください";
-        }
-      }
-    }
+    const newError = validateInput(val, {
+      required: !!item.data.required,
+      inputType: item.data.inputType,
+      enableCountryCode: item.data.enableCountryCode
+    });
 
     // エラー状態更新（前回と異なる場合のみ）
     if (newError !== error) {
       setError(newError);
       // store側の状態もクリア（ユーザーが修正し始めたらエラーを消すため）
       if (!newError && itemState?.error) {
-        setPreviewState(prev => ({
+        setPreviewState((prev: PreviewState) => ({
           ...prev,
           [id]: { ...prev[id], error: null }
         }));
@@ -245,7 +239,15 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     }
   };
 
-  if (name.startsWith("画像")) {
+  // 画像判定の強化: 名前が変更されていても type で判定
+  const isImage = name.startsWith("画像") || item.type === 'image';
+
+  // Debug logging for image items
+  if (isImage) {
+    console.log('[PreviewItem] Image detected:', { id, name, type: item.type, hasSrc: !!item.data.src, srcPreview: item.data.src?.substring(0, 50) });
+  }
+
+  if (isImage) {
     if (item.data.src) {
       content = (
         <img
@@ -303,7 +305,8 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
           </div>
         )}
         <textarea
-          className={`preview-input-content ${error ? 'has-error' : ''}`}
+          ref={inputRef}
+          className={`preview-input-content ${error ? 'has-error' : ''} ${item.data.inputType === 'textarea' ? 'is-textarea' : 'is-singleline'}`}
           style={{
             // @ts-ignore - CSS変数の設定
             '--placeholder-color': item.data?.color || '#999999',
@@ -322,10 +325,16 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
             // 入力中にエラーをクリアするか？ UX的にはBlurまで待つのが一般的だが、即座に消すのもあり
             if (error) validate(newValue);
           }}
+          onScroll={(e) => {
+            console.log('📜 Textarea Scrolled:', e.currentTarget.scrollTop);
+          }}
           onKeyDown={(e) => {
             inputTracker.onKeyDown(e.nativeEvent, inputValue);
             if (e.key === "Enter") {
-              e.currentTarget.blur();
+              // 長文テキスト以外の場合のみBlurさせる (textareaは改行)
+              if (item.data.inputType !== 'textarea') {
+                e.currentTarget.blur();
+              }
               // 注意: ここで直接onItemEventを呼ばない。blur()経由でhandleBlurが呼ばれるため。
             }
           }}
@@ -345,9 +354,10 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   return (
     <div
+      ref={rootRef}
       className={itemClassName}
       data-node-id={id}
-      data-node-name={name}
+      data-node-name={item.data.customName || name}
       data-node-type={item.type}
       style={{
         position: "absolute",
@@ -358,7 +368,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         height: isAutoHeight ? 'auto' : `${height}px`,
         minHeight: isAutoHeight ? `${height}px` : undefined,
 
-        zIndex: 0,
+        zIndex: item.zIndex || 0,
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
@@ -378,7 +388,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         fontFamily: 'var(--theme-font-family, inherit)',
         // @ts-ignore
         borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
-        overflow: 'hidden',
+        overflow: isInput ? 'visible' : 'hidden',
       }}
       onClick={handleClick}
     >

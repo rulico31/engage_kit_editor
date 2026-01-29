@@ -275,9 +275,9 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
         if (durationMs < 100) {
           thinkingPattern = 'noise';
-        } else if (durationMs < 2500) {
+        } else if (durationMs < 3000) { // 2500ms → 3000ms (THRESHOLD_INTUITIVE統一)
           thinkingPattern = 'intuitive';
-        } else if (durationMs < 8000) {
+        } else if (durationMs < 15000) { // 8000ms → 15000ms (THRESHOLD_HESITATION統一)
           thinkingPattern = 'normal';
         } else {
           thinkingPattern = 'hesitation';

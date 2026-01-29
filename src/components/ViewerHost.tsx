@@ -117,6 +117,12 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
             ...page,
             placedItems: (page.placedItems || []).map((item: any) => ({
               ...item,
+              // Flatten position and size for PreviewItem compatibility
+              x: item.x ?? item.position?.x ?? 0,
+              y: item.y ?? item.position?.y ?? 0,
+              width: item.width ?? item.size?.width ?? 200,
+              height: item.height ?? item.size?.height ?? 50,
+              // Also keep nested structure for compatibility
               position: item.position || { x: item.x || 0, y: item.y || 0 },
               size: item.size || { width: item.width || 200, height: item.height || 50 }
             }))
@@ -138,10 +144,18 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
         if (firstPageId) {
           // 全アイテムの初期表示状態を作成
-          const initialItemStates: Record<string, { isVisible: boolean }> = {};
+          const initialItemStates: Record<string, any> = {};
           Object.values(normalizedPages).forEach((page: any) => {
             (page.placedItems || []).forEach((item: any) => {
-              initialItemStates[item.id] = { isVisible: true };
+              initialItemStates[item.id] = {
+                isVisible: true,
+                x: item.x ?? item.position?.x ?? 0,
+                y: item.y ?? item.position?.y ?? 0,
+                opacity: 1,
+                scale: 1,
+                rotation: 0,
+                transition: null
+              };
             });
           });
           console.log('[ViewerHost] Initial item states:', initialItemStates);
@@ -238,7 +252,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   // 背景画像のスタイル
   const backgroundStyle: React.CSSProperties = {
     backgroundColor: backgroundColor,
-    backgroundImage: backgroundImage ? `url(${backgroundImage.url})` : 'none',
+    backgroundImage: backgroundImage?.src ? `url(${backgroundImage.src})` : 'none',
     backgroundSize: backgroundImage?.displayMode === 'cover' ? 'cover' :
       backgroundImage?.displayMode === 'contain' ? 'contain' : 'auto',
     backgroundPosition: 'center center',

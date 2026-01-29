@@ -175,7 +175,16 @@ export const fetchProjectStats = async (projectId: string, environment?: string)
     (pvLogsForDevice || []).forEach((log: any) => {
         const deviceInfo = log.metadata?.device_info;
         if (!deviceInfo) {
-            devices.desktop++;
+            // device_infoがない場合はUserAgentから簡易判定（あれば）
+            if (log.metadata?.user_agent) {
+                if (/mobile/i.test(log.metadata.user_agent)) devices.mobile++;
+                else if (/tablet/i.test(log.metadata.user_agent)) devices.tablet++;
+                else devices.desktop++;
+            } else {
+                // 完全不明な場合はデスクトップ扱いにするが、ログを残す
+                // console.warn('[Stats] Missing device_info for log:', log.id);
+                devices.desktop++;
+            }
             return;
         }
         const deviceType = deviceInfo.device_type;
@@ -448,8 +457,8 @@ const normalizeBrowser = (browser: string | undefined): string => {
 };
 
 // 思考時間の閾値定数
-const THRESHOLD_INTUITIVE = 2500; // 2.5秒未満
-const THRESHOLD_HESITATION = 8000; // 8秒以上
+const THRESHOLD_INTUITIVE = 3000; // 3秒未満
+const THRESHOLD_HESITATION = 15000; // 15秒以上
 
 export const fetchExtendedStats = async (projectId: string, filters?: StatFilters): Promise<ExtendedStats> => {
     console.log('[Dashboard-Extended] fetchExtendedStats called with projectId:', projectId);
@@ -489,7 +498,8 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
         .from('analytics_logs')
         .select('event_type, metadata, session_id, created_at, node_id')
         .eq('project_id', projectId)
-        .in('event_type', ['rage_click', 'idle_hesitation']);
+        .in('event_type', ['rage_click', 'idle_hesitation'])
+        .order('created_at', { ascending: true });
 
     frustrationQuery = applyFilters(frustrationQuery);
     const { data: frustrationLogs, error: frustrationError } = await frustrationQuery;
@@ -509,7 +519,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
                 name: null
             };
             current.count++;
-            if (!current.name && log.metadata?.item_name) current.name = log.metadata.item_name;
+            if (log.metadata?.item_name) current.name = log.metadata.item_name;
             rageMap.set(key, current);
         } else if (log.event_type === 'idle_hesitation') {
             if (log.session_id) hesitationSessions.add(log.session_id);
@@ -518,11 +528,21 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
 
     const rageClicks: RageClickStat[] = Array.from(rageMap.entries()).map(([key, val]) => {
         const isEmpty = key === 'empty_space';
-        let displayName = isEmpty ? '空白エリア (Empty Space)' : (val.name || `Node: ${key}`);
-        if (!isEmpty && !val.name) {
-            if (val.type) displayName = `${val.type} (${key.slice(-4)})`;
-            else displayName = `削除された要素 (${key.slice(-4)})`;
+        let displayName: string;
+
+        if (isEmpty) {
+            displayName = '空白エリア (Empty Space)';
+        } else if (val.name) {
+            // カスタム名（item_name）が設定されている場合は最優先で表示
+            displayName = val.name;
+        } else if (val.type) {
+            // カスタム名がなくノードタイプがある場合
+            displayName = `${val.type} (${key.slice(-4)})`;
+        } else {
+            // それ以外は削除された要素として表示
+            displayName = `削除された要素 (${key.slice(-4)})`;
         }
+
         return {
             targetNodeId: isEmpty ? null : key,
             targetNodeType: val.type,
@@ -559,6 +579,8 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     interactionQuery = applyFilters(interactionQuery);
     const { data: interactionLogs } = await interactionQuery;
 
+    console.log(`[DashboardService] Fetched ${(interactionLogs || []).length} interaction logs for thinking time analysis`);
+
     const thinkingTimeCounts: Record<string, number> = { intuitive: 0, normal: 0, hesitation: 0, noise: 0 };
     const inputMap = new Map<string, {
         name: string;
@@ -584,6 +606,17 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
         } else {
             // durationが取れていない場合はメタデータがあればそれを使用、なければノイズ扱い
             pattern = nestedMeta.thinking_pattern || log.metadata?.thinking_pattern || 'noise';
+        }
+
+        // デバッグ用: 最初の5件のログを出力
+        if (thinkingTimeCounts.intuitive + thinkingTimeCounts.normal + thinkingTimeCounts.hesitation + thinkingTimeCounts.noise < 5) {
+            console.log('[DashboardService] Interaction Log Sample:', {
+                nodeId: log.node_id,
+                duration,
+                pattern,
+                metadata: log.metadata,
+                nestedMeta
+            });
         }
 
         if (thinkingTimeCounts[pattern] !== undefined) thinkingTimeCounts[pattern]++;
@@ -617,11 +650,15 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
     });
 
     const totalInteractions = Object.values(thinkingTimeCounts).reduce((a, b) => a + b, 0);
+    console.log('[DashboardService] ThinkingTime Counts:', thinkingTimeCounts, 'Total:', totalInteractions);
+
     const thinkingTimeStats: ThinkingTimeStat[] = Object.entries(thinkingTimeCounts).map(([pattern, count]) => ({
         pattern: pattern as any,
         count,
         percentage: totalInteractions > 0 ? (count / totalInteractions) * 100 : 0
     }));
+
+    console.log('[DashboardService] Final ThinkingTime Stats:', thinkingTimeStats);
 
     (inputLogs || []).forEach((log: any) => {
         const nodeId = log.node_id;
@@ -769,7 +806,7 @@ export const fetchExtendedStats = async (projectId: string, filters?: StatFilter
         }
     });
 
-    const totalSessions = processedSessions.size || 1;
+    const totalSessions = processedSessions.size; // ゼロ除算は各使用箇所で適切にハンドリング
     const advancedDeviceStats = {
         os: Object.entries(osStats).map(([name, val]) => ({
             name, sessions: val.sessions, sessionPercentage: (val.sessions / totalSessions) * 100, conversions: val.conversions, cvr: val.sessions > 0 ? (val.conversions / val.sessions) * 100 : 0

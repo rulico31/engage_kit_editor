@@ -13,7 +13,8 @@ export type AnalyticsEventType =
   | 'interaction'        // B2B: 汎用インタラクション (Thinking Time計測用)
   | 'exit_context'       // B2B: 離脱時の状況
   | 'backtracking'       // B2B: 戻る行動
-  | 'score_change';      // B2B: スコア変動
+  | 'score_change'       // B2B: スコア変動
+  | 'logic_branch';      // ロジック分岐結果
 
 export interface AnalyticsEvent {
   project_id: string;
@@ -25,15 +26,30 @@ export interface AnalyticsEvent {
   created_at?: string;
 }
 
+// UUID生成のフォールバック関数（crypto.randomUUIDが使えない場合）
+const generateUUID = (): string => {
+  // crypto.randomUUID() はセキュアコンテキスト（HTTPS）でのみ利用可能
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // フォールバック: 簡易的なUUID生成
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 // セッションIDの生成・取得 (簡易実装)
 const getSessionId = () => {
   let sid = sessionStorage.getItem('engage_session_id');
   if (!sid) {
-    sid = crypto.randomUUID();
+    sid = generateUUID();
     sessionStorage.setItem('engage_session_id', sid);
   }
   return sid;
 };
+
 
 // 環境判定 (簡易実装)
 const detectEnvironment = (): 'production' | 'preview' | 'development' | 'unknown' => {
@@ -45,14 +61,31 @@ const detectEnvironment = (): 'production' | 'preview' | 'development' | 'unknow
   // Viewer判定用のヘルパー関数
   const isViewerPath = () => pathname.includes('/view/') || pathname.includes('/viewer');
 
+  // ローカル/プライベートネットワーク判定
+  const isLocalOrPrivateNetwork = () => {
+    // localhost / 127.0.0.1
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    // プライベートIPアドレス
+    // 192.168.x.x
+    if (hostname.startsWith('192.168.')) return true;
+    // 10.x.x.x
+    if (hostname.startsWith('10.')) return true;
+    // 172.16.x.x - 172.31.x.x
+    if (hostname.startsWith('172.')) {
+      const secondOctet = parseInt(hostname.split('.')[1], 10);
+      if (secondOctet >= 16 && secondOctet <= 31) return true;
+    }
+    return false;
+  };
+
   // ローカル開発環境
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+  if (isLocalOrPrivateNetwork()) {
     // ローカルでも /view/ または /viewer があれば production 扱い（テスト用）
     if (isViewerPath()) {
-      console.log('[Analytics] Local + viewer path -> production');
+      console.log('[Analytics] Local/Private + viewer path -> production');
       return 'production';
     }
-    console.log('[Analytics] Local without viewer path -> development');
+    console.log('[Analytics] Local/Private without viewer path -> development');
     return 'development';
   }
 

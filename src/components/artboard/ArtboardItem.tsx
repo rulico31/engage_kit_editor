@@ -8,6 +8,7 @@ import { usePageStore } from "../../stores/usePageStore";
 import { useProjectStore } from "../../stores/useProjectStore"; // Added
 import { InputTracker } from "../../lib/InputTracker"; // 追加
 import { logAnalyticsEvent } from "../../lib/analytics"; // 追加
+import { validateInput } from "../../lib/validation"; // 追加
 
 // 国コードリスト（PreviewItemと共通）
 const COUNTRY_CODES = [
@@ -67,7 +68,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const isHighlighted = highlightedItemIds.includes(item.id);
 
   // 入力系アイテムの自動高さ調整除外設定
-  const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン"));
+  const isAutoHeight = !isGroup && ((item.name.startsWith("テキスト") && !item.name.startsWith("テキスト入力欄")) || item.name.startsWith("ボタン"));
 
   // モバイル用の座標・サイズ（未設定時はデスクトップ値を使用）
   const x = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
@@ -87,8 +88,13 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     fontFamily: 'var(--theme-font-family, inherit)',
     // @ts-ignore - 個別のborderRadius設定を使用
     borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
-    // 選択時はリサイズハンドルを表示するためoverflowをvisibleに、それ以外はhidden
-    overflow: (isSelected && !isPreviewing) ? 'visible' : 'hidden',
+    // 重なり順 (zIndex)
+    zIndex: item.zIndex || 0,
+    // 選択時はリサイズハンドルを表示するためoverflowをvisibleに
+    // また、プレビュー中の入力欄もスクロールバーを表示するためにvisibleにする
+    overflow: ((isSelected && !isPreviewing) || (isPreviewing && item.name.startsWith("テキスト入力欄"))) ? 'visible' : 'hidden',
+    // テキスト入力欄の場合はコンテナのパディングを0にする（入力エリアを最大化するため）
+    padding: item.name.startsWith("テキスト入力欄") ? 0 : undefined,
   };
 
   // 背景色（isTransparentがtrueの場合は強制的にtransparent）
@@ -167,6 +173,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState(item.data?.countryCode || "+81");
+  const [isEditing, setIsEditing] = useState(false); // 編集モード管理用
   const [inputTracker] = useState(() => new InputTracker()); // InputTracker初期化
   const focusTimeRef = useRef<number>(0); // 滞在時間計測用
 
@@ -176,60 +183,46 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         setInputValue(externalValue);
       }
     } else {
-      setInputValue("");
+      // エディタモードではプレースホルダーを初期値としてセット
+      setInputValue(item.data.placeholder || "");
       setError(null);
     }
-  }, [externalValue, isPreviewing]);
+  }, [externalValue, isPreviewing, item.data.placeholder]);
 
-  // バリデーション関数（PreviewItemと同じロジック）
+  // Debug: Layout check
+  useEffect(() => {
+    if (isPreviewing && item.name.startsWith("テキスト入力欄")) {
+      const ta = textareaRef.current;
+      if (ta) {
+        console.log('📏 [ArtboardItem] Layout Debug:', {
+          id: item.id,
+          name: item.name,
+          inputValueLength: inputValue.length,
+          styleHeight: containerStyle.height,
+          textarea: {
+            clientHeight: ta.clientHeight,
+            scrollHeight: ta.scrollHeight,
+            offsetHeight: ta.offsetHeight,
+            computedHeight: window.getComputedStyle(ta).height,
+            computedOverflowY: window.getComputedStyle(ta).overflowY
+          }
+        });
+      }
+    }
+  }, [isPreviewing, inputValue, item.name, item.id, containerStyle.height]);
+
+  // バリデーション関数 (validation.tsを使用)
   const validate = (val: string) => {
     if (!isPreviewing) return true; // 編集モード時はバリデーションしない
 
-    let newError: string | null = null;
-    const trimmed = val ? val.trim() : "";
+    const errorMsg = validateInput(val, {
+      required: !!item.data.required,
+      inputType: item.data.inputType,
+      enableCountryCode: item.data.enableCountryCode
+    });
 
-    // 1. 必須チェック
-    if (item.data.required && !trimmed) {
-      newError = "必須項目です";
-    }
-    // 2. 入力タイプ別チェック
-    else if (trimmed) {
-      if (item.data.inputType === 'email') {
-        // メールアドレスの形式チェック（ドメインチェック強化）
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(trimmed)) {
-          newError = "メールアドレスの形式が正しくありません";
-        } else {
-          // ドメイン部分の検証
-          const domain = trimmed.split('@')[1];
-          if (!domain || domain.length < 3 || !domain.includes('.')) {
-            newError = "有効なドメイン名を含むメールアドレスを入力してください";
-          }
-        }
-      } else if (item.data.inputType === 'tel') {
-        // 電話番号の検証（国コード対応）
-        if (item.data.enableCountryCode) {
-          // 国コード選択が有効な場合は数字のみ許可（ハイフンは任意）
-          const telRegex = /^[0-9\-\s]{8,}$/;
-          if (!telRegex.test(trimmed)) {
-            newError = "電話番号は8桁以上の数字で入力してください";
-          }
-        } else {
-          // 国コード選択が無効な場合は通常の電話番号形式
-          const telRegex = /^[0-9\-]{10,}$/;
-          if (!telRegex.test(trimmed)) {
-            newError = "電話番号の形式が正しくありません";
-          }
-        }
-      } else if (item.data.inputType === 'number') {
-        if (isNaN(Number(trimmed))) {
-          newError = "数値を入力してください";
-        }
-      }
-    }
-
-    setError(newError);
-    return newError === null;
+    setError(errorMsg);
+    return errorMsg === null;
   };
 
   const handleBlur = () => {
@@ -298,6 +291,11 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       }
     }
   };
+
+  // ★ プレースホルダーに応じた自動高さ調整
+  // 自動高さ調整ロジックは廃止 (固定高さ + スクロールに変更)
+  // 以前のロジックがあった場所
+
 
 
   // イベントハンドラ
@@ -398,7 +396,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         {item.data.text}
       </button>
     );
-  } else if (item.name.startsWith("画像")) {
+  } else if (item.name.startsWith("画像") || item.type === 'image') {
     containerStyle.height = item.height;
     containerStyle.minHeight = undefined;
     if (item.data?.src) {
@@ -444,34 +442,67 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
           className={`artboard-item-textarea ${isPreviewing && error ? 'has-error' : ''}`}
           style={{
             ...textStyle,
+            // エディタモード時はプレースホルダーとして表示するため、文字色をグレーにする
+            color: !isPreviewing ? '#999999' : textStyle.color,
             // @ts-ignore - CSS変数の設定
             '--placeholder-color': item.data?.color || '#999999',
+            overflow: 'hidden',
+            resize: 'none',
+            padding: '10px 12px', // コンテナのパディングの代わりに入力エリアにパディングを設定
+            boxSizing: 'border-box', // パディングを含めたサイズ計算にする
+            // プレビュー中以外で、かつ編集モードでない場合はクリックを透過させる（ドラッグ移動を優先）
+            pointerEvents: !isPreviewing && !isEditing ? 'none' : 'auto',
+            // スクロール関連のスタイルをインラインで強制適用
+            height: '100%',
+            maxHeight: '100%',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-all',
           }}
-          placeholder={placeholder}
+          // エディタモード時はプレースホルダー文字列自体を編集するため、placeholder属性は空にする（重複表示防止）
+          placeholder={isPreviewing ? placeholder : ""}
           value={inputValue}
-          readOnly={!isPreviewing}
+          readOnly={!isPreviewing && !isEditing}
           onCompositionStart={() => isPreviewing && inputTracker.onCompositionStart()}
           onCompositionEnd={() => isPreviewing && inputTracker.onCompositionEnd()}
           onChange={(e) => {
-            if (isPreviewing) {
+            if (isPreviewing || isEditing) {
               const newValue = e.target.value;
               setInputValue(newValue);
-              inputTracker.onInput(newValue); //InputTrackerへ通知
-              onVariableChange(variableName, newValue);
-              // 入力中にエラーをクリア
-              if (error) validate(newValue);
+              if (isPreviewing) {
+                inputTracker.onInput(newValue); //InputTrackerへ通知
+                onVariableChange(variableName, newValue);
+                // 入力中にエラーをクリア
+                if (error) validate(newValue);
+              } else {
+                // 編集モード時の変更を反映（プレースホルダーを更新）
+                onItemUpdate(item.id, { data: { ...item.data, placeholder: newValue } }, false);
+              }
             }
           }}
           onKeyDown={(e) => {
             if (isPreviewing) {
               inputTracker.onKeyDown(e.nativeEvent, inputValue); // KeyDown通知
               if (e.key === "Enter") {
-                e.currentTarget.blur();
+                // 長文テキスト以外の場合のみBlurさせる (textareaは改行)
+                if (item.data.inputType !== 'textarea') {
+                  e.currentTarget.blur();
+                }
                 // blurイベントでhandleBlurが呼ばれるため、ここでは呼び出さない
               }
+            } else if (isEditing && e.key === "Enter") {
+              // 編集モードでのEnterキーは改行として扱う（イベント伝播のみ止める）
+              e.stopPropagation();
             }
           }}
-          onBlur={handleBlur}
+          onBlur={() => {
+            handleBlur();
+            if (!isPreviewing) {
+              setIsEditing(false); // 編集モード終了
+            }
+          }}
           onFocus={() => {
             if (isPreviewing) {
               focusTimeRef.current = Date.now();
@@ -501,8 +532,25 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       className={itemClassName}
       style={containerStyle}
       onClick={handleClick}
+      onDoubleClick={() => {
+        if (!isPreviewing && item.name.startsWith("テキスト入力欄")) {
+          // ダブルクリックで編集モード開始
+          setIsEditing(true);
+          // ステート更新後にフォーカスを当てる
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              // カーソルを末尾に移動（任意）
+              const len = textareaRef.current.value.length;
+              textareaRef.current.setSelectionRange(len, len);
+            }
+          }, 0);
+        }
+      }}
       onMouseDown={handleMouseDown}
       data-node-id={item.id}
+      data-node-name={item.data.customName || item.name}
+      data-node-type={item.type || 'unknown'}
     >
       {content}
       {renderChildren(item.id)}

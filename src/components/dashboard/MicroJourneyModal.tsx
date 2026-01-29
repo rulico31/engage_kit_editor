@@ -1,6 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { getNodeLabel } from '../../lib/dashboardService';
+import { useProjectStore } from '../../stores/useProjectStore';
+import type { NodeGraph, PlacedItemType } from '../../types';
+
+interface PageWithLogics {
+    id: string;
+    name: string;
+    placedItems: (PlacedItemType & { displayName?: string })[];
+    allItemLogics?: Record<string, NodeGraph>;
+}
 
 interface Props {
     sessionId: string;
@@ -19,6 +28,37 @@ interface TimelineEvent {
 export const MicroJourneyModal: React.FC<Props> = ({ sessionId, leadId, onClose }) => {
     const [events, setEvents] = useState<TimelineEvent[]>([]);
     const [loading, setLoading] = useState(true);
+    const projectMeta = useProjectStore(state => state.projectMeta);
+
+    // プロジェクトデータから全ノードの現在の名称マップを作成
+    const currentNodeNames = useMemo(() => {
+        const map = new Map<string, string>();
+        if (!projectMeta?.data?.pages) return map;
+
+        Object.values(projectMeta.data.pages).forEach((pageRaw: any) => {
+            const page = pageRaw as PageWithLogics;
+
+            // Placed Items
+            page.placedItems.forEach(item => {
+                const label = item.data?.customName || item.displayName || item.name;
+                if (label) map.set(item.id, label);
+            });
+
+            // Logic Nodes
+            if (page.allItemLogics) {
+                Object.values(page.allItemLogics).forEach((graphRaw: any) => {
+                    const graph = graphRaw as NodeGraph;
+                    if (graph.nodes) {
+                        graph.nodes.forEach(node => {
+                            const label = node.data?.customName || node.data?.label || node.data?.name;
+                            if (label) map.set(node.id, label);
+                        });
+                    }
+                });
+            }
+        });
+        return map;
+    }, [projectMeta]);
 
     useEffect(() => {
         const fetchTimeline = async () => {
@@ -33,17 +73,31 @@ export const MicroJourneyModal: React.FC<Props> = ({ sessionId, leadId, onClose 
             if (error) {
                 console.error("Failed to fetch timeline:", error);
             } else if (data) {
-                const mapped = data.map((d: any) => ({
-                    ...d,
-                    node_name: d.metadata?.node_name || d.metadata?.item_name || getNodeLabel({ id: d.node_id, data: d.metadata, type: d.metadata?.nodeType })
-                }));
+                const mapped = data.map((d: any) => {
+                    // 1. まず現在のプロジェクト設定にある名前を最優先 (Custom Name > DisplayName > Name)
+                    const currentName = d.node_id ? currentNodeNames.get(d.node_id) : undefined;
+
+                    // 2. なければログのメタデータ (Custom Name優先)
+                    // 3. 最後に getNodeLabel のフォールバック
+                    const resolvedName = currentName ||
+                        d.metadata?.customName ||
+                        d.metadata?.custom_name ||
+                        d.metadata?.node_name ||
+                        d.metadata?.item_name ||
+                        getNodeLabel({ id: d.node_id, data: d.metadata, type: d.metadata?.nodeType });
+
+                    return {
+                        ...d,
+                        node_name: resolvedName
+                    };
+                });
                 setEvents(mapped);
             }
             setLoading(false);
         };
 
         if (sessionId) fetchTimeline();
-    }, [sessionId]);
+    }, [sessionId, currentNodeNames]);
 
     const getEventIcon = (type: string, meta: any) => {
         if (type === 'page_view') return '🏁';

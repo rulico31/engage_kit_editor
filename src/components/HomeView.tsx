@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "./HomeView.css";
 import { supabase } from "../lib/supabaseClient";
 import ConfirmModal from "./ConfirmModal";
@@ -34,6 +34,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
   // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false); // 追加: 削除中のローディング状態
 
   // Rename State
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
@@ -45,16 +46,9 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
   // アカウントメニューの状態
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchProjects();
-    } else {
-      setProjects([]);
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  const fetchProjects = async () => {
+  // プロジェクト一覧を取得（useCallbackで安定した参照を保つ）
+  const fetchProjects = useCallback(async () => {
+    console.log('[HomeView] fetchProjects called');
     try {
       setIsLoading(true);
       if (!user) {
@@ -76,7 +70,54 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  // 初回ロード（fetchProjectsは意図的に依存配列から除外 - 初回のみ実行したいため）
+  useEffect(() => {
+    if (user) {
+      fetchProjects();
+    } else {
+      setProjects([]);
+      setIsLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // タブ復帰時のステイルなローディング状態をクリーンアップ
+  useEffect(() => {
+    const handleVisibility = () => {
+      console.log('[HomeView] visibilitychange:', document.visibilityState, 'isLoading:', isLoading);
+      if (document.visibilityState === 'visible') {
+        // isLoading（プロジェクト一覧取得中）のステイル状態をチェック
+        // 再取得ではなくローディング状態をリセットするだけ
+        // (バックグラウンドでfetchが完了していれば既にデータは取得されている)
+        if (isLoading) {
+          console.warn('[HomeView] Tab returned while loading, resetting loading state...');
+          // 少し待ってからリセット（fetchが完了している可能性を待つ）
+          setTimeout(() => {
+            setIsLoading(false);
+          }, 300);
+        }
+
+        // isProjectLoading（プロジェクトを開く処理中）のステイル状態をチェック
+        if (isProjectLoading) {
+          setTimeout(() => {
+            setIsProjectLoading(prev => {
+              if (prev) {
+                console.warn('[HomeView] Stale project loading state detected, resetting...');
+                return false;
+              }
+              return prev;
+            });
+          }, 500);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [isLoading, isProjectLoading]);
+
 
   const handleTemplateSelect = (templateId: string | null) => {
     setSelectedTemplateId(templateId);
@@ -116,7 +157,7 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
   };
 
   // プロジェクトクリック時のハンドラ
-  const handleProjectClick = (projectId: string) => {
+  const handleProjectClick = async (projectId: string) => {
     // ログインチェック
     if (!user) {
       alert('プロジェクトを開くには、GoogleまたはMicrosoftアカウントでログインしてください。');
@@ -124,22 +165,23 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
     }
 
     setIsProjectLoading(true); // ローディング開始
-    // 少し遅延させて視覚的なフィードバックを確実にする（UX向上）
-    // 実際の読み込みはonOpenProject内で行われる
-    requestAnimationFrame(() => {
-      try {
-        onOpenProject(projectId);
-      } catch (e) {
-        console.error("Failed to open project:", e);
-        setIsProjectLoading(false);
-        alert("プロジェクトを開けませんでした");
-      }
-    });
+    try {
+      await onOpenProject(projectId);
+      // 成功した場合は画面遷移するのでリセット不要（念のためfinallyでリセット）
+    } catch (e) {
+      console.error("Failed to open project:", e);
+      alert("プロジェクトを開けませんでした");
+    } finally {
+      // 成功・失敗どちらの場合もローディング状態をリセット
+      setIsProjectLoading(false);
+    }
   };
 
   // 削除実行
   const executeDeleteProject = async () => {
     if (!projectToDelete) return;
+
+    setIsDeleting(true); // ローディング開始
 
     try {
       const projectId = projectToDelete.id;
@@ -230,6 +272,8 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
       alert("プロジェクトの削除に失敗しました");
       setIsDeleteModalOpen(false);
       setProjectToDelete(null);
+    } finally {
+      setIsDeleting(false); // ローディング終了
     }
   };
 
@@ -507,8 +551,8 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
         />
 
         {/* 全画面ローディングオーバーレイ */}
-        {isProjectLoading && (
-          <LoadingOverlay message="Editorを起動中..." />
+        {(isProjectLoading || isDeleting) && (
+          <LoadingOverlay message={isDeleting ? "プロジェクトを削除中..." : "Editorを起動中..."} />
         )}
 
         {/* テンプレート選択モーダル */}

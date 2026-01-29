@@ -51,6 +51,11 @@ export interface PlacedItemType {
   y?: number; // Added (flattened)
   width?: number; // Added (flattened)
   height?: number; // Added (flattened)
+  // Mobile view properties
+  mobileX?: number;
+  mobileY?: number;
+  mobileWidth?: number;
+  mobileHeight?: number;
   position: { x: number; y: number };
   size: { width: number; height: number };
   zIndex: number;

@@ -31,7 +31,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                             <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[25%]" style={{ textAlign: 'left' }}>行動インサイト</th>
                             <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[150px]" style={{ textAlign: 'left' }}>リスク検知</th>
                             <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[160px]" style={{ textAlign: 'left' }}>日時 / デバイス</th>
-                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[80px]" style={{ textAlign: 'right' }}>詳細</th>
+                            {/* <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[80px]" style={{ textAlign: 'right' }}>詳細</th> */}
                         </tr>
                     </thead>
 
@@ -40,7 +40,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                     <tbody className="divide-y divide-zinc-800/50">
                         {leads.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="p-20 text-center text-zinc-500">
+                                <td colSpan={6} className="p-20 text-center text-zinc-500">
                                     <div className="flex flex-col items-center gap-4">
                                         <div className="w-16 h-16 rounded-full bg-zinc-800/30 flex items-center justify-center">
                                             <Clock size={32} className="opacity-10" />
@@ -204,11 +204,11 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         </td>
 
                                         {/* Action */}
-                                        <td className="py-5 px-4 text-right align-middle">
+                                        {/* <td className="py-5 px-4 text-right align-middle">
                                             <div className="inline-flex items-center justify-center p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 group-hover:text-indigo-400 group-hover:border-indigo-500/30 group-hover:bg-indigo-500/5 transition-all">
                                                 <ChevronRight size={18} />
                                             </div>
-                                        </td>
+                                        </td> */}
                                     </tr>
                                 );
                             })

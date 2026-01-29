@@ -42,11 +42,11 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
                 // session_idを含めることでダッシュボードでの集計が可能になる
                 const sessionId = sessionStorage.getItem('engage_session_id');
                 logAnalyticsEvent('idle_hesitation', {
-                    duration: 5,
+                    duration: 20,
                     session_id: sessionId
                 }, projectId);
-                console.log('[Analytics] idle_hesitation triggered after 5s inactivity');
-            }, 5000);
+                console.log('[Analytics] idle_hesitation triggered after 20s inactivity');
+            }, 20000);
         };
 
         // 初期化時にタイマーを開始 (何もしない場合も考慮)
@@ -207,6 +207,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
         window.addEventListener('touchstart', resetIdleTimer, { capture: true });
         window.addEventListener('scroll', resetIdleTimer, { capture: true });
         window.addEventListener('click', resetIdleTimer, { capture: true });
+        window.addEventListener('keydown', resetIdleTimer, { capture: true }); // キーボード入力を検知
+        window.addEventListener('input', resetIdleTimer, { capture: true }); // テキスト入力を検知
 
         window.addEventListener('click', handleRageClick, { capture: true });
         window.addEventListener('touchstart', handleRageClick, { capture: true });
@@ -232,6 +234,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean)
             window.removeEventListener('touchstart', resetIdleTimer, { capture: true });
             window.removeEventListener('scroll', resetIdleTimer, { capture: true });
             window.removeEventListener('click', resetIdleTimer, { capture: true });
+            window.removeEventListener('keydown', resetIdleTimer, { capture: true });
+            window.removeEventListener('input', resetIdleTimer, { capture: true });
             window.removeEventListener('click', handleRageClick, { capture: true });
             window.removeEventListener('touchstart', handleRageClick, { capture: true });
             // window.removeEventListener('click', handleThinkingTime, { capture: true });

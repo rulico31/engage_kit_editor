@@ -137,6 +137,8 @@ const EditorView: React.FC<EditorViewProps> = ({
   const handlePublishWrapper = async () => {
     setIsPublishing(true);
     try {
+      // バリデーション等の重い処理が走る前にローディング表示を確実に描画させるための待機
+      await new Promise(resolve => setTimeout(resolve, 50));
       await Promise.resolve(onPublish());
     } catch (error) {
       console.error("Publish failed:", error);

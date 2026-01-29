@@ -50,7 +50,10 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const isInput = name.startsWith("テキスト入力欄");
   const isButton = name.includes("ボタン");
 
-  if (name.startsWith("画像")) {
+  // 画像判定の強化: 名前が変更されていても type や id で判定
+  const isImage = name.startsWith("画像") || item.type === 'image' || id.startsWith('image');
+
+  if (isImage) {
     if (item.data.src) {
       content = (
         <img
@@ -142,7 +145,8 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     <div
       className={itemClassName}
       data-node-id={id}
-      data-node-type={name.split('-')[0] || 'unknown'}
+      data-node-name={item.data.customName || name}
+      data-node-type={item.type || name.split('-')[0] || 'unknown'}
       style={{
         position: "absolute",
         left: `${itemState.x}px`,
@@ -152,7 +156,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         height: isAutoHeight ? 'auto' : `${height}px`,
         minHeight: isAutoHeight ? `${height}px` : undefined,
 
-        zIndex: 0,
+        zIndex: item.zIndex || 0,
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',

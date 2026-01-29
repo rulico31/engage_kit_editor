@@ -320,24 +320,41 @@ const NodeEditorContent: React.FC = () => {
     }
   }, [isOver]);
 
+  // フォーカスを強制的にエディタに移すヘルパー
+  const handleFocus = useCallback(() => {
+    if (reactFlowWrapper.current) {
+      reactFlowWrapper.current.focus();
+      console.log('[NodeEditor] Focused wrapper');
+    }
+  }, []);
+
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    handleFocus(); // フォーカス移動
     selectItem(node.id, 'node', node.data.label || 'ノード');
     // 他のノードが選択された場合はハイライトをクリア
     useSelectionStore.getState().clearHighlightedItems();
-  }, [selectItem]);
+  }, [selectItem, handleFocus]);
 
   const onPaneClick = useCallback(() => {
+    handleFocus(); // フォーカス移動
     // メニューを閉じる
     setContextMenu(null);
     // ハイライトもクリア
     useSelectionStore.getState().clearHighlightedItems();
-  }, []);
+  }, [handleFocus]);
+
+  // エッジクリック時のフォーカス移動用
+  const onEdgeClick = useCallback(() => {
+    handleFocus();
+    console.log('[NodeEditor] Edge clicked');
+  }, [handleFocus]);
 
   // 右クリックメニューハンドラー
   const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
     event.preventDefault();
+    handleFocus(); // フォーカス移動
     setContextMenu({ x: event.clientX, y: event.clientY });
-  }, []);
+  }, [handleFocus]);
 
   // コメントノード追加ハンドラー
   const handleAddComment = useCallback(() => {
@@ -367,7 +384,8 @@ const NodeEditorContent: React.FC = () => {
 
     // 新しく追加したノードを選択状態にする
     selectItem(newNode.id, 'node', 'コメント');
-  }, [contextMenu, currentGraph.nodes, currentGraph.edges, updateGraph, selectItem, reactFlowInstance]);
+    handleFocus();
+  }, [contextMenu, currentGraph.nodes, currentGraph.edges, updateGraph, selectItem, reactFlowInstance, handleFocus]);
 
   // エッジ削除ハンドラー
   const handleDeleteEdge = useCallback(() => {
@@ -382,16 +400,18 @@ const NodeEditorContent: React.FC = () => {
 
     // メニューを閉じる
     setEdgeContextMenu(null);
-  }, [edgeContextMenu, currentGraph.nodes, currentGraph.edges, updateGraph]);
+    handleFocus();
+  }, [edgeContextMenu, currentGraph.nodes, currentGraph.edges, updateGraph, handleFocus]);
 
   // エッジ右クリックハンドラー
   const onEdgeContextMenu = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.preventDefault();
+    handleFocus(); // フォーカス移動
     console.log('🔗 Edge right-clicked:', edge.id);
     setEdgeContextMenu({ x: event.clientX, y: event.clientY, edgeId: edge.id });
     // ノード用のコンテキストメニューは閉じる
     setContextMenu(null);
-  }, []);
+  }, [handleFocus]);
 
   if (!activeLogicGraphId) {
     return (
@@ -410,6 +430,8 @@ const NodeEditorContent: React.FC = () => {
       <div
         className="node-editor-wrapper"
         ref={setRefs}
+        tabIndex={0}
+        onClickCapture={handleFocus} // 全体のクリックを捕捉してフォーカス
       >
         <ReactFlow
           nodes={currentGraph.nodes} // Storeの値を直接使用
@@ -420,6 +442,7 @@ const NodeEditorContent: React.FC = () => {
           onEdgesDelete={onEdgesDelete} // エッジ削除時のハンドラー
           onConnect={onConnect}
           onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick} // エッジクリックを追加
           onEdgeContextMenu={onEdgeContextMenu} // エッジ右クリックで削除メニュー
           onPaneClick={onPaneClick}
           onPaneContextMenu={onPaneContextMenu}

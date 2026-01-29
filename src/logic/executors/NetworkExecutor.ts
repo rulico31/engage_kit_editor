@@ -110,7 +110,13 @@ export class NetworkExecutor implements NodeExecutor {
         else if (node.type === "submitFormNode") {
             try {
                 const currentVars = getVariables();
-                const success = await context.submitLead(currentVars);
+
+                // Retrieve project ID from store (for Editor Preview) or context
+                // Dynamic import to avoid circular dependency if any, though store should be fine
+                const { useProjectStore } = await import('../../stores/useProjectStore');
+                const projectId = useProjectStore.getState().currentProjectId || undefined;
+
+                const success = await context.submitLead(currentVars, projectId);
                 const resultPath = success ? "success" : "error";
 
                 const submittedFieldTypes = placedItems

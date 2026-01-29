@@ -6,6 +6,9 @@ export default defineConfig(({ mode }) => {
   return {
     base: './',
     plugins: [react()],
+    server: {
+      host: true,  // LAN内の他デバイスからアクセス可能にする
+    },
     esbuild: {
       // 本番ビルド時のみconsoleとdebuggerを削除
       drop: mode === 'production' ? ['console', 'debugger'] : [],

@@ -33,6 +33,10 @@
   height: 100%;
 }
 
+.node-editor-wrapper:focus {
+  outline: none;
+}
+
 .react-flow-drop-target {
   flex-grow: 1;
   /* 残りのスペースすべてを使う */

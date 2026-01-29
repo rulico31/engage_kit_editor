@@ -27,9 +27,17 @@ export const submitLeadData = async (
   _placedItems?: PlacedItemType[],
   _analyticsLogs?: any[]
 ) => {
-  // projectIdが指定されていない場合はURLから取得
-  const resolvedProjectId = projectId || getProjectIdFromUrl();
+  // projectIdが指定されていない場合はURLから取得、それでもなければStoreから取得
+  let resolvedProjectId = projectId || getProjectIdFromUrl();
+
   if (!resolvedProjectId) {
+    // Import store dynamically to avoid circular dependencies if this file is imported by stores
+    const { useProjectStore } = await import('../stores/useProjectStore');
+    resolvedProjectId = useProjectStore.getState().currentProjectId || null;
+  }
+
+  if (!resolvedProjectId) {
+    console.error('Project ID missing. URL:', window.location.href);
     throw new Error('Project ID is required. Please provide it as an argument or ensure it is in the URL.');
   }
 
@@ -54,7 +62,16 @@ export const submitLeadData = async (
   // Get session_id to fetch relevant logs
   let sessionId = sessionStorage.getItem('engage_session_id');
   if (!sessionId) {
-    sessionId = crypto.randomUUID();
+    // crypto.randomUUID() はセキュアコンテキスト（HTTPS）でのみ利用可能なためフォールバック
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      sessionId = crypto.randomUUID();
+    } else {
+      sessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
     sessionStorage.setItem('engage_session_id', sessionId);
   }
 
@@ -195,5 +212,6 @@ export const submitLeadData = async (
     // 送信成功時、現在時刻を記録（次回送信時のフィルタリングに使用）
     sessionStorage.setItem('engage_last_lead_submit', new Date().toISOString());
     console.log('Lead submitted successfully:', { rank, totalScore, flags: behaviorFlags });
+    return true; // 成功を示す
   }
 };

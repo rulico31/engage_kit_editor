@@ -170,14 +170,25 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                     {(item.type === 'button' || item.type === 'text' || item.type === 'choice') && (
                         <div className="prop-group">
                             <div className="prop-label">テキスト内容</div>
-                            <textarea
-                                value={item.data?.label || item.data?.text || ""}
-                                onChange={(e) => handleDataChange("text", e.target.value)}
-                                className="prop-textarea"
-                                rows={2}
-                                style={{ resize: 'vertical', minHeight: '60px' }}
-                                placeholder="テキストを入力..."
-                            />
+                            {/* テキスト入力欄の場合は1行入力（プレースホルダーと同様）、それ以外はテキストエリア */}
+                            {item.name.startsWith("テキスト入力欄") ? (
+                                <input
+                                    type="text"
+                                    value={item.data?.label || item.data?.text || ""}
+                                    onChange={(e) => handleDataChange("text", e.target.value)}
+                                    className="prop-input"
+                                    placeholder="テキストを入力..."
+                                />
+                            ) : (
+                                <textarea
+                                    value={item.data?.label || item.data?.text || ""}
+                                    onChange={(e) => handleDataChange("text", e.target.value)}
+                                    className="prop-textarea"
+                                    rows={2}
+                                    style={{ resize: 'vertical', minHeight: '60px' }}
+                                    placeholder="テキストを入力..."
+                                />
+                            )}
                         </div>
                     )}
 
@@ -298,8 +309,58 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                         />
                     )}
 
+                    {/* Input Type Selection */}
+                    {item.name.startsWith("テキスト入力欄") && (
+                        <>
+                            <div className="prop-group">
+                                <div className="prop-label">入力タイプ</div>
+                                <select
+                                    value={item.data?.inputType || 'text'}
+                                    onChange={(e) => {
+                                        const newVal = e.target.value;
+                                        handleDataChange("inputType", newVal);
+                                        // テキストエリア選択時に高さを自動調整
+                                        const currentHeight = (item as any).height ?? 100;
+                                        if (newVal === 'textarea' && currentHeight < 100) {
+                                            onItemUpdate(item.id, { height: 120 }, { addToHistory: true });
+                                        }
+                                    }}
+                                    className="prop-select"
+                                    style={{
+                                        width: '100%',
+                                        padding: '6px',
+                                        background: '#333',
+                                        border: '1px solid #444',
+                                        color: '#eee',
+                                        borderRadius: '4px'
+                                    }}
+                                >
+                                    <option value="text">テキスト (通常)</option>
+                                    <option value="email">メールアドレス</option>
+                                    <option value="tel">電話番号</option>
+                                    <option value="number">数値</option>
+                                    <option value="textarea">長文テキスト (複数行)</option>
+                                </select>
+                            </div>
+
+                            {/* Country Code Toggle (Only for Tel) */}
+                            {item.data?.inputType === 'tel' && (
+                                <div style={{ paddingLeft: '4px', marginTop: '-8px', marginBottom: '12px' }}>
+                                    <label className="prop-checkbox-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={item.data?.enableCountryCode || false}
+                                            onChange={(e) => handleDataChange("enableCountryCode", e.target.checked)}
+                                        />
+                                        <span style={{ fontSize: '12px', color: '#ccc' }}>国コード選択を表示</span>
+                                    </label>
+                                </div>
+                            )}
+                        </>
+                    )}
+
                     {/* Placeholder */}
-                    {(item.type === 'input' || item.type === 'textarea') && (
+                    {(item.type === 'input' || item.type === 'textarea' || item.name.startsWith("テキスト入力欄")) && (
                         <div className="prop-group">
                             <div className="prop-label">プレースホルダー</div>
                             <input
@@ -343,7 +404,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                     )}
 
                     {/* Validation */}
-                    {(item.type === 'input' || item.type === 'choice') && (
+                    {(item.name.startsWith("テキスト入力欄") || item.type === 'choice') && (
                         <div style={{ paddingTop: '4px' }}>
                             <label className="prop-checkbox-row">
                                 <input
@@ -358,57 +419,12 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                 </div>
             </AccordionSection>
 
-            {/* ACTION (Button Only) */}
-            {item.type === 'button' && (
+            {/* ACTION (Button Only) - Removed as per refactor to use SubmitFormNode */}
+            {/* {item.type === 'button' && (
                 <AccordionSection title="アクション (Action)" defaultOpen={true}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {/* Action Type */}
-                        <div className="prop-group">
-                            <div className="prop-label">クリック時の動作</div>
-                            <select
-                                value={item.data?.actionType || 'none'}
-                                onChange={(e) => handleDataChange("actionType", e.target.value)}
-                                className="prop-select"
-                                style={{
-                                    width: '100%',
-                                    padding: '6px',
-                                    background: '#333',
-                                    border: '1px solid #444',
-                                    color: '#eee',
-                                    borderRadius: '4px'
-                                }}
-                            >
-                                <option value="none">ノードフロー (デフォルト)</option>
-                                <option value="submit">フォーム送信</option>
-                            </select>
-                        </div>
-
-                        {/* Submit Settings */}
-                        {item.data?.actionType === 'submit' && (
-                            <div style={{
-                                padding: '10px',
-                                background: '#2a2a2e',
-                                borderRadius: '6px',
-                                border: '1px solid #444'
-                            }}>
-                                <div style={{ marginBottom: '8px' }}>
-                                    <div className="prop-label">リダイレクトURL (任意)</div>
-                                    <input
-                                        type="text"
-                                        value={item.data?.submitRedirectUrl || ""}
-                                        onChange={(e) => handleDataChange("submitRedirectUrl", e.target.value)}
-                                        className="prop-input"
-                                        placeholder="https://example.com/thanks"
-                                    />
-                                    <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
-                                        空欄の場合、デフォルトの完了メッセージを表示します
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                   ...
                 </AccordionSection>
-            )}
+            )} */}
 
             {/* Design / Appearance */}
             <AccordionSection title="外観 (Appearance)" defaultOpen={true}>

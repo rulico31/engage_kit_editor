@@ -176,7 +176,18 @@ const App: React.FC = () => {
         const activeEntry = tabs.find(t => t.id === activeTabId);
         if (activeEntry && activeEntry.type === 'node') return;
 
+        // ノードエディタにフォーカスがある、またはマウスが乗っている場合は、グローバル削除をスキップ
+        // (ReactFlow側でノード/エッジ削除が処理されるため)
+        if (
+          (activeElement && activeElement.closest('.node-editor-wrapper')) ||
+          document.querySelector('.node-editor-wrapper:hover')
+        ) {
+          console.log('🛡️ Skipping global delete: NodeEditor is active/hovered');
+          return;
+        }
+
         if (selectedIds.length > 0) {
+          console.log('🗑️ Executing global delete for items:', selectedIds);
           e.preventDefault();
           deleteItems(selectedIds);
         }
@@ -257,7 +268,7 @@ const App: React.FC = () => {
 
     // 警告がない場合は直接公開処理へ
     console.log('✅ [handlePublish] No validation warnings!');
-    proceedToPublish();
+    await proceedToPublish();
   };
 
   const proceedToPublish = async () => {

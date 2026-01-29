@@ -36,6 +36,7 @@ import { EngagementDistribution } from "./dashboard/EngagementDistribution";
 import { HotLeadsTable } from "./dashboard/HotLeadsTable";
 import { RageClickTable } from "./dashboard/RageClickTable";
 import { ItemScatterPlot } from "./dashboard/ItemScatterPlot";
+import { DashboardDetailModal } from "./dashboard/DashboardDetailModal";
 
 // Local interface for pages with item logics (used by projectMeta.data.pages)
 interface PageWithLogics {
@@ -46,13 +47,6 @@ interface PageWithLogics {
 }
 
 // Grouped stats interface for dashboard aggregation
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface GroupedStat {
-    id: string;
-    name: string;
-    interaction_count: number;
-    unique_users: number;
-}
 
 type DashboardTab = 'overview' | 'behavior' | 'content';
 
@@ -91,6 +85,7 @@ const DashboardView: React.FC = () => {
 
     // エクスポート設定用のState
     const [showExportModal, setShowExportModal] = useState(false);
+    const [showDropoutModal, setShowDropoutModal] = useState(false);
     const [exportStartDate, setExportStartDate] = useState<string>("");
     const [exportEndDate, setExportEndDate] = useState<string>("");
     const [exportColumns, setExportColumns] = useState<string[]>([]);
@@ -838,7 +833,7 @@ const DashboardView: React.FC = () => {
             <div className="bento-grid">
                 {/* Interaction Table */}
                 <div className="col-span-8 bento-card">
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between mb-4 flex-wrap gap-y-2">
                         <div className="card-title mb-0">離脱要因分析</div>
                         <div className="stats-group-tabs">
                             <button className={`stats-tab ${groupingMode === 'node' ? 'active' : ''}`} onClick={() => setGroupingMode('node')}>個別アイテム</button>
@@ -872,12 +867,31 @@ const DashboardView: React.FC = () => {
                                                     <span className="text-[10px] text-zinc-500 font-normal ml-1">({percentage.toFixed(0)}%)</span>
                                                 </div>
                                             </td>
-                                            <td>{stat.unique_users}</td>
+                                            <td style={{ textAlign: 'right', padding: '12px 16px', borderBottom: '1px solid #27272a', fontWeight: 500, color: '#e4e4e7' }}>
+                                                {stat.unique_users}
+                                            </td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </table>
+                        <div className="mt-4 flex justify-start">
+                            <button
+                                onClick={() => setShowDropoutModal(true)}
+                                style={{
+                                    backgroundColor: '#27272a',
+                                    color: '#ffffff',
+                                    border: '1px solid #3f3f46',
+                                    padding: '6px 16px',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    cursor: 'pointer'
+                                }}
+                                className="font-medium hover:opacity-80 transition-opacity"
+                            >
+                                すべて見る
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -899,9 +913,10 @@ const DashboardView: React.FC = () => {
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
-                )}
+                )
+                }
             </div>
-        </div>
+        </div >
     );
 
     const renderBehaviorTab = () => {
@@ -920,7 +935,22 @@ const DashboardView: React.FC = () => {
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                     <XAxis type="number" stroke="#71717a" fontSize={12} />
                                     <YAxis dataKey="name" type="category" stroke="#71717a" fontSize={12} width={80} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }} itemStyle={{ color: '#fff' }} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }}
+                                        itemStyle={{ color: '#fff' }}
+                                        content={(props: any) => {
+                                            if (!props.active || !props.payload || !props.payload.length) return null;
+                                            const data = props.payload[0].payload;
+                                            return (
+                                                <div style={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', padding: '8px 12px', borderRadius: '6px' }}>
+                                                    <p style={{ color: '#e4e4e7', fontWeight: 'bold', marginBottom: '4px' }}>{data.name}</p>
+                                                    <p style={{ color: '#3b82f6', fontSize: '12px', margin: '2px 0' }}>シェア: {data.sessionPercentage.toFixed(1)}%</p>
+                                                    <p style={{ color: '#10b981', fontSize: '12px', margin: '2px 0' }}>CVR: {data.cvr.toFixed(1)}%</p>
+                                                    <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '2px 0' }}>サンプル数: {data.sessions}</p>
+                                                </div>
+                                            );
+                                        }}
+                                    />
                                     <Legend />
                                     <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
                                     <Bar dataKey="cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
@@ -936,7 +966,22 @@ const DashboardView: React.FC = () => {
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#27272a" />
                                     <XAxis type="number" stroke="#71717a" fontSize={12} />
                                     <YAxis dataKey="name" type="category" stroke="#71717a" fontSize={12} width={80} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }} itemStyle={{ color: '#fff' }} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }}
+                                        itemStyle={{ color: '#fff' }}
+                                        content={(props: any) => {
+                                            if (!props.active || !props.payload || !props.payload.length) return null;
+                                            const data = props.payload[0].payload;
+                                            return (
+                                                <div style={{ backgroundColor: '#18181b', border: '1px solid #3f3f46', padding: '8px 12px', borderRadius: '6px' }}>
+                                                    <p style={{ color: '#e4e4e7', fontWeight: 'bold', marginBottom: '4px' }}>{data.name}</p>
+                                                    <p style={{ color: '#3b82f6', fontSize: '12px', margin: '2px 0' }}>シェア: {data.sessionPercentage.toFixed(1)}%</p>
+                                                    <p style={{ color: '#10b981', fontSize: '12px', margin: '2px 0' }}>CVR: {data.cvr.toFixed(1)}%</p>
+                                                    <p style={{ color: '#a1a1aa', fontSize: '12px', margin: '2px 0' }}>サンプル数: {data.sessions}</p>
+                                                </div>
+                                            );
+                                        }}
+                                    />
                                     <Legend />
                                     <Bar dataKey="sessionPercentage" name="シェア(%)" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
                                     <Bar dataKey="cvr" name="CVR(%)" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
@@ -999,16 +1044,21 @@ const DashboardView: React.FC = () => {
     const renderContentTab = () => {
         const analysisData = extendedStats?.inputAnalytics || [];
         const sortedData = [...analysisData].sort((a, b) => b.avgHesitation - a.avgHesitation);
-        const scoreFlowData = extendedStats?.advanced?.scoreFlow || [];
+
+        // Custom Nameを反映させるためにmap処理を追加
+        const scoreFlowData = (extendedStats?.advanced?.scoreFlow || []).map(item => ({
+            ...item,
+            nodeName: getNodeDisplayName(item.nodeId) || item.nodeName
+        }));
 
         // Scatter Plot Data preparation
         const scatterData = sortedData.map(item => ({
             nodeId: item.nodeId,
-            nodeName: getNodeDisplayName(item.nodeId) || item.nodeId,
+            nodeName: getNodeDisplayName(item.nodeId), // 名前を取得
             avgDuration: item.avgDuration,
             avgHesitation: item.avgHesitation,
             sampleCount: item.sampleCount
-        }));
+        })).filter(item => item.nodeName !== ""); // 名前が空（削除済みまたはロジックノード）の場合は除外
 
         return (
             <div className="space-y-6 animate-fade-in">
@@ -1144,6 +1194,16 @@ const DashboardView: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* Modals */}
+            <DashboardDetailModal
+                title={`離脱要因分析 (${groupingMode === 'node' ? 'アイテム別' : groupingMode === 'page' ? 'ページ別' : 'タイプ別'})`}
+                isOpen={showDropoutModal}
+                onClose={() => setShowDropoutModal(false)}
+                data={groupedStats}
+                type="dropout"
+                onItemClick={handleJumpToEditor}
+            />
+
         </div>
     );
 };
