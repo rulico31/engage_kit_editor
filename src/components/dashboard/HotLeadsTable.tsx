@@ -7,6 +7,60 @@ interface HotLeadsTableProps {
     leads: LeadData[];
 }
 
+
+const PopoverCell = ({ label, value }: { label: string; value: string }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const isTruncated = value.length > 15;
+    const displayValue = isTruncated ? value.slice(0, 15) : value;
+
+    // クリックイベントのハンドラ（親の行クリックを発火させないためstopPropagation）
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsOpen(!isOpen);
+    };
+
+    if (isOpen) {
+        return (
+            <div
+                className="inline-flex flex-col gap-1 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 shadow-xl max-w-[280px] animate-in fade-in zoom-in-95 duration-200 cursor-auto relative z-20"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex justify-between items-center border-b border-zinc-800 pb-1 mb-1">
+                    <span className="text-zinc-500 font-medium text-[10px] uppercase tracking-wider">{label}</span>
+                    <button
+                        onClick={() => setIsOpen(false)}
+                        className="text-[10px] text-white hover:text-white bg-zinc-600 hover:bg-zinc-500 px-2 py-0.5 rounded transition-colors font-bold"
+                        style={{ backgroundColor: '#27272a', color: '#ffffff', border: '1px solid #52525b', borderRadius: '6px', padding: '2px 8px' }}
+                    >
+                        閉じる
+                    </button>
+                </div>
+                <div className="text-xs text-zinc-200 whitespace-normal break-words leading-relaxed select-text font-mono">
+                    {value}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-900/50 border border-zinc-800 text-[10px] whitespace-nowrap max-w-[150px]">
+            <span className="text-zinc-500 font-medium">{label}:</span>
+            <span className="text-zinc-300 font-semibold" title={value}>
+                {displayValue}
+                {isTruncated && (
+                    <button
+                        onClick={handleClick}
+                        className="ml-1.5 inline-flex items-center justify-center px-1.5 h-6 rounded bg-zinc-600 text-white border border-zinc-500 hover:bg-zinc-500 hover:text-white hover:border-zinc-400 transition-all text-xs font-black tracking-widest leading-none pb-1 cursor-pointer shadow-sm active:translate-y-px"
+                        style={{ backgroundColor: '#27272a', color: '#ffffff', border: '1px solid #52525b', borderRadius: '6px', padding: '2px 8px', height: 'auto' }}
+                    >
+                        すべて見る
+                    </button>
+                )}
+            </span>
+        </div>
+    );
+};
+
 export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
     const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
 
@@ -139,15 +193,9 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
 
                                                     return (
                                                         <>
-                                                            {filteredEntries.slice(0, 2).map(([key, value]) => {
-                                                                const displayKey = key.startsWith('box-') ? '回答' : key;
-                                                                return (
-                                                                    <div key={key} className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-900/50 border border-zinc-800 text-[10px] whitespace-nowrap max-w-[150px]">
-                                                                        <span className="text-zinc-500 font-medium">{displayKey}:</span>
-                                                                        <span className="text-zinc-300 truncate font-semibold">{String(value)}</span>
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                            {filteredEntries.slice(0, 2).map(([key, value]) => (
+                                                                <PopoverCell key={key} label={key.startsWith('box-') ? '回答' : key} value={String(value)} />
+                                                            ))}
                                                             {filteredEntries.length > 2 && (
                                                                 <span className="text-[10px] font-bold text-zinc-600 self-center px-1.5 py-0.5 rounded border border-zinc-800/50 bg-zinc-900/30">+{filteredEntries.length - 2} items</span>
                                                             )}
