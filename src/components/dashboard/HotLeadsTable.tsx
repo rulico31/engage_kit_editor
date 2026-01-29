@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import type { LeadData } from '../../lib/dashboardService';
-import { MicroJourneyModal } from './MicroJourneyModal';
-import { ChevronRight, Flame, Clock, Smartphone, Tablet, Monitor, MousePointerClick, Hourglass, Clipboard } from 'lucide-react';
+import { Flame, Clock, Smartphone, Tablet, Monitor, MousePointerClick, Hourglass, Clipboard } from 'lucide-react';
 
 interface HotLeadsTableProps {
     leads: LeadData[];
@@ -62,7 +61,7 @@ const PopoverCell = ({ label, value }: { label: string; value: string }) => {
 };
 
 export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
-    const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
+    // const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
 
     return (
         <div className="bento-card h-full w-full flex flex-col overflow-hidden">
@@ -75,7 +74,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
             </h3>
 
             <div className="w-full overflow-x-auto rounded-lg border border-zinc-800/50 flex-1 custom-scrollbar">
-                <table className="w-full min-w-[1200px] text-sm text-left border-separate border-spacing-0 table-fixed" style={{ width: '100%' }}>
+                <table className="w-full min-w-[1200px] text-sm text-left border-collapse table-fixed" style={{ width: '100%' }}>
                     {/* Table Header */}
                     <thead className="bg-zinc-900/80 text-zinc-500 sticky top-0 z-10 backdrop-blur-sm">
                         <tr>
@@ -91,7 +90,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
 
 
                     {/* Table Body */}
-                    <tbody className="divide-y divide-zinc-800/50">
+                    <tbody className="">
                         {leads.length === 0 ? (
                             <tr>
                                 <td colSpan={6} className="p-20 text-center text-zinc-500">
@@ -143,8 +142,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                 return (
                                     <tr
                                         key={lead.id}
-                                        className={`group hover:bg-zinc-800/20 transition-all cursor-pointer ${rank === 'Hot' ? 'bg-red-500/[0.02]' : rank === 'Warm' ? 'bg-amber-500/[0.01]' : ''}`}
-                                        onClick={() => setSelectedLead(lead)}
+                                        className={`group hover:bg-zinc-800/20 transition-all border-b border-zinc-600 ${rank === 'Hot' ? 'bg-red-500/[0.02]' : rank === 'Warm' ? 'bg-amber-500/[0.01]' : ''}`}
                                     >
                                         {/* Rank */}
                                         <td className={`py-5 px-6 align-middle transition-all text-left ${rowGlow}`}>
@@ -265,13 +263,13 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                 </table>
             </div >
 
-            {selectedLead && (
+            {/* {selectedLead && (
                 <MicroJourneyModal
                     sessionId={selectedLead.session_id}
                     leadId={selectedLead.id}
                     onClose={() => setSelectedLead(null)}
                 />
-            )}
+            )} */}
         </div >
     );
 };
