@@ -4,7 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig(({ mode }) => {
   return {
-    base: './',
+    base: '/',
     plugins: [react()],
     server: {
       host: true,  // LAN内の他デバイスからアクセス可能にする
