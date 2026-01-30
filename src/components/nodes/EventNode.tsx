@@ -34,7 +34,7 @@ const EventNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
 
     const names = targetIds.map((id: string) => {
       const item = placedItems.find(i => i.id === id);
-      return item ? (item.displayName || item.data.text || item.name) : '(Unknown)';
+      return item ? (item.data.customName ? `${item.data.customName} (${item.name})` : item.name) : '(Unknown)';
     });
 
     if (names.length <= 2) {

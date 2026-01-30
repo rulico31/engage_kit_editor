@@ -288,6 +288,18 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
     content = (
       <>
+        {item.data?.required && (
+          <div style={{
+            position: 'absolute',
+            top: '2px',
+            right: '5px',
+            color: '#ff4d4f',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            zIndex: 1,
+            pointerEvents: 'none'
+          }}>*</div>
+        )}
         {error && <div className="input-error-message">{error}</div>}
         {item.data?.enableCountryCode && item.data?.inputType === 'tel' && (
           <div className="country-code-wrapper">

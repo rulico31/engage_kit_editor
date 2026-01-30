@@ -52,19 +52,29 @@ const getSessionId = () => {
 
 
 // 環境判定 (簡易実装)
-const detectEnvironment = (): 'production' | 'preview' | 'development' | 'unknown' => {
+export const detectEnvironment = (): 'production' | 'preview' | 'development' | 'unknown' => {
   if (typeof window === 'undefined') return 'unknown';
-  const { hostname, pathname } = window.location;
+  const { hostname, pathname, search } = window.location;
 
-  console.log('[Analytics] detectEnvironment called:', { hostname, pathname });
+  console.log('[Analytics] detectEnvironment called:', { hostname, pathname, search });
 
   // Viewer判定用のヘルパー関数
   const isViewerPath = () => pathname.includes('/view/') || pathname.includes('/viewer');
+
+  // クエリパラメータでの判定 (App.tsxのルーティング仕様に合わせる)
+  const isViewModeParam = () => {
+    const params = new URLSearchParams(search);
+    return params.get('mode') === 'view';
+  };
 
   // ローカル/プライベートネットワーク判定
   const isLocalOrPrivateNetwork = () => {
     // localhost / 127.0.0.1
     if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+
+    // Vercel Preview Deployments (AWS/Vercel URLs) - often have unique subdomains but not local IPs
+    // If it's vercel.app, it's remote.
+
     // プライベートIPアドレス
     // 192.168.x.x
     if (hostname.startsWith('192.168.')) return true;
@@ -81,17 +91,17 @@ const detectEnvironment = (): 'production' | 'preview' | 'development' | 'unknow
   // ローカル開発環境
   if (isLocalOrPrivateNetwork()) {
     // ローカルでも /view/ または /viewer があれば production 扱い（テスト用）
-    if (isViewerPath()) {
-      console.log('[Analytics] Local/Private + viewer path -> production');
+    if (isViewerPath() || isViewModeParam()) {
+      console.log('[Analytics] Local/Private + viewer path/mode -> production');
       return 'production';
     }
     console.log('[Analytics] Local/Private without viewer path -> development');
     return 'development';
   }
 
-  // 本番環境の判定: /view/ または /viewer パスは公開ページ
-  if (isViewerPath()) {
-    console.log('[Analytics] Remote + viewer path -> production');
+  // 本番環境の判定: /view/ または /viewer パス、あるいは mode=view は公開ページ
+  if (isViewerPath() || isViewModeParam()) {
+    console.log('[Analytics] Remote + viewer path/mode -> production');
     return 'production';
   }
 

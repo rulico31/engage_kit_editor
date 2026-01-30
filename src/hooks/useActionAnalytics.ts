@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { logAnalyticsEvent } from "../lib/analytics";
+import { logAnalyticsEvent, detectEnvironment } from "../lib/analytics";
 
 /**
  * レイジクリック、ヘジテーション、離脱、インタラクション追跡を行うフック
@@ -136,6 +136,14 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean,
             // ページ移動時に unmount されるので、その時点の pageId が使われるはず。
             // ただしSPA遷移などでコンポーネントが生き残る場合は注意。
             // ここでは依存配列に pageId が入るので再生成される。
+
+            // 这里は依存配列に pageId が入るので再生成される。
+
+            const env = detectEnvironment();
+            if (env !== 'production') {
+                console.log(`%c🚧 [Exit Log] Preview Mode - Beacon送信はスキップされました`, 'color: #f59e0b; font-style: italic;');
+                return;
+            }
 
             const analyticsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analytics-beacon`;
             const payload = {

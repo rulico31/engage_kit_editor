@@ -46,8 +46,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // PV重複防止用のRef（React Strict Mode対策）
-  const hasLoggedPV = useRef(false);
+  // PV重複防止用のRef（React Strict Mode対策 & ページ遷移追跡）
+  const lastLoggedPageId = useRef<string | null>(null);
 
   // Store actions
   const loadFromData = usePageStore((state) => state.loadFromData);
@@ -148,7 +148,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
           Object.values(normalizedPages).forEach((page: any) => {
             (page.placedItems || []).forEach((item: any) => {
               initialItemStates[item.id] = {
-                isVisible: true,
+                isVisible: item.data?.initialVisibility !== false,
                 x: item.x ?? item.position?.x ?? 0,
                 y: item.y ?? item.position?.y ?? 0,
                 opacity: 1,
@@ -183,27 +183,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
         // UTM & Device Tracking Initialization
         initializeUTMTracking();
-        const deviceInfo = initializeDeviceTracking();
+        initializeDeviceTracking();
 
         // IP Address Pre-fetch (リード送信時の遅延を防ぐ)
         const { prefetchIpAddress } = await import('../lib/IpAddressTracker');
         prefetchIpAddress();
-
-        // PV計測 (device_info を含める) - 重複防止ガード
-        if (!hasLoggedPV.current) {
-          hasLoggedPV.current = true;
-          // ページ名取得
-          const firstPageName = firstPageId ? normalizedPages[firstPageId]?.name : 'Unknown Page';
-
-          logAnalyticsEvent('page_view', {
-            pageId: firstPageId,
-            pageName: firstPageName, // ★ Added pageName
-            device_info: deviceInfo
-          }, projectId);
-          console.log('[ViewerHost] page_view logged', { pageId: firstPageId, pageName: firstPageName });
-        } else {
-          console.log('[ViewerHost] page_view skipped (already logged)');
-        }
 
         console.log('[ViewerHost] Initialization complete!');
 
@@ -220,6 +204,28 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
       fetchProject();
     }
   }, [projectId, loadFromData, setPreviewState]);
+
+  // Page View Logging Effect (Tracks navigation)
+  useEffect(() => {
+    const currentPageId = previewState.currentPageId;
+    if (!currentPageId || !projectId) return;
+
+    // Prevent duplicate logs for the same page (and Strict Mode double-fire)
+    if (lastLoggedPageId.current === currentPageId) return;
+
+    const pageName = pages[currentPageId]?.name || 'Unknown Page';
+    // Ensure accurate device info is available
+    const deviceInfo = initializeDeviceTracking();
+
+    logAnalyticsEvent('page_view', {
+      pageId: currentPageId,
+      pageName: pageName,
+      device_info: deviceInfo
+    }, projectId);
+
+    console.log('[ViewerHost] page_view logged', { pageId: currentPageId, pageName });
+    lastLoggedPageId.current = currentPageId;
+  }, [previewState.currentPageId, projectId, pages]);
 
   // ■ 行動分析監視ロジック (Smart Action Analytics)
   // usePreviewStore から現在のページ情報を取得

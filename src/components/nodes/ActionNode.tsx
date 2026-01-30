@@ -14,7 +14,7 @@ const ActionNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
   // ターゲットアイテムの情報を検索
   const targetItem = placedItems.find(item => item.id === data.targetItemId);
   const targetName = targetItem
-    ? (targetItem.displayName || targetItem.data.text || targetItem.name)
+    ? (targetItem.data.customName ? `${targetItem.data.customName} (${targetItem.name})` : targetItem.name)
     : "(Not Set)";
 
   // モードに応じたアイコンとラベルの定義

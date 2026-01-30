@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { detectEnvironment } from './analytics';
 import { usePageStore } from '../stores/usePageStore';
 import { usePreviewStore } from '../stores/usePreviewStore';
 
@@ -186,7 +187,13 @@ export const submitLeadData = async (
 
 
 
-  // IPアドレスの取得
+
+  const env = detectEnvironment();
+  if (env !== 'production') {
+    console.log(`%c🚧 [Lead Submit] Preview Mode - DB保存はスキップされました`, 'color: #f59e0b; font-style: italic;');
+    return true; // 成功したふりをする
+  }
+
   const { getClientIpAddress } = await import('./IpAddressTracker');
   const ipAddress = await getClientIpAddress();
 

@@ -430,6 +430,22 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
             <AccordionSection title="外観 (Appearance)" defaultOpen={true}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
+
+                    {/* Initial Visibility Checkbox */}
+                    <div className="prop-group">
+                        <label className="prop-checkbox-row">
+                            <input
+                                type="checkbox"
+                                checked={item.data?.initialVisibility !== false} // Default true
+                                onChange={(e) => handleDataChange("initialVisibility", e.target.checked)}
+                            />
+                            <span style={{ fontSize: '12px' }}>最初から表示</span>
+                        </label>
+                        <div style={{ fontSize: '10px', color: '#666', marginTop: '4px', marginLeft: '20px' }}>
+                            チェックを外すと初期状態では非表示になります
+                        </div>
+                    </div>
+
                     {/* Background Transparency Checkbox */}
                     <div className="prop-group">
                         <label className="prop-checkbox-row">

@@ -107,7 +107,9 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
     // WaitForClickNodeの旧形式targetItemId対応（一応保持）
     if (node.type === "waitForClickNode" && name === "targetItemId") {
       const selectedItem = placedItems.find(p => p.id === newValue);
-      const newLabel = selectedItem ? `待ち: ${selectedItem.data.text || selectedItem.name} ` : "ターゲット未設定";
+      const newLabel = selectedItem
+        ? `待ち: ${selectedItem.data.customName ? `${selectedItem.data.customName} (${selectedItem.name})` : selectedItem.name} `
+        : "ターゲット未設定";
 
       // selectタイプの場合は即座に履歴保存、それ以外はデバウンス
       const shouldSaveImmediately = type === 'select';
@@ -153,7 +155,10 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
       dynamicOptions = [
         { label: "-- アイテムを選択 --", value: "" },
 
-        ...validItems.map(item => ({ label: item.data.text || item.name, value: item.id })),
+        ...validItems.map(item => ({
+          label: item.data.customName ? `${item.data.customName} (${item.name})` : item.name,
+          value: item.id
+        })),
       ];
     } else if (name === "targetPageId" || name === "backPageId") {
       dynamicOptions = [
@@ -222,7 +227,7 @@ const DynamicPropertyInput: React.FC<DynamicPropertyInputProps> = ({ node, propC
                 style={{ marginRight: '8px' }}
               />
               <span>
-                {item.displayName || item.data.text || item.name}
+                {item.data.customName ? `${item.data.customName} (${item.name})` : item.name}
                 {item.pageName && name === "targetItemIds" && (
                   <span style={{ marginLeft: '8px', color: '#888', fontSize: '11px' }}>
                     ({item.pageName})
