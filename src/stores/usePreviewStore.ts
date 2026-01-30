@@ -4,11 +4,13 @@ import { create } from 'zustand';
 import type {
   PreviewState,
   VariableState,
-
+  PlacedItemType,
+  NodeGraph,
 } from '../types';
 import { type ActiveListeners, type LogicRuntimeContext } from '../logicEngine';
 import { triggerEvent } from "../logicEngine"; // ★ 新しいLogicEngine実装を使用
 import { usePageStore } from './usePageStore';
+import { useProjectStore } from './useProjectStore';
 import { logAnalyticsEvent } from '../lib/analytics';
 import { submitLeadData } from '../lib/leads';
 
@@ -67,15 +69,22 @@ interface PreviewStoreState {
   currentHistoryIndex: number;
   nodeRevisitCounts: Record<string, number>; // { [nodeId]: count }
 
+  // プロジェクト情報
+  projectId: string | null;
+
+  // ページごとの状態スナップショット (戻る機能用)
+  pageStateCache: Record<string, PreviewState>;
+
   // --- Actions ---
   initPreview: () => void;
   stopPreview: () => void;
 
   setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void;
   setVariables: (newVars: VariableState | ((prev: VariableState) => VariableState)) => void;
+  setProjectId: (id: string) => void;
 
   // ページ遷移リクエスト処理
-  handlePageChangeRequest: (pageId: string) => void;
+  handlePageChangeRequest: (pageId: string, options?: { skipHistory?: boolean; restoreFromCache?: boolean }) => void;
   handleVariableChangeFromItem: (variableName: string, value: any) => void;
   handleItemEvent: (eventName: string, itemId: string) => void;
 
@@ -102,7 +111,7 @@ const variablesRef = { current: {} as VariableState }; // 復元
 const interactionTimerRef = { current: 0 };
 
 export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
-  previewState: { currentPageId: '', isFinished: false },
+  previewState: { currentPageId: '', variables: {}, history: [] },
   variables: {},
   activeListeners: new Map(),
   currentNodeExecution: null, // 削除予定だが型定義に残っているためnull
@@ -111,6 +120,8 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   navigationHistory: [],
   currentHistoryIndex: -1,
   nodeRevisitCounts: {},
+  projectId: null,
+  pageStateCache: {}, // キャッシュ初期化
 
   // --- Actions ---
 
@@ -121,9 +132,9 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     const page = usePageStore.getState().pages[pageId];
     if (!page) return;
     const items = page.placedItems;
-    const initialPS: PreviewState = { currentPageId: pageId, isFinished: false };
+    const initialPS: PreviewState = { currentPageId: pageId, variables: {}, history: [] };
 
-    items.forEach(item => {
+    items.forEach((item: PlacedItemType) => {
       let isVisible = item.data.initialVisibility !== false;
       const initialX = item.x;
       const initialY = item.y;
@@ -144,10 +155,10 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   },
 
   stopPreview: () => {
-    previewStateRef.current = { currentPageId: '', isFinished: false };
+    previewStateRef.current = { currentPageId: '', variables: {}, history: [] };
     variablesRef.current = {};
     set({
-      previewState: { currentPageId: '', isFinished: false },
+      previewState: { currentPageId: '', variables: {}, history: [] },
       variables: {},
       activeListeners: new Map(),
     });
@@ -171,8 +182,26 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     set({ variables: variablesRef.current });
   },
 
-  handlePageChangeRequest: (targetPageId) => {
+  setProjectId: (id) => {
+    set({ projectId: id });
+  },
+
+  handlePageChangeRequest: (targetPageId, options = {}) => {
     const { pages } = usePageStore.getState();
+
+    // ★ 現在のページの状態をキャッシュに保存 (ページIDがある場合のみ)
+    const currentState = get();
+    const currentPageId = currentState.previewState.currentPageId;
+    if (currentPageId) {
+      const currentSnapshot = { ...previewStateRef.current };
+      set((state) => ({
+        pageStateCache: {
+          ...state.pageStateCache,
+          [currentPageId]: currentSnapshot
+        }
+      }));
+    }
+
     const targetPageData = pages[targetPageId];
 
     if (!targetPageData) {
@@ -182,21 +211,39 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
     usePageStore.getState().setSelectedPageId(targetPageId);
 
-    const initialPS: PreviewState = { currentPageId: targetPageId, isFinished: false };
-    targetPageData.placedItems.forEach(item => {
-      const isVisible = item.data.initialVisibility !== false;
-      const initialX = item.x;
-      const initialY = item.y;
-      initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
-    });
+    // ★ 履歴記録 (戻る操作以外の場合)
+    if (!options?.skipHistory) {
+      get().recordNavigation(targetPageId);
+    }
 
-    previewStateRef.current = initialPS;
+    let nextPreviewState: PreviewState;
+
+    // ★ キャッシュからの復元を試みる (restoreFromCacheオプションがあり、かつキャッシュが存在する場合)
+    if (options.restoreFromCache && currentState.pageStateCache[targetPageId]) {
+      console.log(`[PreviewStore] Restoring snapshot for page: ${targetPageId}`);
+      nextPreviewState = {
+        ...currentState.pageStateCache[targetPageId],
+        currentPageId: targetPageId //念のためIDはターゲットにする
+      };
+    } else {
+      // 通常の初期化
+      const initialPS: PreviewState = { currentPageId: targetPageId, variables: {}, history: [] };
+      targetPageData.placedItems.forEach((item: PlacedItemType) => {
+        const isVisible = item.data.initialVisibility !== false;
+        const initialX = item.x;
+        const initialY = item.y;
+        initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
+      });
+      nextPreviewState = initialPS;
+    }
+
+    previewStateRef.current = nextPreviewState;
 
     // ★ ページ遷移時にタイマーリセット（前のページの最後の思考時間は遷移トリガーのアクションで記録済み）
     interactionTimerRef.current = Date.now();
 
     set({
-      previewState: initialPS,
+      previewState: nextPreviewState,
     });
 
     // 古い計測開始コードは削除
@@ -228,9 +275,9 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
         if (durationMs < 100) {
           thinkingPattern = 'noise';
-        } else if (durationMs < 2500) {
+        } else if (durationMs < 3000) { // 2500ms → 3000ms (THRESHOLD_INTUITIVE統一)
           thinkingPattern = 'intuitive';
-        } else if (durationMs < 8000) {
+        } else if (durationMs < 15000) { // 8000ms → 15000ms (THRESHOLD_HESITATION統一)
           thinkingPattern = 'normal';
         } else {
           thinkingPattern = 'hesitation';
@@ -241,9 +288,25 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
 
         // ページ名・ノード名の解決
         let nodeName = originItemId;
-        const item = currentPage.placedItems.find(i => i.id === originItemId);
+        const item = currentPage.placedItems.find((i: PlacedItemType) => i.id === originItemId);
         if (item) {
           nodeName = item.data?.text || item.name;
+
+          // ★ テキスト入力に対する 'click' と 'onInputComplete' イベントはログ記録しない
+          // 理由: ArtboardItem.handleBlur で 'input_correction' ログが送られるため、
+          //       ここでも送信するとダブルカウントになってしまう。
+          // 入力欄については 'input_correction' のみを使用する。
+          if ((eventName === 'click' || eventName === 'onInputComplete') && item.name.startsWith('テキスト入力欄')) {
+            return;
+          }
+        }
+
+
+        // Fix for missing projectId: Try getting from URL if store is empty
+        let projectId = useProjectStore.getState().currentProjectId || get().projectId || undefined;
+        if (!projectId) {
+          const params = new URLSearchParams(window.location.search);
+          projectId = params.get('project_id') || undefined;
         }
 
         logAnalyticsEvent('interaction', {
@@ -257,21 +320,51 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
             page_name: currentPage.name,
             node_name: nodeName,
           }
-        });
+        }, projectId); // ★ Editor/Preview両対応
       }
     }
 
     const { placedItems, allItemLogics } = currentPage;
 
-    // 古い計測終了コードは削除
+    // ★★ B2B Scoring: スコア加算はここで1回だけ行う（triggerEventループの前）
+    // これにより、複数のロジックグラフに対してtriggerEventが呼ばれても、スコアは1回だけ加算される
+    if (eventName === 'click') {
+      const targetItem = placedItems.find((i: PlacedItemType) => i.id === originItemId);
+      if (targetItem && targetItem.data.score && typeof targetItem.data.score === 'number') {
+        const currentScore = (variablesRef.current._system_total_score as number) || 0;
+        const scoreToAdd = targetItem.data.score;
+        const newScore = currentScore + scoreToAdd;
+
+        console.log(`📈 [handleItemEvent] Score Update: ${currentScore} + ${scoreToAdd} = ${newScore}`);
+
+        variablesRef.current = {
+          ...variablesRef.current,
+          _system_total_score: newScore
+        };
+        set({ variables: variablesRef.current });
+
+        // スコア変更のアナリティクスログ
+        logAnalyticsEvent('score_change', {
+          nodeId: originItemId,
+          nodeType: 'item_interaction',
+          metadata: {
+            oldScore: currentScore,
+            newScore: newScore,
+            added: scoreToAdd,
+            itemLabel: targetItem.data?.text || targetItem.data?.label || targetItem.name
+          }
+        }, useProjectStore.getState().currentProjectId || get().projectId || undefined); // ★ Editor用にuseProjectStoreを優先
+      }
+    }
 
     Object.entries(allItemLogics).forEach(([logicOwnerId, targetGraph]) => {
-      if (targetGraph && targetGraph.nodes.length > 0) {
+      const graph = targetGraph as NodeGraph;
+      if (graph && graph.nodes && graph.nodes.length > 0) {
         triggerEvent(
           eventName,
           originItemId,
           logicOwnerId,
-          targetGraph,
+          graph,
           placedItems,
           () => previewStateRef.current,
           get().setPreviewState,
@@ -385,22 +478,31 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     const fromEntry = state.navigationHistory[state.currentHistoryIndex];
     const toEntry = state.navigationHistory[newIndex];
 
+    // ページ名解決
+    const { pages } = usePageStore.getState();
+    const fromPageName = pages[fromEntry.pageId]?.name || fromEntry.pageId;
+    const toPageName = pages[toEntry.pageId]?.name || toEntry.pageId;
+
+    console.log('[usePreviewStore] Sending Backtrack Log:', { fromPageName, toPageName, projectId: get().projectId });
+
     // バックトラッキングログ記録
     logAnalyticsEvent('backtracking', {
-      metadata: {
-        from_page_id: fromEntry.pageId,
-        from_node_id: fromEntry.nodeId,
-        to_page_id: toEntry.pageId,
-        to_node_id: toEntry.nodeId,
-        backtrack_distance: state.currentHistoryIndex - newIndex,
-        revisit_count: toEntry.nodeId ? state.nodeRevisitCounts[toEntry.nodeId] : 0,
-        total_backtracks: Object.values(state.nodeRevisitCounts).reduce((a, b) => a + b, 0),
-      }
-    });
+      from_page_id: fromEntry.pageId,
+      from_page_name: fromPageName,
+      from_node_id: fromEntry.nodeId,
+      to_page_id: toEntry.pageId,
+      to_page_name: toPageName,
+      to_node_id: toEntry.nodeId,
+      backtrack_distance: state.currentHistoryIndex - newIndex,
+      revisit_count: toEntry.nodeId ? state.nodeRevisitCounts[toEntry.nodeId] : 0,
+      total_backtracks: Object.values(state.nodeRevisitCounts).reduce((a, b) => a + b, 0),
+    }, get().projectId || undefined);
 
-    // ページ遷移
+    console.log('[usePreviewStore] Backtrack Log Sent');
+
+    // ページ遷移 (キャッシュからの復元を有効化)
     if (toEntry.pageId !== fromEntry.pageId) {
-      get().handlePageChangeRequest(toEntry.pageId);
+      get().handlePageChangeRequest(toEntry.pageId, { skipHistory: true, restoreFromCache: true });
     }
 
     set({ currentHistoryIndex: newIndex });

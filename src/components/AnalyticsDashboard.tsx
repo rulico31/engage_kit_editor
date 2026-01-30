@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getFunnelData, type FunnelAnalytics } from '../lib/analyticsService';
+import { fetchExtendedStats, type ExtendedStats } from '../lib/dashboardService';
 import './AnalyticsDashboard.css';
 
 interface AnalyticsDashboardProps {
@@ -8,6 +9,7 @@ interface AnalyticsDashboardProps {
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ projectId }) => {
     const [analytics, setAnalytics] = useState<FunnelAnalytics | null>(null);
+    const [extendedStats, setExtendedStats] = useState<ExtendedStats | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -16,8 +18,12 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ projectI
 
     const loadAnalytics = async () => {
         setIsLoading(true);
-        const data = await getFunnelData(projectId);
-        setAnalytics(data);
+        const [funnelData, extendedData] = await Promise.all([
+            getFunnelData(projectId),
+            fetchExtendedStats(projectId)
+        ]);
+        setAnalytics(funnelData);
+        setExtendedStats(extendedData);
         setIsLoading(false);
     };
 
@@ -127,6 +133,71 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ projectI
                     })}
                 </div>
             </div>
-        </div>
+
+
+            {/* Drop-off Factors Section */}
+            {
+                extendedStats && (
+                    <div className="analytics-section">
+                        <h3 className="section-title">離脱要因分析</h3>
+                        <div className="dropoff-grid">
+                            {/* Item Drop-off */}
+                            <div className="dropoff-card">
+                                <h4>離脱発生アイテム (Top 10)</h4>
+                                {extendedStats.dropOffByItem.length > 0 ? (
+                                    <table className="dropoff-table">
+                                        <thead>
+                                            <tr>
+                                                <th>アイテム名</th>
+                                                <th>タイプ</th>
+                                                <th>離脱数</th>
+                                                <th>割合</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {extendedStats.dropOffByItem.map((item, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="item-name" title={item.nodeId || ''}>
+                                                        {item.nodeName === 'unknown' ? '不明な要素' : item.nodeName}
+                                                    </td>
+                                                    <td className="item-type badge">{item.nodeType}</td>
+                                                    <td>{item.count}</td>
+                                                    <td>{item.percentage.toFixed(1)}%</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <p className="no-data">データがありません</p>
+                                )}
+                            </div>
+
+                            {/* Type Drop-off */}
+                            <div className="dropoff-card">
+                                <h4>アイテムタイプ別離脱傾向</h4>
+                                {extendedStats.dropOffByType.length > 0 ? (
+                                    <div className="type-distribution">
+                                        {extendedStats.dropOffByType.map((type, idx) => (
+                                            <div key={idx} className="type-row">
+                                                <span className="type-label">{type.nodeType}</span>
+                                                <div className="type-bar-wrapper">
+                                                    <div
+                                                        className="type-bar"
+                                                        style={{ width: `${type.percentage}%` }}
+                                                    ></div>
+                                                </div>
+                                                <span className="type-count">{type.count} ({type.percentage.toFixed(1)}%)</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="no-data">データがありません</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };

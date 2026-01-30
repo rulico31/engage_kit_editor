@@ -13,17 +13,22 @@ import "./GridPopover.css";
 import EmbedModal from "./EmbedModal";
 import { ProjectSettingsModal } from "./ProjectSettingsModal";
 import AuthLinkModal from "./Auth/AuthLinkModal"; // 追加
+import LoadingOverlay from "./LoadingOverlay";
 
 import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { useAuthStore } from "../stores/useAuthStore"; // 追加
 import { useProjectStore } from "../stores/useProjectStore";
+import { usePageStore } from "../stores/usePageStore";
+import { useSelectionStore } from "../stores/useSelectionStore";
 import { useTabSync } from "../hooks/useTabSync";
+import { useActionAnalytics } from "../hooks/useActionAnalytics";
+import { usePreviewStore } from "../stores/usePreviewStore";
 
 interface EditorViewProps {
   projectName: string;
   onGoHome: () => void;
 
-  onPublish: () => void;
+  onPublish: () => void | Promise<void>;
 }
 
 const GridPopover: React.FC = () => {
@@ -87,27 +92,70 @@ const EditorView: React.FC<EditorViewProps> = ({
     togglePreview: state.togglePreview,
   }));
 
-  const { saveProject } = useProjectStore();
+  const { saveProject, currentProjectId } = useProjectStore(state => ({
+    saveProject: state.saveProject,
+    currentProjectId: state.currentProjectId
+  }));
   const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // 認証関連
-  const { user, isAnonymous } = useAuthStore();
+  const { user } = useAuthStore();
+  const isAnonymous = user?.is_anonymous;
   const [isAuthLinkModalOpen, setIsAuthLinkModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // タブの自動同期（削除時のクローズ、Undo時の復元）
   useTabSync();
 
+  // Previewモード時の行動分析 (Rage Click, Hesitation等)
+  // EditorViewでもPreview中はページ情報を渡す
+  const { previewState } = usePreviewStore(state => ({
+    previewState: state.previewState
+  }));
+  const { pages } = usePageStore(state => ({
+    pages: state.pages
+  }));
+
+  const currentPageId = isPreviewing ? previewState?.currentPageId : null;
+  const currentPageName = currentPageId ? pages[currentPageId]?.name : null;
+
+  useActionAnalytics(currentProjectId, isPreviewing, currentPageId, currentPageName);
+
   const handleSave = async () => {
+    setIsSaving(true);
     try {
+      // 少し待機してローディングを見せる (UX向上)
+      await new Promise(resolve => setTimeout(resolve, 500));
       const success = await saveProject();
       if (success) {
-        alert("プロジェクトを保存しました");
+        // 保存成功時はアラートを出す前にローディングを消すか、あるいは出したままにするか。
+        // ここではアラートが出るので、その前にローディングを消す
+        setIsSaving(false);
+        // 少し遅らせてからアラートなどを出すとスムーズだが、既存のフローに従う
+        setTimeout(() => alert("プロジェクトを保存しました"), 10);
+      } else {
+        setIsSaving(false);
       }
-      // キャンセルの場合(success === false)は何も表示しない
     } catch (e) {
       console.error(e);
+      setIsSaving(false);
       alert("保存に失敗しました");
+    }
+  };
+
+
+  const handlePublishWrapper = async () => {
+    setIsPublishing(true);
+    try {
+      // バリデーション等の重い処理が走る前にローディング表示を確実に描画させるための待機
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await Promise.resolve(onPublish());
+    } catch (error) {
+      console.error("Publish failed:", error);
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -208,6 +256,71 @@ const EditorView: React.FC<EditorViewProps> = ({
     };
   }, [isGridPopoverOpen]);
 
+  // Handle URL query parameters for deep linking (Jump to Editor)
+  const { setPendingFocusNodeId } = useEditorSettingsStore(state => ({
+    setPendingFocusNodeId: state.setPendingFocusNodeId
+  }));
+  const projectMeta = useProjectStore(state => state.projectMeta);
+  const setSelectedPageId = usePageStore(state => state.setSelectedPageId);
+  const handleItemSelect = useSelectionStore(state => state.handleItemSelect);
+
+  useEffect(() => {
+    // Check for nodeId in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const nodeIdParam = urlParams.get('nodeId');
+
+    if (nodeIdParam && projectMeta?.data?.pages) {
+      console.log('[EditorView] Found nodeId in URL:', nodeIdParam);
+
+      // Logic reused from DashboardView (simplified)
+      let foundPageId: string | null = null;
+      let foundItemId: string | null = null;
+      let isLogicNode = false;
+
+      for (const [pageId, page] of Object.entries(projectMeta.data.pages as Record<string, any>)) {
+        const item = page.placedItems.find((it: any) => it.id === nodeIdParam);
+        if (item) {
+          foundPageId = pageId;
+          foundItemId = item.id;
+          break;
+        }
+        if (page.allItemLogics) {
+          for (const [itemId, graph] of Object.entries(page.allItemLogics as Record<string, any>)) {
+            if (graph.nodes?.find((n: any) => n.id === nodeIdParam)) {
+              foundPageId = pageId;
+              foundItemId = itemId;
+              isLogicNode = true;
+              break;
+            }
+          }
+        }
+        if (foundPageId) break;
+      }
+
+      if (foundPageId && foundItemId) {
+        const page = projectMeta.data.pages[foundPageId];
+        const item = page.placedItems.find((i: any) => i.id === foundItemId);
+
+        setSelectedPageId(foundPageId);
+        if (item) {
+          handleItemSelect(foundItemId, item.displayName || item.name, false);
+        }
+
+        if (isLogicNode) {
+          setViewMode('split');
+          setPendingFocusNodeId(nodeIdParam);
+        } else {
+          setViewMode('design');
+          setPendingFocusNodeId(nodeIdParam);
+        }
+
+        // Clean up URL without reload
+        const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+      }
+    }
+  }, [projectMeta, setSelectedPageId, handleItemSelect, setViewMode, setPendingFocusNodeId]);
+
 
   return (
     <div className="editor-container">
@@ -220,13 +333,13 @@ const EditorView: React.FC<EditorViewProps> = ({
         onEnterFullscreen={handleEnterFullscreen}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        onPublish={() => handleProtectedAction(onPublish)}
+        onPublish={() => handleProtectedAction(handlePublishWrapper)}
         // onPublish={onPublish}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
       />
 
       <div className="editor-workspace-vertical" ref={workspaceRef}>
-        {viewMode === "dashboard" ? (
+        {viewMode === "dashboard" && !isPreviewing ? (
           <div className="workspace-section dashboard-section" style={{ width: '100%', height: '100%' }}>
             <DashboardView />
           </div>
@@ -344,6 +457,12 @@ const EditorView: React.FC<EditorViewProps> = ({
       {isAuthLinkModalOpen && (
         <AuthLinkModal
           onClose={() => setIsAuthLinkModalOpen(false)}
+        />
+      )}
+
+      {(isSaving || isPublishing) && (
+        <LoadingOverlay
+          message={isSaving ? "プロジェクトを保存中..." : "公開準備中..."}
         />
       )}
     </div>

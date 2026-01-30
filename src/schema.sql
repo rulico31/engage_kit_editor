@@ -157,20 +157,20 @@ create or replace view analytics_daily_stats as
 with daily_pv as (
   select
     project_id,
-    date_trunc('day', created_at) as date,
+    date_trunc('day', created_at at time zone 'Asia/Tokyo') as date,
     count(*) as pv,
     count(distinct session_id) as uu
   from analytics_logs
   where event_type = 'page_view'
-  group by project_id, date_trunc('day', created_at)
+  group by project_id, date_trunc('day', created_at at time zone 'Asia/Tokyo')
 ),
 daily_cv as (
   select
     project_id,
-    date_trunc('day', created_at) as date,
+    date_trunc('day', created_at at time zone 'Asia/Tokyo') as date,
     count(*) as cv
   from leads
-  group by project_id, date_trunc('day', created_at)
+  group by project_id, date_trunc('day', created_at at time zone 'Asia/Tokyo')
 )
 select
   coalesce(pv.project_id, cv.project_id) as project_id,
@@ -196,6 +196,19 @@ select
   count(distinct session_id) as unique_users
 from analytics_logs
 where node_id is not null
+group by project_id, node_id;
+
+-- (2) ノード別統計
+drop view if exists analytics_node_stats cascade;
+create or replace view analytics_node_stats as
+select
+  project_id,
+  node_id,
+  count(*) as interaction_count,
+  count(distinct session_id) as unique_users
+from analytics_logs
+where node_id is not null
+  and event_type in ('interaction', 'click', 'lead_submit', 'input_correction') -- ユーザー操作のみに限定
 group by project_id, node_id;
 
 

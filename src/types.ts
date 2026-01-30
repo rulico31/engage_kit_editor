@@ -1,132 +1,125 @@
-// src/types.ts
+import type { Edge, Node } from "reactflow";
 
-import type { Node, Edge } from "reactflow";
+export interface ProjectData {
+  id: string;
+  name: string;
+  pages: PageType[];
+  owner_id: string;
+  is_published: boolean;
+  public_url?: string;
+  settings?: ProjectSettings;
+  created_at?: string;
+  updated_at?: string;
+}
 
-// ★ 修正: ダッシュボードモードを追加
-export type ViewMode = "design" | "logic" | "split" | "dashboard";
+export interface ProjectSettings {
+  seoTitle?: string;
+  seoDescription?: string;
+  ogImage?: string;
+  favicon?: string;
+  googleAnalyticsId?: string;
+  customCss?: string;
+  theme?: {
+    primaryColor: string;
+    fontFamily: string;
+  };
+}
 
+export interface PageType {
+  id: string;
+  name: string;
+  nodes: Node[];
+  edges: Edge[];
+  placedItems: PlacedItemType[];
+  backgroundColor?: string;
+  backgroundImage?: BackgroundImage;
+}
 
+export interface BackgroundImage {
+  url: string;
+  opacity: number;
+  scale: number;
+  position: { x: number; y: number };
+  displayMode: 'cover' | 'contain' | 'tile' | 'fixed'; // 背景画像の表示モード
+}
 
 export interface PlacedItemType {
   id: string;
-  type: string; // added
-  name: string; // 要素のタイプ（例: "ボタン", "画像", "テキスト"など）- 固定
-  displayName?: string; // ユーザーが設定するカスタム名（オプション）
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  groupId?: string;
-
-  // Mobile Layout
+  type: string;
+  name: string; // Added
+  x?: number; // Added (flattened)
+  y?: number; // Added (flattened)
+  width?: number; // Added (flattened)
+  height?: number; // Added (flattened)
+  // Mobile view properties
   mobileX?: number;
   mobileY?: number;
   mobileWidth?: number;
   mobileHeight?: number;
-
-  // Device Visibility
-  deviceVisibility?: {
-    hideOnMobile?: boolean;
-    hideOnDesktop?: boolean;
-  };
-
-  style?: {
-    shadow?: { enabled: boolean; color: string; x: number; y: number; blur: number };
-    glow?: { enabled: boolean; color: string; blur: number; spread: number };
-    textShadow?: { enabled: boolean; color: string; x: number; y: number; blur: number };
-    textGlow?: { enabled: boolean; color: string; blur: number };
-    backgroundColor?: string;
-  };
-
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  zIndex: number;
   data: {
-    text?: string;
-    src?: string | null;
-    variableName?: string;
-    placeholder?: string;
-    keepAspectRatio?: boolean;
-    originalAspectRatio?: number;
-    showBorder?: boolean;
-    inputType?: string; // "text" | "email" | "number" | "tel" ...
-    required?: boolean;
-    initialVisibility?: boolean; // 初期表示
-
-    // 画像トリミング用
-    originalSrc?: string;
-    cropState?: { crop: any; zoom: number };
-    isTransparent?: boolean; // 背景透過
-    isArtboardBackground?: boolean; // アートボード背景かどうか
-    color?: string; // 文字色など
+    text?: string; // Added
+    label?: string;
+    value?: string;
+    src?: string;
+    backgroundColor?: string;
+    color?: string;
     fontSize?: number;
+    fontFamily?: string;
+    textAlign?: 'left' | 'center' | 'right';
+    borderWidth?: number;
+    borderColor?: string;
+    borderRadius?: number;
+    placeholder?: string;
+    options?: string[]; // For Choice/Dropdown
+    required?: boolean; // For Input
+    name?: string; // For Form Input name attribute
+    targetItemId?: string; // Legacy: For specific interaction target
+    targetItemIds?: string[]; // For multi-target interactions
 
-    // 電話番号入力用
-    enableCountryCode?: boolean; // 国コード選択UIを表示するか
-    countryCode?: string; // 選択された国コード (例: "+81")
+    // B2B行動分析用スコア
+    score?: number;
+
+    // Action (Button)
+    actionType?: 'none' | 'submit';
+    submitRedirectUrl?: string;
+
+    // Additional Properties for Input/Text
+    variableName?: string;
+    customName?: string; // カスタム名 (Dashboard等での表示用)
+    inputType?: 'text' | 'email' | 'tel' | 'number' | 'textarea';
+    enableCountryCode?: boolean;
+    countryCode?: string;
+    showBorder?: boolean;
+    isTransparent?: boolean;
+    isArtboardBackground?: boolean;
+    initialVisibility?: boolean;
+
+    // Image Crop Data
+    originalSrc?: string;
+    crop?: any; // ReactCrop type
+    zoom?: number;
   };
+  style?: any; // Added to support direct style access
 }
 
 export interface VariableState {
   [key: string]: any;
 }
 
-export interface PageData {
-  id: string;
-  name: string;
-  placedItems: PlacedItemType[];
-  allItemLogics: Record<string, NodeGraph>;
-  comments?: CommentType[]; // コメント配列を追加
-  backgroundColor?: string; // 背景色
-  backgroundImage?: {
-    src: string;
-    cropState?: { crop: any; zoom: number };
-    originalSrc?: string;
-    displayMode?: 'cover' | 'contain' | 'stretch' | 'tile' | 'custom';
-    position?: string; // 表示位置（デフォルト: 'center center'）
-    scale?: number; // サイズ倍率（デフォルト: 1.0 = 100%）
-  }; // 背景画像
-
-}
-
-export interface ThemeConfig {
-  fontFamily?: string;
-  accentColor?: string;
-  backgroundColor?: string;
-  borderRadius?: number; // px
-}
-
-export interface ProjectData {
-  projectName: string;
-  pages: Record<string, PageData>;
-  pageOrder: string[];
+export interface PreviewState {
+  [itemId: string]: any; // Allow indexing by itemId
+  currentPageId: string;
   variables: VariableState;
-  cloud_id?: string; // ★追加: クラウド同期用のID (UUID)
-  theme?: ThemeConfig; // ★追加: テーマ設定
-  dataRetentionPeriod?: 'forever' | '1year' | '3months';
-  deviceType?: 'mobile' | 'desktop'; // ★追加: デバイスタイプ
-  version?: number; // ★追加: データバージョン
+  history: string[]; // Page ID history
 }
 
-export interface PageInfo {
-  id: string;
-  name: string;
+export interface NodeGraph {
+  nodes: Node[];
+  edges: Edge[];
 }
-
-export interface SelectionEntry {
-  id: string;
-  type: 'item' | 'node';
-  label: string;
-  pageId?: string; // 所属するページID
-}
-
-
-
-export type PropertyControlType =
-  | 'text'
-  | 'number'
-  | 'textarea'
-  | 'select'
-  | 'multiselect'
-  | 'checkbox'
-  | 'color';
 
 export interface PropertySelectOption {
   label: string;
@@ -135,64 +128,13 @@ export interface PropertySelectOption {
 
 export interface PropertyConfig {
   name: string;
-  label: string;
-  type: PropertyControlType;
+  label?: string;
+  type: string;
   defaultValue?: any;
-  options?: PropertySelectOption[]; // for select
-  min?: number; // for number
-  max?: number; // for number
-  step?: number; // for number
-  checkboxLabel?: string; // チェックボックスの横に表示するテキスト
-  // 条件付き表示: 関数形式またはオブジェクト形式 { name: string, value: any }
-  condition?: ((data: any) => boolean) | { name: string; value: any };
-  // 表示条件: 他のフィールドの値に応じて表示を切り替え (例: { operationMode: "score" })
+  options?: PropertySelectOption[];
   visibleWhen?: Record<string, any>;
-}
-
-// React Flow Types
-export interface NodeGraph {
-  nodes: Node[];
-  edges: Edge[];
-  comments?: CommentType[]; // コメント配列を追加
-}
-
-// Preview State
-export interface PreviewState {
-  currentPageId: string;
-  isFinished: boolean;
-  confirmationModal?: {
-    isOpen: boolean;
-    nodeId: string;
-    variables: Record<string, any>;
-    headerText: string;
-    noticeText: string;
-    targetItemIds?: string[]; // ★ 追加: 表示対象のアイテムID
-    backPageId?: string; // ★ 追加: 戻る先のページID
-    isSubmitConfirmation?: boolean; // ★ 追加: 送信前の確認かどうか
-  };
-  [key: string]: any; // 動的なアイテム状態を許可
-}
-
-export interface SavedProject {
-  id: string;
-  user_id: string;
-  name: string;
-  data: ProjectData;
-  is_published: boolean;
-  published_url?: string;
-  created_at: string;
-  updated_at: string;
-  cloud_id?: string; // ★追加: ストア内でも管理するためのクラウドID
-}
-
-
-export interface CommentType {
-  id: string;
-  content: string;
-  x: number;
-  y: number;
-  color?: string;
-  isMinimized?: boolean;
-  authorId?: string; // 将来的にユーザー識別用
-  createdAt: number;
+  condition?: ((data: any) => boolean) | { name: string; value: any };
+  step?: number;
+  min?: number;
+  checkboxLabel?: string;
 }

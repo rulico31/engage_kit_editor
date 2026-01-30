@@ -5,12 +5,15 @@ export class SetVariableExecutor implements NodeExecutor {
         const { node, getVariables, setVariables, pushNext, allEdges, accumulatedQueue } = params;
         const { variableName, operation = 'set', value } = node.data;
 
-        console.log('📊 変数セットノード実行', {
-            nodeId: node.id,
-            variableName,
-            operation,
-            value
-        });
+
+        if (import.meta.env.DEV) {
+            console.log('📊 変数セットノード実行', {
+                nodeId: node.id,
+                variableName,
+                operation,
+                value
+            });
+        }
 
         if (variableName) {
             const currentVars = getVariables();

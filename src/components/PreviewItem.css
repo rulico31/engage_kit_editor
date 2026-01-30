@@ -17,6 +17,10 @@
   /* 追加: 行の高さを明示的に設定 */
 
   box-sizing: border-box;
+  flex-shrink: 0;
+  /* 自動縮小防止 */
+  flex-grow: 0;
+  /* 自動拡大防止 */
   cursor: default;
 
   /* 中央揃え */
@@ -39,6 +43,9 @@
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
+
+  /* スクロールバーが隠れないようにする */
+  overflow: visible !important;
 }
 
 /* 画像コンテンツ */
@@ -61,7 +68,14 @@
 .preview-input-content {
   width: 100%;
   height: 100%;
+  flex: 1;
+  /* 親要素の残りの高さを埋める */
+  min-height: 0;
+  /* Flexアイテムの押し出し防止 */
+  max-height: 100%;
+  /* 親の高さを超えない */
   resize: none;
+  overflow-y: auto;
   border: 1px solid transparent;
   /* 境界線を透明で確保 */
   background: transparent;
@@ -99,6 +113,17 @@
 .preview-input-content.has-error {
   border: 1px solid #ef4444;
   background-color: #fef2f2;
+}
+
+/* ★ 追加: 全ての入力タイプ共通（折り返し＆縦スクロール） */
+.preview-input-content.is-singleline,
+.preview-input-content.is-textarea {
+  white-space: pre-wrap;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* 強制的に折り返す（英数字の羅列対策） */
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 /* ★ 更新: エラーメッセージを上に表示 */

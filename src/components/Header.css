@@ -172,6 +172,8 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+  /* Prevent text wrapping */
 }
 
 .preview-toggle-button:hover {
@@ -202,6 +204,11 @@
   cursor: pointer;
   transition: background-color 0.2s;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  margin-left: 8px;
+  /* Add space from other buttons */
+  margin-right: 4px;
+  /* Add space from edge */
+  white-space: nowrap;
 }
 
 .publish-button:hover {

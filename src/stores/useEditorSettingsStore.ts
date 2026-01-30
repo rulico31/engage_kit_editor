@@ -11,6 +11,9 @@ interface EditorSettingsState {
   isPreviewing: boolean;
   isMobileView: boolean;
 
+  // Focus management
+  pendingFocusNodeId: string | null;
+
   // Actions
   toggleGrid: () => void;
   setShowGrid: (show: boolean) => void;
@@ -19,6 +22,7 @@ interface EditorSettingsState {
   setViewMode: (mode: ViewMode) => void;
   togglePreview: () => void;
   setIsMobileView: (isMobile: boolean) => void;
+  setPendingFocusNodeId: (id: string | null) => void;
 }
 
 export const useEditorSettingsStore = create<EditorSettingsState>((set, get) => ({
@@ -28,12 +32,14 @@ export const useEditorSettingsStore = create<EditorSettingsState>((set, get) => 
   viewMode: 'design',
   isPreviewing: false,
   isMobileView: false,
+  pendingFocusNodeId: null,
 
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   setShowGrid: (show) => set({ showGrid: show }),
   toggleSnap: () => set((state) => ({ snapToGrid: !state.snapToGrid })),
   setGridSize: (size) => set({ gridSize: size }),
   setViewMode: (mode) => set({ viewMode: mode }),
+  setPendingFocusNodeId: (id) => set({ pendingFocusNodeId: id }),
   togglePreview: () => {
     const newState = !get().isPreviewing;
     set({ isPreviewing: newState });

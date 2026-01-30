@@ -4,11 +4,14 @@ export class AnimateExecutor implements NodeExecutor {
     async execute(params: ExecutionParams): Promise<void> {
         const { node, getPreviewState, setPreviewState, placedItems, triggerItemId, pushNext, allEdges, processQueue } = params;
 
-        console.log('🎬 アニメーションノード実行', {
-            nodeId: node.id,
-            nodeData: node.data,
-            targetItemId: node.data.targetItemId
-        });
+
+        if (import.meta.env.DEV) {
+            console.log('🎬 アニメーションノード実行', {
+                nodeId: node.id,
+                nodeData: node.data,
+                targetItemId: node.data.targetItemId
+            });
+        }
 
         const {
             targetItemId,

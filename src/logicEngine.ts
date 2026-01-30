@@ -170,10 +170,12 @@ export const onConfirmationResult = (
   activeListeners: ActiveListeners,
   context: LogicRuntimeContext
 ) => {
-  console.log('📋 確認画面の結果を処理', {
-    nodeId,
-    result
-  });
+  if (import.meta.env.DEV) {
+    // console.log('📋 確認画面の結果を処理', {
+    //   nodeId,
+    //   result
+    // });
+  }
 
   // モーダルを閉じる
   const currentState = getPreviewState();
@@ -235,13 +237,15 @@ export const triggerEvent = (
 ) => {
   const { nodes, edges } = currentPageGraph;
 
-  console.log('🔔 イベント発火', {
-    eventName,
-    targetItemId,
-    logicOwnerId,
-    totalNodes: nodes.length,
-    totalEdges: edges.length
-  });
+  if (import.meta.env.DEV) {
+    // console.log('🔔 イベント発火', {
+    //   eventName,
+    //   targetItemId,
+    //   logicOwnerId,
+    //   totalNodes: nodes.length,
+    //   totalEdges: edges.length
+    // });
+  }
 
   // 1. 「待機中」のフローを再開させる
   if (eventName === "click" && activeListeners.has(targetItemId)) {
@@ -251,6 +255,9 @@ export const triggerEvent = (
       activeListeners.delete(targetItemId);
     }
   }
+
+  // --- B2B Scoring Logic は usePreviewStore.handleItemEvent に移動済み ---
+  // triggerEvent は複数回呼ばれるため、ここではスコア加算しない
 
   // 2. イベント開始ノードを探す
   const startingNodes = nodes.filter((n) => {
@@ -271,10 +278,12 @@ export const triggerEvent = (
     return logicOwnerId === targetItemId;
   });
 
-  console.log('🎯 見つかったイベントノード', {
-    count: startingNodes.length,
-    nodes: startingNodes.map(n => ({ id: n.id, label: n.data.label }))
-  });
+  if (import.meta.env.DEV) {
+    // console.log('🎯 見つかったイベントノード', {
+    //   count: startingNodes.length,
+    //   nodes: startingNodes.map(n => ({ id: n.id, label: n.data.label }))
+    // });
+  }
 
   if (startingNodes.length > 0) {
     const initialQueue: string[] = [];

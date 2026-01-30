@@ -33,7 +33,7 @@ export const ThinkingTimeChart: React.FC<ThinkingTimeChartProps> = ({ data }) =>
             <h3 className="chart-title">思考時間パターン (Thinking Time)</h3>
             <div className="chart-subtitle">ユーザーがアクションを起こすまでの「迷い」の割合</div>
             <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
                             data={chartData}
@@ -59,19 +59,23 @@ export const ThinkingTimeChart: React.FC<ThinkingTimeChartProps> = ({ data }) =>
                                 <Cell key={`cell-${index}`} fill={COLORS[entry.pattern] || '#8884d8'} />
                             ))}
                         </Pie>
-                        <Tooltip formatter={(value: number, name: string, props: any) => {
-                            const label = LABELS[props.payload.pattern as keyof typeof LABELS] || name;
-                            return [`${value}回`, label];
-                        }} />
+                        <Tooltip
+                            contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }}
+                            itemStyle={{ color: '#fff' }}
+                            formatter={(value: number, name: string, props: any) => {
+                                const label = LABELS[props.payload.pattern as keyof typeof LABELS] || name;
+                                return [`${value}回`, label];
+                            }}
+                        />
                         <Legend formatter={(value, entry: any) => LABELS[entry.payload.pattern as keyof typeof LABELS] || value} />
                     </PieChart>
                 </ResponsiveContainer>
             </div>
             <div className="chart-legend-note">
                 <ul className="legend-note-list">
-                    <li><strong>⚡ 直感 (&lt;2.5s)</strong>: 即答。確信度が高い状態。</li>
-                    <li><strong>🤔 通常 (2.5-8s)</strong>: 一般的な思考・読み込み時間。</li>
-                    <li><strong>😰 迷い (&gt;8s)</strong>: 悩み、離脱リスクが高い状態。</li>
+                    <li><strong>⚡ 直感 (&lt;3s)</strong>: 即答。確信度が高い状態。</li>
+                    <li><strong>🤔 通常 (3-15s)</strong>: 一般的な思考・読み込み時間。</li>
+                    <li><strong>😰 迷い (&gt;15s)</strong>: 悩み、離脱リスクが高い状態。</li>
                 </ul>
             </div>
         </div>

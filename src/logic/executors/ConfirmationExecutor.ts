@@ -64,12 +64,17 @@ export class ConfirmationExecutor implements NodeExecutor {
         });
 
         if (hasValidationError) {
-            console.log("🚫 Validation failed at confirmation node", validationErrors);
+            if (import.meta.env.DEV) {
+                console.log("🚫 Validation failed at confirmation node", validationErrors);
+            }
             setPreviewState(newPreviewState);
             return;
         }
 
-        console.log('✅ Validation OK. Showing confirmation modal.');
+
+        if (import.meta.env.DEV) {
+            console.log('✅ Validation OK. Showing confirmation modal.');
+        }
         const currentVars = getVariables();
 
         setPreviewState({

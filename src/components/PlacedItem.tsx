@@ -50,7 +50,10 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const isInput = name.startsWith("テキスト入力欄");
   const isButton = name.includes("ボタン");
 
-  if (name.startsWith("画像")) {
+  // 画像判定の強化: 名前が変更されていても type や id で判定
+  const isImage = name.startsWith("画像") || item.type === 'image' || id.startsWith('image');
+
+  if (isImage) {
     if (item.data.src) {
       content = (
         <img
@@ -75,7 +78,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         placeholder={item.data.placeholder || "入力してください"}
         value={inputValue}
         onCompositionStart={() => inputTracker.onCompositionStart()}
-        onCompositionEnd={(e) => inputTracker.onCompositionEnd(e.data)}
+        onCompositionEnd={() => inputTracker.onCompositionEnd()}
         onChange={(e) => {
           const newValue = e.target.value;
           setInputValue(newValue);
@@ -95,7 +98,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
           console.log('🔍 [PlacedItem] InputTracker report:', report);
 
           // Supabaseに入力修正データを記録
-          const shouldLog = inputValue.length > 0 || report.raw.correction_count > 0;
+          const shouldLog = inputValue.length > 0 || report.input_correction_count > 0;
 
           if (shouldLog) {
             console.log('🔍 [PlacedItem] Calling logAnalyticsEvent...', {
@@ -141,6 +144,9 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   return (
     <div
       className={itemClassName}
+      data-node-id={id}
+      data-node-name={item.data.customName || name}
+      data-node-type={item.type || name.split('-')[0] || 'unknown'}
       style={{
         position: "absolute",
         left: `${itemState.x}px`,
@@ -150,7 +156,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         height: isAutoHeight ? 'auto' : `${height}px`,
         minHeight: isAutoHeight ? `${height}px` : undefined,
 
-        zIndex: 0,
+        zIndex: item.zIndex || 0,
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
@@ -158,7 +164,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
         // 枠線の制御（入力欄はCSSで制御するためここではborder指定をスキップする場合もあるが、一貫性のため残す）
         border: (item.data.showBorder === false) ? 'none' : undefined,
-        backgroundColor: (item.data.isTransparent) ? 'transparent' : ((item.style as any)?.backgroundColor || undefined),
+        backgroundColor: (item.data.isTransparent) ? 'transparent' : (item.data?.backgroundColor || (item.style as any)?.backgroundColor || undefined),
         // @ts-ignore
         borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
         overflow: 'hidden',

@@ -14,6 +14,7 @@ interface PreviewHostProps {
   ) => void;
   allItemLogics: Record<string, NodeGraph>;
   isMobile?: boolean; // 追加
+  projectId?: string; // 追加
 }
 
 const PreviewHost: React.FC<PreviewHostProps> = ({
@@ -22,6 +23,7 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
   setPreviewState,
   allItemLogics,
   isMobile = false,
+  projectId
 }) => {
   const clearLogs = useDebugLogStore(state => state.clearLogs);
 
@@ -49,6 +51,11 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
           return null;
         }
 
+        // Debug: Log image items
+        if (item.type === 'image' || item.name?.startsWith('画像')) {
+          console.log('[PreviewHost] Image item found:', { id: item.id, name: item.name, type: item.type, hasSrc: !!item.data?.src, itemState });
+        }
+
         // アイテムの状態が存在しない、または非表示設定の場合は描画しない
         if (!itemState || !itemState.isVisible) {
           return null;
@@ -63,6 +70,8 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
             setPreviewState={setPreviewState}
             allItemLogics={allItemLogics}
             isMobile={isMobile}
+            projectId={projectId}
+            placedItems={placedItems} // Added for submitLeadData
           />
         );
       })}

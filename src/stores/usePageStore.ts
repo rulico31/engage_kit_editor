@@ -766,21 +766,17 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
   // --- 履歴管理 ---
   commitHistory: (debounce = false) => {
-    console.log('[COMMIT_HISTORY] called with debounce:', debounce);
 
     if (debounce) {
       if (commitHistoryTimer !== null) {
         clearTimeout(commitHistoryTimer);
       }
       commitHistoryTimer = window.setTimeout(() => {
-        console.log('[COMMIT_HISTORY] debounce timer fired');
         get().commitHistory(false);
         commitHistoryTimer = null;
       }, 500);
       return;
     }
-
-    console.log('[COMMIT_HISTORY] saving history NOW');
 
     set(state => {
       const pageId = state.selectedPageId;
@@ -819,16 +815,13 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
   undo: () => {
     const currentState = get();
-    console.log('[UNDO] historyIndex:', currentState.historyIndex, 'history.length:', currentState.history.length);
 
     set(state => {
       if (state.historyIndex <= 0) {
-        console.log('[UNDO] Cannot undo - at beginning of history');
         return state;
       }
       const newIndex = state.historyIndex - 1;
       const historyState = state.history[newIndex];
-      console.log('[UNDO] Applying undo, new index:', newIndex);
 
       return {
         historyIndex: newIndex,
@@ -843,16 +836,13 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
   redo: () => {
     const currentState = get();
-    console.log('[REDO] historyIndex:', currentState.historyIndex, 'history.length:', currentState.history.length, 'canRedo:', currentState.canRedo);
 
     set(state => {
       if (state.historyIndex >= state.history.length - 1) {
-        console.log('[REDO] Cannot redo - at end of history');
         return state;
       }
       const newIndex = state.historyIndex + 1;
       const historyState = state.history[newIndex];
-      console.log('[REDO] Applying redo, new index:', newIndex);
 
       return {
         historyIndex: newIndex,

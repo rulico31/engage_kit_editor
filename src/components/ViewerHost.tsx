@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { usePreviewStore } from "../stores/usePreviewStore";
 import { usePageStore } from "../stores/usePageStore";
-import { useProjectStore } from "../stores/useProjectStore";
 import PreviewHost from "./PreviewHost";
-import type { ProjectData } from "../types";
+import type { ProjectData, PlacedItemType } from "../types";
 import "./Artboard.css";
 import { logAnalyticsEvent } from "../lib/analytics";
 import { ViewerErrorBoundary } from "./ViewerErrorBoundary";
 import { initializeUTMTracking } from "../lib/UTMTracker";
 import { initializeDeviceTracking } from "../lib/DeviceDetector";
+import { useActionAnalytics } from "../hooks/useActionAnalytics";
 
 interface ViewerHostProps {
   projectId: string;
@@ -32,195 +32,263 @@ const PoweredByBadge: React.FC = () => (
       zIndex: 9999,
       fontSize: '11px',
       color: '#444',
-      fontFamily: 'sans-serif',
-      transition: 'opacity 0.2s',
-      border: '1px solid rgba(0,0,0,0.05)',
+      pointerEvents: 'none',
       userSelect: 'none',
-      pointerEvents: 'none'
     }}
   >
-    <span style={{ fontWeight: 500 }}>Powered by</span>
-    <span style={{ fontWeight: 700, color: '#3b82f6' }}>EngageKit</span>
+    <span style={{ opacity: 0.7 }}>Powered by</span>
+    <span style={{ fontWeight: 600, color: '#2563eb' }}>EngageKit</span>
   </div>
 );
 
 const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [projectData, setProjectData] = useState<ProjectData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showWatermark] = useState(true);
 
-  const hasLogged = useRef(false);
+  // PV重複防止用のRef（React Strict Mode対策）
+  const hasLoggedPV = useRef(false);
 
-  // PC基準の固定幅
-  const FIXED_WIDTH = 1000;
+  // Store actions
+  const loadFromData = usePageStore((state) => state.loadFromData);
+  const setPreviewState = usePreviewStore((state) => state.setPreviewState);
+  const previewState = usePreviewStore((state) => state.previewState);
+  const currentHistoryIndex = usePreviewStore((state) => state.currentHistoryIndex);
 
-  const [scale, setScale] = useState(1);
+  console.log('[ViewerHost] Top-Level Log -> currentHistoryIndex:', currentHistoryIndex);
 
-  const initPreview = usePreviewStore(state => state.initPreview);
-  const loadFromData = usePageStore(state => state.loadFromData);
+  // Store data
+  const pages = usePageStore((state) => state.pages);
 
-  const { placedItems, allItemLogics, backgroundColor, backgroundImage } = usePageStore(state => {
-    const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
-    return {
-      placedItems: page?.placedItems || [],
-      allItemLogics: page?.allItemLogics || {},
-      backgroundColor: page?.backgroundColor,
-      backgroundImage: page?.backgroundImage,
-    };
-  });
+  // Logic
+  // ノードごとのロジックマップを作成 (NodeExecutor等で使用)
+  const allItemLogics = useMemo(() => {
+    // 実際の実装では、pages から nodes/edges を抽出してマップ化する
+    // 簡易的に全ページのノードを集約
+    const logics: Record<string, any> = {};
+    // ...ロジック抽出処理があればここに記述
+    return logics;
+  }, [pages]);
 
-  const { previewState, setPreviewState } = usePreviewStore(state => ({
-    previewState: state.previewState,
-    setPreviewState: state.setPreviewState,
-  }));
-
-  // コンテンツの「本当の高さ」を自動計算
-  const contentHeight = useMemo(() => {
-    if (!placedItems || placedItems.length === 0) return 700; // アイテムがない時のデフォルト
-
-    // すべてのアイテムの中で「一番下のY座標」を探す
-    const bottomY = Math.max(...placedItems.map(item => item.y + item.height));
-
-    // 余白バッファを完全に削除 (bottomYのみ)
-    // 最低でも100pxは確保
-    return Math.max(bottomY, 100);
-  }, [placedItems]);
-
-  // UTMパラメータとデバイス情報の初期化
+  // 初期化: Supabaseからプロジェクトデータを取得
   useEffect(() => {
-    // UTMパラメータ取得・保存（初回アクセス時のみ）
-    const utmData = initializeUTMTracking();
-    if (utmData) {
-      console.log('📊 UTM Parameters captured:', utmData);
-    }
-
-    // デバイス情報取得・保存
-    const deviceInfo = initializeDeviceTracking();
-    console.log('📱 Device Info captured:', deviceInfo);
-  }, []); // 1回のみ実行
-
-  useEffect(() => {
-    const fetchAndInit = async () => {
+    const fetchProject = async () => {
       try {
-        useProjectStore.setState({ currentProjectId: projectId });
-
+        console.log('[ViewerHost] Starting fetch for projectId:', projectId);
+        setLoading(true);
+        // 公開プロジェクトの取得
+        // RLSポリシーにより、公開プロジェクトのみ取得可能である前提
         const { data, error } = await supabase
           .from("projects")
-          .select("published_content, is_published")
+          .select("*")
           .eq("id", projectId)
           .single();
 
+        console.log('[ViewerHost] Supabase response:', { data, error });
+
         if (error) throw error;
-        if (!data) throw new Error("プロジェクトが見つかりません");
+        if (!data) throw new Error("Project not found");
 
-        if (!data.is_published || !data.published_content) {
-          throw new Error("このプロジェクトは現在公開されていません。");
+        // Supabaseのprojectsテーブルから取得したデータ
+        // Viewerでは published_content を使用（公開済みコンテンツ）
+        const rawData = data as any;
+        setProjectData(rawData);
+        console.log('[ViewerHost] Raw data:', rawData);
+
+        // published_content から pages と pageOrder を取得
+        // データはすでに { pages: Record<string, PageData>, pageOrder: string[] } 形式
+        const publishedContent = rawData.published_content;
+        console.log('[ViewerHost] Published content:', publishedContent);
+
+        if (!publishedContent) {
+          throw new Error("Project is not published");
         }
 
-        const projectData = data.published_content as ProjectData;
+        const pagesRecord = publishedContent.pages || {};
+        const pageOrder = publishedContent.pageOrder || [];
+        console.log('[ViewerHost] Pages record:', pagesRecord);
+        console.log('[ViewerHost] Page order:', pageOrder);
 
-        // テーマ適用
-        if (projectData.theme) {
-          const root = document.documentElement;
-          if (projectData.theme.fontFamily) root.style.setProperty('--theme-font-family', projectData.theme.fontFamily);
-          if (projectData.theme.accentColor) root.style.setProperty('--theme-accent-color', projectData.theme.accentColor);
-          if (projectData.theme.backgroundColor) root.style.setProperty('--theme-background-color', projectData.theme.backgroundColor);
-          if (projectData.theme.borderRadius !== undefined) root.style.setProperty('--theme-border-radius', `${projectData.theme.borderRadius}px`);
+        // placedItems の position と size を正規化（x,y,width,height → position, size形式）
+        const normalizedPages: Record<string, any> = {};
+        Object.keys(pagesRecord).forEach(pageId => {
+          const page = pagesRecord[pageId];
+          normalizedPages[pageId] = {
+            ...page,
+            placedItems: (page.placedItems || []).map((item: any) => ({
+              ...item,
+              // Flatten position and size for PreviewItem compatibility
+              x: item.x ?? item.position?.x ?? 0,
+              y: item.y ?? item.position?.y ?? 0,
+              width: item.width ?? item.size?.width ?? 200,
+              height: item.height ?? item.size?.height ?? 50,
+              // Also keep nested structure for compatibility
+              position: item.position || { x: item.x || 0, y: item.y || 0 },
+              size: item.size || { width: item.width || 200, height: item.height || 50 }
+            }))
+          };
+        });
+        console.log('[ViewerHost] Normalized pages:', normalizedPages);
+
+        // ストアにデータをセット（loadFromDataを使用）
+        console.log('[ViewerHost] Calling loadFromData...');
+        loadFromData({
+          pages: normalizedPages,
+          pageOrder: pageOrder
+        } as any);
+        console.log('[ViewerHost] loadFromData complete');
+
+        // 初期ページを取得してプレビュー状態を設定
+        const firstPageId = pageOrder.length > 0 ? pageOrder[0] : null;
+        console.log('[ViewerHost] First page ID:', firstPageId);
+
+        if (firstPageId) {
+          // 全アイテムの初期表示状態を作成
+          const initialItemStates: Record<string, any> = {};
+          Object.values(normalizedPages).forEach((page: any) => {
+            (page.placedItems || []).forEach((item: any) => {
+              initialItemStates[item.id] = {
+                isVisible: true,
+                x: item.x ?? item.position?.x ?? 0,
+                y: item.y ?? item.position?.y ?? 0,
+                opacity: 1,
+                scale: 1,
+                rotation: 0,
+                transition: null
+              };
+            });
+          });
+          console.log('[ViewerHost] Initial item states:', initialItemStates);
+
+          setPreviewState({
+            currentPageId: firstPageId,
+            variables: {},
+            history: [firstPageId],
+            ...initialItemStates
+          } as any);
+
+          // 履歴インデックスの初期化を明示的に行う
+          usePreviewStore.setState({
+            navigationHistory: [{ pageId: firstPageId, visitedAt: Date.now() }],
+            currentHistoryIndex: 0
+          });
+
+          // プロジェクトIDを明示的にセット
+          if (projectId) {
+            usePreviewStore.getState().setProjectId(projectId);
+          }
+
+          console.log('[ViewerHost] Preview state set with item visibility');
         }
 
-        loadFromData(projectData);
+        // UTM & Device Tracking Initialization
+        initializeUTMTracking();
+        const deviceInfo = initializeDeviceTracking();
 
-        setTimeout(() => {
-          initPreview();
-          setIsLoaded(true);
+        // IP Address Pre-fetch (リード送信時の遅延を防ぐ)
+        const { prefetchIpAddress } = await import('../lib/IpAddressTracker');
+        prefetchIpAddress();
+
+        // PV計測 (device_info を含める) - 重複防止ガード
+        if (!hasLoggedPV.current) {
+          hasLoggedPV.current = true;
+          // ページ名取得
+          const firstPageName = firstPageId ? normalizedPages[firstPageId]?.name : 'Unknown Page';
+
           logAnalyticsEvent('page_view', {
-            metadata: { referrer: document.referrer }
+            pageId: firstPageId,
+            pageName: firstPageName, // ★ Added pageName
+            device_info: deviceInfo
           }, projectId);
-        }, 50);
+          console.log('[ViewerHost] page_view logged', { pageId: firstPageId, pageName: firstPageName });
+        } else {
+          console.log('[ViewerHost] page_view skipped (already logged)');
+        }
+
+        console.log('[ViewerHost] Initialization complete!');
 
       } catch (err: any) {
-        console.error(err);
-        setError(err.message || "コンテンツの読み込みに失敗しました。");
+        console.error("[ViewerHost] Error fetching project:", err);
+        setError(err.message || "Failed to load content");
+      } finally {
+        setLoading(false);
+        console.log('[ViewerHost] Loading set to false');
       }
     };
 
-    if (projectId && !hasLogged.current) {
-      fetchAndInit();
-      hasLogged.current = true;
+    if (projectId) {
+      fetchProject();
     }
-  }, [projectId, loadFromData, initPreview]);
+  }, [projectId, loadFromData, setPreviewState]);
 
-  // スケール計算ロジック
+  // ■ 行動分析監視ロジック (Smart Action Analytics)
+  // usePreviewStore から現在のページ情報を取得
+  const currentId = previewState.currentPageId;
+  const currentName = currentId ? pages[currentId]?.name : null;
+  useActionAnalytics(projectId, true, currentId, currentName);
+
+
+  // レイアウト計算
+  const FIXED_WIDTH = 1000;
+  const FIXED_HEIGHT = 700; // 基準の高さ
+
+  const [scale, setScale] = useState(1);
+
   useEffect(() => {
     const handleResize = () => {
-      const viewportWidth = window.innerWidth;
-      const newScale = Math.min(viewportWidth / FIXED_WIDTH, 1);
+      const windowWidth = window.innerWidth;
+      // 1000pxより小さい場合のみ縮小
+      const newScale = windowWidth < FIXED_WIDTH ? windowWidth / FIXED_WIDTH : 1;
       setScale(newScale);
     };
 
-    handleResize();
     window.addEventListener('resize', handleResize);
+    handleResize(); // 初期実行
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // 計算した高さをスケールに合わせて適用
-  const wrapperHeight = contentHeight * scale;
+  // 現在のページの背景設定を取得
+  const currentPage = previewState.currentPageId ? pages[previewState.currentPageId] : null;
+  const backgroundColor = currentPage?.backgroundColor || '#ffffff';
+  const backgroundImage = currentPage?.backgroundImage;
 
-  // iframeの高さを自動調整するためのメッセージ送信
-  useEffect(() => {
-    if (wrapperHeight > 0) {
-      window.parent.postMessage({
-        type: 'ENGAGE_KIT_RESIZE',
-        height: wrapperHeight
-      }, '*');
-    }
-  }, [wrapperHeight]);
-
-  if (error) {
-    return (
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        color: "#ff6b6b",
-        backgroundColor: "#111",
-        flexDirection: "column",
-        gap: "1rem"
-      }}>
-        <p>{error}</p>
-        <p style={{ fontSize: "0.8rem", color: "#666" }}>Project ID: {projectId}</p>
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        color: "#888",
-        backgroundColor: "#111"
-      }}>
-        Loading content...
-      </div>
-    );
-  }
-
+  // 背景画像のスタイル
   const backgroundStyle: React.CSSProperties = {
-    backgroundColor: backgroundColor || "#ffffff",
-    width: "100vw",
-    height: "100vh",
-    overflowX: "hidden",
-    overflowY: "auto",
-    position: "relative",
-    backgroundImage: backgroundImage?.src ? `url(${backgroundImage.src})` : undefined,
-    backgroundSize: backgroundImage?.displayMode === 'tile' ? 'auto' : (backgroundImage?.displayMode || 'cover'),
-    backgroundPosition: backgroundImage?.position || 'center center',
+    backgroundColor: backgroundColor,
+    backgroundImage: backgroundImage?.src ? `url(${backgroundImage.src})` : 'none',
+    backgroundSize: backgroundImage?.displayMode === 'cover' ? 'cover' :
+      backgroundImage?.displayMode === 'contain' ? 'contain' : 'auto',
+    backgroundPosition: 'center center',
     backgroundRepeat: backgroundImage?.displayMode === 'tile' ? 'repeat' : 'no-repeat',
   };
+
+  // デバッグログ: レンダリング状態
+  console.log('[ViewerHost] Render state:', { loading, error, projectData: !!projectData, previewState, currentPage, pages });
+
+  if (loading) {
+    console.log('[ViewerHost] Rendering: Loading...');
+    return <div className="viewer-loading">Loading...</div>;
+  }
+  if (error) {
+    console.log('[ViewerHost] Rendering: Error', error);
+    return <div className="viewer-error">Error: {error}</div>;
+  }
+  if (!projectData) {
+    console.log('[ViewerHost] Rendering: No Data');
+    return <div className="viewer-error">No Data</div>;
+  }
+
+  // コンテンツの高さ計算 (ページ内の最下部アイテムを探す)
+  const currentPageData = previewState.currentPageId ? pages[previewState.currentPageId] : null;
+  const placedItems = currentPageData?.placedItems || [];
+  const currentPageItems = placedItems;
+
+  console.log('[ViewerHost] Rendering content:', { currentPageData, placedItems: placedItems.length, currentPageItems });
+
+  const maxY = currentPageItems.reduce((max: number, item: PlacedItemType) => Math.max(max, item.position.y + item.size.height), FIXED_HEIGHT);
+  const contentHeight = Math.max(FIXED_HEIGHT, maxY + 50); // 余白
+
+  console.log('[ViewerHost] About to render main content with', placedItems.length, 'items');
 
   return (
     <div style={backgroundStyle}>
@@ -231,19 +299,19 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-start",
-        paddingTop: "0px", // 余白削除
-        paddingBottom: "0px" // 余白削除
+        paddingTop: "0px",
+        paddingBottom: "0px"
       }}>
 
         {/* コンテンツラッパー: 自動計算された高さを使用 */}
         <div style={{
           width: `${FIXED_WIDTH * scale}px`,
-          height: `${wrapperHeight}px`,
+          height: `${contentHeight * scale}px`, // スクロール対応のためwrapperHeightではなくコンテンツに合わせる
           position: "relative",
-          overflow: "hidden",
+          overflow: "hidden", // はみ出し防止
         }}>
 
-          {/* 中身: 自動計算された contentHeight を使用 */}
+          {/* 中身: scale変換 */}
           <div style={{
             width: `${FIXED_WIDTH}px`,
             height: `${contentHeight}px`,
@@ -261,13 +329,61 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
                 setPreviewState={setPreviewState}
                 allItemLogics={allItemLogics}
                 isMobile={false}
+                projectId={projectId || undefined} // Pass projectId
               />
             </ViewerErrorBoundary>
 
-            {showWatermark && <PoweredByBadge />}
           </div>
         </div>
       </div>
+
+      {/* 無料プラン等の場合のみ表示 (ロジック実装時は条件分岐) */}
+      <PoweredByBadge />
+
+      {/* Debug Info (To be removed) */}
+      <div style={{ position: 'fixed', bottom: 40, right: 10, fontSize: 10, color: 'red', zIndex: 10000, background: 'white' }}>
+        Idx: {currentHistoryIndex}
+      </div>
+
+      {/* 戻るボタン (履歴がある場合のみ表示) */}
+      {currentHistoryIndex > 0 && (
+        <button
+          onClick={() => usePreviewStore.getState().goBack()}
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: '20px',
+            zIndex: 9999,
+            padding: '10px 20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            border: '1px solid #e4e4e7',
+            borderRadius: '30px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: '#18181b',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            backdropFilter: 'blur(8px)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.12)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.08)';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+          <span style={{ paddingTop: '1px' }}>戻る</span>
+        </button>
+      )}
     </div>
   );
 };

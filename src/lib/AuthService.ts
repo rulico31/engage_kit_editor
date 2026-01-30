@@ -12,7 +12,7 @@ class AuthService {
      */
     async signInWithGoogle(forceAccountSelection: boolean = false): Promise<void> {
         const options: any = {
-            redirectTo: window.location.origin,
+            redirectTo: (import.meta.env.VITE_SITE_URL || window.location.origin),
         };
 
         // アカウント選択を強制する場合
@@ -39,7 +39,7 @@ class AuthService {
      */
     async signInWithMicrosoft(forceAccountSelection: boolean = false): Promise<void> {
         const options: any = {
-            redirectTo: window.location.origin,
+            redirectTo: (import.meta.env.VITE_SITE_URL || window.location.origin),
             scopes: 'email',
         };
 

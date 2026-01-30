@@ -67,7 +67,13 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
         const currentViewMode = useEditorSettingsStore.getState().viewMode;
         if (currentViewMode === 'logic') return;
         if (currentViewMode === 'split') {
-          if (activeEl?.closest('.react-flow') || activeEl?.closest('.node-editor')) {
+          if (
+            activeEl?.closest('.react-flow') ||
+            activeEl?.closest('.node-editor') ||
+            activeEl?.closest('.node-editor-wrapper') ||
+            document.querySelector('.node-editor-wrapper:hover')
+          ) {
+            console.log('🛡️ useArtboardLogic: Skipping delete (NodeEditor active/hovered)');
             return;
           }
         }

@@ -3,8 +3,12 @@ import type { PlacedItemType, PreviewState, VariableState } from "../../types";
 import "../Artboard.css";
 import { ResizeHandles } from "./ResizeHandles";
 import { useSelectionStore } from "../../stores/useSelectionStore";
+import { usePreviewStore } from "../../stores/usePreviewStore";
+import { usePageStore } from "../../stores/usePageStore";
+import { useProjectStore } from "../../stores/useProjectStore"; // Added
 import { InputTracker } from "../../lib/InputTracker"; // 追加
 import { logAnalyticsEvent } from "../../lib/analytics"; // 追加
+import { validateInput } from "../../lib/validation"; // 追加
 
 // 国コードリスト（PreviewItemと共通）
 const COUNTRY_CODES = [
@@ -64,7 +68,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const isHighlighted = highlightedItemIds.includes(item.id);
 
   // 入力系アイテムの自動高さ調整除外設定
-  const isAutoHeight = !isGroup && (item.name.startsWith("テキスト") || item.name.startsWith("ボタン"));
+  const isAutoHeight = !isGroup && ((item.name.startsWith("テキスト") && !item.name.startsWith("テキスト入力欄")) || item.name.startsWith("ボタン"));
 
   // モバイル用の座標・サイズ（未設定時はデスクトップ値を使用）
   const x = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
@@ -84,15 +88,23 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     fontFamily: 'var(--theme-font-family, inherit)',
     // @ts-ignore - 個別のborderRadius設定を使用
     borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
-    // 選択時はリサイズハンドルを表示するためoverflowをvisibleに、それ以外はhidden
-    overflow: (isSelected && !isPreviewing) ? 'visible' : 'hidden',
+    // 重なり順 (zIndex)
+    zIndex: item.zIndex || 0,
+    // 選択時はリサイズハンドルを表示するためoverflowをvisibleに
+    // また、プレビュー中の入力欄もスクロールバーを表示するためにvisibleにする
+    overflow: ((isSelected && !isPreviewing) || (isPreviewing && item.name.startsWith("テキスト入力欄"))) ? 'visible' : 'hidden',
+    // テキスト入力欄の場合はコンテナのパディングを0にする（入力エリアを最大化するため）
+    padding: item.name.startsWith("テキスト入力欄") ? 0 : undefined,
   };
 
   // 背景色（isTransparentがtrueの場合は強制的にtransparent）
   if (item.data?.isTransparent === true) {
     containerStyle.backgroundColor = 'transparent';
+  } else if (item.data?.backgroundColor) {
+    // プロパティパネルで設定された背景色 (data.backgroundColor)
+    containerStyle.backgroundColor = item.data.backgroundColor;
   } else if (item.style?.backgroundColor) {
-    // 個別に背景色が設定されている場合
+    // 個別に背景色が設定されている場合 (style.backgroundColor - legacy fallback)
     containerStyle.backgroundColor = item.style.backgroundColor;
   }
 
@@ -161,7 +173,9 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState(item.data?.countryCode || "+81");
+  const [isEditing, setIsEditing] = useState(false); // 編集モード管理用
   const [inputTracker] = useState(() => new InputTracker()); // InputTracker初期化
+  const focusTimeRef = useRef<number>(0); // 滞在時間計測用
 
   useEffect(() => {
     if (isPreviewing) {
@@ -169,60 +183,46 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         setInputValue(externalValue);
       }
     } else {
-      setInputValue("");
+      // エディタモードではプレースホルダーを初期値としてセット
+      setInputValue(item.data.placeholder || "");
       setError(null);
     }
-  }, [externalValue, isPreviewing]);
+  }, [externalValue, isPreviewing, item.data.placeholder]);
 
-  // バリデーション関数（PreviewItemと同じロジック）
+  // Debug: Layout check
+  useEffect(() => {
+    if (isPreviewing && item.name.startsWith("テキスト入力欄")) {
+      const ta = textareaRef.current;
+      if (ta) {
+        console.log('📏 [ArtboardItem] Layout Debug:', {
+          id: item.id,
+          name: item.name,
+          inputValueLength: inputValue.length,
+          styleHeight: containerStyle.height,
+          textarea: {
+            clientHeight: ta.clientHeight,
+            scrollHeight: ta.scrollHeight,
+            offsetHeight: ta.offsetHeight,
+            computedHeight: window.getComputedStyle(ta).height,
+            computedOverflowY: window.getComputedStyle(ta).overflowY
+          }
+        });
+      }
+    }
+  }, [isPreviewing, inputValue, item.name, item.id, containerStyle.height]);
+
+  // バリデーション関数 (validation.tsを使用)
   const validate = (val: string) => {
     if (!isPreviewing) return true; // 編集モード時はバリデーションしない
 
-    let newError: string | null = null;
-    const trimmed = val ? val.trim() : "";
+    const errorMsg = validateInput(val, {
+      required: !!item.data.required,
+      inputType: item.data.inputType,
+      enableCountryCode: item.data.enableCountryCode
+    });
 
-    // 1. 必須チェック
-    if (item.data.required && !trimmed) {
-      newError = "必須項目です";
-    }
-    // 2. 入力タイプ別チェック
-    else if (trimmed) {
-      if (item.data.inputType === 'email') {
-        // メールアドレスの形式チェック（ドメインチェック強化）
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(trimmed)) {
-          newError = "メールアドレスの形式が正しくありません";
-        } else {
-          // ドメイン部分の検証
-          const domain = trimmed.split('@')[1];
-          if (!domain || domain.length < 3 || !domain.includes('.')) {
-            newError = "有効なドメイン名を含むメールアドレスを入力してください";
-          }
-        }
-      } else if (item.data.inputType === 'tel') {
-        // 電話番号の検証（国コード対応）
-        if (item.data.enableCountryCode) {
-          // 国コード選択が有効な場合は数字のみ許可（ハイフンは任意）
-          const telRegex = /^[0-9\-\s]{8,}$/;
-          if (!telRegex.test(trimmed)) {
-            newError = "電話番号は8桁以上の数字で入力してください";
-          }
-        } else {
-          // 国コード選択が無効な場合は通常の電話番号形式
-          const telRegex = /^[0-9\-]{10,}$/;
-          if (!telRegex.test(trimmed)) {
-            newError = "電話番号の形式が正しくありません";
-          }
-        }
-      } else if (item.data.inputType === 'number') {
-        if (isNaN(Number(trimmed))) {
-          newError = "数値を入力してください";
-        }
-      }
-    }
-
-    setError(newError);
-    return newError === null;
+    setError(errorMsg);
+    return errorMsg === null;
   };
 
   const handleBlur = () => {
@@ -237,22 +237,52 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       });
 
       // 入力または修正があった場合のみログ送信
-      const shouldLog = inputValue.length > 0 || report.raw.correction_count > 0;
-      if (shouldLog) {
-        console.log('🔍 [ArtboardItem] Sending input_analysis log...');
-        logAnalyticsEvent('input_analysis', {
+      const hasInput = inputValue.length > 0;
+      const hasCorrection = report.input_correction_count > 0;
+      // usePreviewStore.projectId はエディタプレビューでは設定されないため、useProjectStoreから取得
+      // usePreviewStore.projectId はエディタプレビューでは設定されないため、useProjectStoreから取得 + URLフォールバック
+      let projectId = useProjectStore.getState().currentProjectId || usePreviewStore.getState().projectId || undefined;
+
+      if (!projectId) {
+        const params = new URLSearchParams(window.location.search);
+        projectId = params.get('project_id') || undefined;
+      }
+
+      // ★ 滞在時間 (Duration) の計算
+      const now = Date.now();
+      const durationMs = (focusTimeRef.current > 0) ? (now - focusTimeRef.current) : 0;
+      focusTimeRef.current = 0; // リセット
+
+      console.log('🔍 [ArtboardItem] handleBlur - projectId:', projectId, 'hasInput:', hasInput, 'hasCorrection:', hasCorrection, 'duration:', durationMs);
+
+      // 入力がある、修正がある、または一定時間以上滞在した場合にログ送信
+      if (hasInput || hasCorrection || durationMs > 2000) {
+        console.log('🔍 [ArtboardItem] Sending input_correction log...');
+        // @ts-ignore - input_analysis was invalid, changed to input_correction
+        logAnalyticsEvent('input_correction', {
           nodeId: item.id,
           nodeType: 'text_input',
           metadata: {
-            metrics: report.metrics,
-            raw: report.raw,
+            ...report, // フラットな構造を展開
             item_name: item.name,
+            duration_ms: durationMs, // ★ 滞在時間を追加
           }
-        }).then(() => {
+        }, projectId).then(() => {
           console.log('✅ [ArtboardItem] Log sent successfully');
         }).catch(err => {
           console.error('❌ [ArtboardItem] Log failed:', err);
         });
+      } else {
+        // 入力放棄 (Focusしたのに何もせずBlur)
+        console.log('⚠️ [ArtboardItem] Input Abandonment detected');
+        logAnalyticsEvent('input_abandonment', {
+          nodeId: item.id,
+          nodeType: 'text_input',
+          metadata: {
+            item_name: item.name,
+            timestamp: Date.now()
+          }
+        }, projectId);
       }
 
       const isValid = validate(inputValue);
@@ -262,10 +292,72 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     }
   };
 
+  // ★ プレースホルダーに応じた自動高さ調整
+  // 自動高さ調整ロジックは廃止 (固定高さ + スクロールに変更)
+  // 以前のロジックがあった場所
+
+
+
   // イベントハンドラ
-  const handleClick = (e: React.MouseEvent) => {
+  // イベントハンドラ
+  const handleClick = async (e: React.MouseEvent) => {
     if (isPreviewing) {
       if (e.target instanceof HTMLTextAreaElement) return;
+
+      // ★ ワンクリック送信 (Simplified CV) - Editor Preview Support
+      if (item.data.actionType === 'submit') {
+        console.log('🚀 One-Click Submit Triggered (Editor Preview)');
+        e.stopPropagation(); // イベント伝播を止める
+
+        // ★★ 重要: スコア加算のためにまずclickイベントを発火
+        // これにより handleItemEvent 内で _system_total_score が加算される
+        onItemEvent("click", item.id);
+
+        try {
+          // 1. 変数の取得
+          const variables = usePreviewStore.getState().variables; // ストアから直接取得
+          const submitData = { ...variables };
+
+          // 2. Project IDの取得 (URL or Store)
+          // Editorの場合はURLに project_id がある場合が多い、または store から
+          let projectId: string | undefined = useProjectStore.getState().currentProjectId || undefined;
+          if (!projectId) {
+            const params = new URLSearchParams(window.location.search);
+            projectId = params.get('project_id') || undefined;
+          }
+
+          // 3. データ送信 (leads.ts の submitLeadData を使用)
+          // Editor Previewではページ全体の状態を取得してスコア計算に利用する
+          const currentPageId = usePageStore.getState().selectedPageId;
+          const pages = usePageStore.getState().pages;
+          const placedItems = (currentPageId && pages[currentPageId]) ? pages[currentPageId].placedItems : [];
+
+          // leads.tsのsubmitLeadDataを呼び出し（ここでleadsテーブルへのINSERTとanalyticsログ送信が行われる）
+          const { submitLeadData } = await import("../../lib/leads"); // Dynamic import to avoid circular dependency issues if any
+
+          await submitLeadData(
+            submitData,
+            projectId,
+            placedItems
+          );
+
+          console.log('✅ Lead Submitted via submitLeadData (Editor Preview)');
+
+          // 4. リダイレクト処理 (Editor上ではAlertのみにするか、window.openにするか)
+          if (item.data.submitRedirectUrl) {
+            // Editor Previewなので、遷移せずにアラートだけ出すのが安全かも
+            alert(`送信成功！\n本来は "${item.data.submitRedirectUrl}" に遷移します。\n(Editor Preview Mode)`);
+          } else {
+            alert('送信しました！ (Thank you for submitting!)');
+          }
+
+        } catch (err) {
+          console.error('❌ Submit Failed:', err);
+          alert('送信に失敗しました。(Submission Failed)');
+        }
+        return;
+      }
+
       onItemEvent("click", item.id);
     } else {
       onItemSelect(e, item.id, item.data.text || item.name);
@@ -304,7 +396,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         {item.data.text}
       </button>
     );
-  } else if (item.name.startsWith("画像")) {
+  } else if (item.name.startsWith("画像") || item.type === 'image') {
     containerStyle.height = item.height;
     containerStyle.minHeight = undefined;
     if (item.data?.src) {
@@ -350,34 +442,72 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
           className={`artboard-item-textarea ${isPreviewing && error ? 'has-error' : ''}`}
           style={{
             ...textStyle,
+            // エディタモード時はプレースホルダーとして表示するため、文字色をグレーにする
+            color: !isPreviewing ? '#999999' : textStyle.color,
             // @ts-ignore - CSS変数の設定
             '--placeholder-color': item.data?.color || '#999999',
+            overflow: 'hidden',
+            resize: 'none',
+            padding: '10px 12px', // コンテナのパディングの代わりに入力エリアにパディングを設定
+            boxSizing: 'border-box', // パディングを含めたサイズ計算にする
+            // プレビュー中以外で、かつ編集モードでない場合はクリックを透過させる（ドラッグ移動を優先）
+            pointerEvents: !isPreviewing && !isEditing ? 'none' : 'auto',
+            // スクロール関連のスタイルをインラインで強制適用
+            height: '100%',
+            maxHeight: '100%',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-all',
           }}
-          placeholder={placeholder}
+          // エディタモード時はプレースホルダー文字列自体を編集するため、placeholder属性は空にする（重複表示防止）
+          placeholder={isPreviewing ? placeholder : ""}
           value={inputValue}
-          readOnly={!isPreviewing}
+          readOnly={!isPreviewing && !isEditing}
           onCompositionStart={() => isPreviewing && inputTracker.onCompositionStart()}
-          onCompositionEnd={(e) => isPreviewing && inputTracker.onCompositionEnd(e.nativeEvent.data)}
+          onCompositionEnd={() => isPreviewing && inputTracker.onCompositionEnd()}
           onChange={(e) => {
-            if (isPreviewing) {
+            if (isPreviewing || isEditing) {
               const newValue = e.target.value;
               setInputValue(newValue);
-              inputTracker.onInput(newValue); //InputTrackerへ通知
-              onVariableChange(variableName, newValue);
-              // 入力中にエラーをクリア
-              if (error) validate(newValue);
+              if (isPreviewing) {
+                inputTracker.onInput(newValue); //InputTrackerへ通知
+                onVariableChange(variableName, newValue);
+                // 入力中にエラーをクリア
+                if (error) validate(newValue);
+              } else {
+                // 編集モード時の変更を反映（プレースホルダーを更新）
+                onItemUpdate(item.id, { data: { ...item.data, placeholder: newValue } }, false);
+              }
             }
           }}
           onKeyDown={(e) => {
             if (isPreviewing) {
               inputTracker.onKeyDown(e.nativeEvent, inputValue); // KeyDown通知
               if (e.key === "Enter") {
-                e.currentTarget.blur();
+                // 長文テキスト以外の場合のみBlurさせる (textareaは改行)
+                if (item.data.inputType !== 'textarea') {
+                  e.currentTarget.blur();
+                }
                 // blurイベントでhandleBlurが呼ばれるため、ここでは呼び出さない
               }
+            } else if (isEditing && e.key === "Enter") {
+              // 編集モードでのEnterキーは改行として扱う（イベント伝播のみ止める）
+              e.stopPropagation();
             }
           }}
-          onBlur={handleBlur}
+          onBlur={() => {
+            handleBlur();
+            if (!isPreviewing) {
+              setIsEditing(false); // 編集モード終了
+            }
+          }}
+          onFocus={() => {
+            if (isPreviewing) {
+              focusTimeRef.current = Date.now();
+            }
+          }}
           onClick={(e) => {
             if (!isPreviewing) {
               e.stopPropagation();
@@ -402,7 +532,25 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       className={itemClassName}
       style={containerStyle}
       onClick={handleClick}
+      onDoubleClick={() => {
+        if (!isPreviewing && item.name.startsWith("テキスト入力欄")) {
+          // ダブルクリックで編集モード開始
+          setIsEditing(true);
+          // ステート更新後にフォーカスを当てる
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              // カーソルを末尾に移動（任意）
+              const len = textareaRef.current.value.length;
+              textareaRef.current.setSelectionRange(len, len);
+            }
+          }, 0);
+        }
+      }}
       onMouseDown={handleMouseDown}
+      data-node-id={item.id}
+      data-node-name={item.data.customName || item.name}
+      data-node-type={item.type || 'unknown'}
     >
       {content}
       {renderChildren(item.id)}

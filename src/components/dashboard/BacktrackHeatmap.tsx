@@ -23,11 +23,11 @@ export const BacktrackHeatmap: React.FC<BacktrackHeatmapProps> = ({ data }) => {
             <div className="chart-subtitle">ユーザーが「戻る」を選択した箇所（迷いや再確認の兆候）</div>
 
             <div style={{ width: '100%', height: 300 }}>
-                <ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                         <XAxis type="number" hide />
                         <YAxis dataKey="path" type="category" width={150} style={{ fontSize: '12px' }} />
-                        <Tooltip />
+                        <Tooltip contentStyle={{ backgroundColor: '#18181b', borderColor: '#3f3f46' }} itemStyle={{ color: '#fff' }} />
                         <Bar dataKey="count" fill="#E91E63" barSize={20} radius={[0, 4, 4, 0]}>
                             {chartData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={`rgba(233, 30, 99, ${1 - index * 0.05})`} />
