@@ -4,6 +4,14 @@ import "./index.css";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
+// 本番環境（Vercelデプロイ時）のみ console.log を無効化する
+if (import.meta.env.PROD) {
+  console.log = () => { };
+  console.debug = () => { };
+  console.info = () => { };
+  // ※ console.error や console.warn は残しておくと、万が一のエラー追跡に役立ちます
+}
+
 // アプリ本体を読み込む
 // React.lazyを使うことで、読み込みエラー時も真っ白にならずエラーを表示できます
 const App = React.lazy(() => import("./App"));
@@ -58,13 +66,13 @@ if (!rootElement) {
     <React.StrictMode>
       <ErrorBoundary>
         <Suspense fallback={
-          <div style={{ 
-            display: "flex", 
-            justifyContent: "center", 
-            alignItems: "center", 
-            height: "100vh", 
-            fontSize: "18px", 
-            color: "#666" 
+          <div style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100vh",
+            fontSize: "18px",
+            color: "#666"
           }}>
             🚀 アプリを読み込んでいます...
           </div>
