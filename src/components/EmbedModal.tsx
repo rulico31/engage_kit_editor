@@ -7,7 +7,9 @@ interface EmbedModalProps {
 }
 
 const EmbedModal: React.FC<EmbedModalProps> = ({ projectId, onClose }) => {
-    const viewerUrl = `https://viewer.engage-kit.com/v/${projectId}`;
+    // 環境変数からビューワーのBase URLを取得し、プロジェクトIDをクエリパラメータとして付与
+    const baseUrl = import.meta.env.VITE_VIEWER_URL || `${window.location.origin}/viewer.html`;
+    const viewerUrl = `${baseUrl}?project_id=${projectId}`;
 
     // 高さ自動調整スクリプトを含む埋め込みコード
     const embedCode = `<iframe
