@@ -50,6 +50,26 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const handleClick = async () => {
     console.log("📍 PreviewItem clicked:", name, id);
 
+    // [NEW] 隠し変数の保存 (onItemEvent経由 - 疎結合の維持)
+    // 変数名と値が両方設定されている場合のみ実行
+    if (item.data.variableName && item.data.variableValue) {
+      console.log('💾 Setting hidden variable:', item.data.variableName, '=', item.data.variableValue);
+      onVariableChange(item.data.variableName, item.data.variableValue);
+    }
+
+    // [NEW] 外部リンク遷移
+    // クリックと同時に別タブで開く。もしページ遷移アクションが設定されていれば
+    // 元のタブはそのまま次のページへ遷移する（仕様通り）
+    if (item.data.linkUrl) {
+      console.log('🔗 Opening external link:', item.data.linkUrl);
+      // URLの形式チェック（簡易）
+      if (item.data.linkUrl.startsWith('http://') || item.data.linkUrl.startsWith('https://')) {
+        window.open(item.data.linkUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        console.warn('⚠️ Invalid URL format. Must start with http:// or https://');
+      }
+    }
+
     // ★★ 重要: すべてのボタン/選択肢クリックでまずclickイベントを発火
     // これにより logicEngine でスコア加算処理が実行される
     if (!name.startsWith("テキスト入力欄")) {

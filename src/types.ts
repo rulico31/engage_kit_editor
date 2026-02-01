@@ -88,6 +88,7 @@ export interface PlacedItemType {
 
     // Additional Properties for Input/Text
     variableName?: string;
+    variableValue?: string; // [NEW] 保存する変数の値 (Hidden Variable Setting)
     customName?: string; // カスタム名 (Dashboard等での表示用)
     inputType?: 'text' | 'email' | 'tel' | 'number' | 'textarea';
     enableCountryCode?: boolean;
@@ -96,6 +97,7 @@ export interface PlacedItemType {
     isTransparent?: boolean;
     isArtboardBackground?: boolean;
     initialVisibility?: boolean;
+    linkUrl?: string; // [NEW] 遷移先URL (External Link Navigation)
 
     // Image Crop Data
     originalSrc?: string;

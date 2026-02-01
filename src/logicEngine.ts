@@ -106,6 +106,7 @@ const processQueue = async (
     context.logEvent('node_execution', {
       nodeId: node.id,
       nodeType: node.type,
+      label: node.data.label,
       metadata: { label: node.data.label }
     });
 

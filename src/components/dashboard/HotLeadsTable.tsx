@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { LeadData } from '../../lib/dashboardService';
 import { Flame, Clock, Smartphone, Tablet, Monitor, MousePointerClick, Hourglass, Clipboard } from 'lucide-react';
+import { MicroJourneyModal } from './MicroJourneyModal';
 
 interface HotLeadsTableProps {
     leads: LeadData[];
@@ -61,7 +62,7 @@ const PopoverCell = ({ label, value }: { label: string; value: string }) => {
 };
 
 export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
-    // const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
+    const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
 
     return (
         <div className="bento-card h-full w-full flex flex-col overflow-hidden">
@@ -84,7 +85,7 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                             <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[25%]" style={{ textAlign: 'left' }}>行動インサイト</th>
                             <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[150px]" style={{ textAlign: 'left' }}>リスク検知</th>
                             <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[160px]" style={{ textAlign: 'left' }}>日時 / デバイス</th>
-                            {/* <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[80px]" style={{ textAlign: 'right' }}>詳細</th> */}
+                            <th className="py-4 px-4 font-semibold text-[10px] tracking-wider uppercase border-b border-zinc-800 whitespace-nowrap w-[80px]" style={{ textAlign: 'right' }}>詳細</th>
                         </tr>
                     </thead>
 
@@ -186,22 +187,25 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                                         .filter(([key]) => !key.startsWith('_system_'));
 
                                                     if (filteredEntries.length === 0) {
-                                                        return <div className="py-2 border-b border-zinc-800 last:border-0"><span className="text-xs text-zinc-700 italic">No data</span></div>;
+                                                        return <div className="py-2"><span className="text-xs text-zinc-700 italic">No data</span></div>;
                                                     }
 
                                                     return (
-                                                        <>
-                                                            {filteredEntries.slice(0, 2).map(([key, value]) => (
-                                                                <div key={key} className="py-2 border-b border-zinc-800 last:border-0">
-                                                                    <PopoverCell label={key.startsWith('box-') ? '回答' : key} value={String(value)} />
+                                                        <div style={{
+                                                            maxHeight: '80px',
+                                                            overflowY: 'auto',
+                                                            fontSize: '10px',
+                                                            paddingRight: '4px'
+                                                        }} className="custom-scrollbar">
+                                                            {filteredEntries.map(([key, value]) => (
+                                                                <div key={key} className="py-1.5 border-b border-zinc-800/50 last:border-0">
+                                                                    <PopoverCell
+                                                                        label={key.startsWith('box-') ? '回答' : key}
+                                                                        value={String(value)}
+                                                                    />
                                                                 </div>
                                                             ))}
-                                                            {filteredEntries.length > 2 && (
-                                                                <div className="py-2 text-center border-b border-zinc-800 last:border-0">
-                                                                    <span className="text-[10px] font-bold text-zinc-600 px-1.5 py-0.5 rounded border border-zinc-800/50 bg-zinc-900/30">+{filteredEntries.length - 2} items</span>
-                                                                </div>
-                                                            )}
-                                                        </>
+                                                        </div>
                                                     );
                                                 })()}
                                             </div>
@@ -254,11 +258,14 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                                         </td>
 
                                         {/* Action */}
-                                        {/* <td className="py-5 px-4 text-right align-middle">
-                                            <div className="inline-flex items-center justify-center p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-500 group-hover:text-indigo-400 group-hover:border-indigo-500/30 group-hover:bg-indigo-500/5 transition-all">
-                                                <ChevronRight size={18} />
-                                            </div>
-                                        </td> */}
+                                        <td className="py-5 px-4 text-right align-middle">
+                                            <button
+                                                onClick={() => setSelectedLead(lead)}
+                                                className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-500 hover:text-indigo-400 hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all text-xs font-medium"
+                                            >
+                                                詳細
+                                            </button>
+                                        </td>
                                     </tr>
                                 );
                             })
@@ -267,13 +274,13 @@ export const HotLeadsTable: React.FC<HotLeadsTableProps> = ({ leads }) => {
                 </table>
             </div >
 
-            {/* {selectedLead && (
+            {selectedLead && (
                 <MicroJourneyModal
                     sessionId={selectedLead.session_id}
                     leadId={selectedLead.id}
                     onClose={() => setSelectedLead(null)}
                 />
-            )} */}
+            )}
         </div >
     );
 };

@@ -426,6 +426,66 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                 </AccordionSection>
             )} */}
 
+            {/* External Link & Hidden Variable Settings (Button Only) */}
+            {item.type === 'button' && (
+                <AccordionSection title="インタラクション (Interaction)" defaultOpen={true}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                        {/* External Link Section */}
+                        <div className="prop-group">
+                            <div className="prop-label">外部リンク (External Link)</div>
+                            <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+                                クリック時に遷移する外部サイトのURLを入力してください。
+                            </div>
+                            <input
+                                type="text"
+                                value={item.data?.linkUrl || ""}
+                                onChange={(e) => handleDataChange("linkUrl", e.target.value)}
+                                className="prop-input"
+                                placeholder="https://example.com"
+                            />
+                        </div>
+
+                        {/* Hidden Variable Section */}
+                        <div style={{
+                            marginTop: '8px',
+                            paddingTop: '16px',
+                            borderTop: '1px solid #333'
+                        }}>
+                            <div className="prop-label">隠しデータ保存 (Hidden Variable)</div>
+                            <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+                                クリック時に保存する変数を指定します（分析・分岐用）。
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <div>
+                                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>変数名 (Name)</div>
+                                    <input
+                                        type="text"
+                                        value={item.data?.variableName || ""}
+                                        onChange={(e) => handleDataChange("variableName", e.target.value)}
+                                        className="prop-input"
+                                        placeholder="例: job_type"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>値 (Value)</div>
+                                    <input
+                                        type="text"
+                                        value={item.data?.variableValue || ""}
+                                        onChange={(e) => handleDataChange("variableValue", e.target.value)}
+                                        className="prop-input"
+                                        placeholder="例: office"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </AccordionSection>
+            )}
+
             {/* Design / Appearance */}
             <AccordionSection title="外観 (Appearance)" defaultOpen={true}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

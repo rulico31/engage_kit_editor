@@ -14,7 +14,8 @@ export type AnalyticsEventType =
   | 'exit_context'       // B2B: 離脱時の状況
   | 'backtracking'       // B2B: 戻る行動
   | 'score_change'       // B2B: スコア変動
-  | 'logic_branch';      // ロジック分岐結果
+  | 'logic_branch'      // ロジック分岐結果
+  | 'error';
 
 export interface AnalyticsEvent {
   project_id: string;
@@ -117,13 +118,13 @@ export const detectEnvironment = (): 'production' | 'preview' | 'development' | 
 };
 
 // ログフォーマット用ヘルパー
-const formatLogMessage = (eventType: AnalyticsEventType, metadata: Record<string, any>): { title: string, details: string, emoji: string } => {
+export const formatLogMessage = (eventType: AnalyticsEventType, metadata: Record<string, any>): { title: string, details: string, emoji: string } => {
   // メタデータがネストしている場合があるため、フラットに検索するヘルパー
   const getMeta = (key: string): any => {
     return metadata[key] ?? metadata.metadata?.[key] ?? undefined;
   };
 
-  const getItemName = () => getMeta('item_name') || getMeta('node_name') || getMeta('page_name') || getMeta('pageId') || '要素';
+  const getItemName = () => getMeta('item_name') || getMeta('node_name') || getMeta('page_name') || getMeta('label') || getMeta('pageId') || '要素';
   const getThinkingPattern = () => getMeta('thinking_pattern');
   const getDurationMs = () => getMeta('duration_ms');
   const getCorrectionCount = () => getMeta('input_correction_count');
@@ -145,13 +146,75 @@ const formatLogMessage = (eventType: AnalyticsEventType, metadata: Record<string
   const getEventName = () => getMeta('event_name');
 
   const itemName = getItemName();
+  const nodeType = getMeta('nodeType') || metadata.nodeType;
 
   switch (eventType) {
     case 'page_view':
       return {
         emoji: '👀',
-        title: `[ページ閲覧] ${getMeta('pageName') || getMeta('pageId')} を開きました`,
-        details: `Page ID: ${getMeta('pageId')}`
+        title: `[ページ閲覧] ${getMeta('pageName') || getMeta('pageId') || 'ページ'} を開きました`,
+        details: `Page ID: ${getMeta('pageId') || 'unknown'}`
+      };
+    case 'node_execution':
+      // ノードタイプに応じたメッセージの出し分け
+      let nodeAction = 'が実行されました';
+      let nodeEmoji = '⚡';
+
+      if (nodeType === 'pageNode') {
+        nodeAction = 'により次ページへ遷移します';
+        nodeEmoji = '📄';
+      } else if (nodeType === 'actionNode') {
+        nodeAction = 'のアクションを実行しました';
+        nodeEmoji = '🎬';
+      } else if (nodeType === 'delayNode') {
+        nodeAction = `により待機を開始します`;
+        nodeEmoji = '⌛';
+      } else if (nodeType === 'externalApiNode' || nodeType === 'submitFormNode') {
+        nodeAction = 'によりデータを送信します';
+        nodeEmoji = '🌐';
+      } else if (nodeType === 'animateNode') {
+        nodeAction = 'のアニメーションを開始しました';
+        nodeEmoji = '✨';
+      }
+
+      return {
+        emoji: nodeEmoji,
+        title: `[処理実行] 「${itemName}」${nodeAction}`,
+        details: `Node: ${getMeta('nodeId') || getMeta('node_id') || 'unknown'}`
+      };
+    case 'lead_submit':
+      return {
+        emoji: '✅',
+        title: `[コンバージョン] リード情報が送信されました`,
+        details: `Session: ${getSessionIdVal() || 'unknown'}`
+      };
+    case 'session_start':
+      return {
+        emoji: '🚀',
+        title: `[セッション開始] アプリケーションが起動されました`,
+        details: `Referrer: ${getMeta('referrer') || 'direct'}`
+      };
+    case 'logic_branch':
+      const result = getMeta('result') || '不明';
+      let branchMsg = `の判定結果: ${result}`;
+
+      if (nodeType === 'ifNode') {
+        const boolResult = result === 'true' ? '成立' : '不成立';
+        branchMsg = `の条件判定: ${boolResult} (${result})`;
+      } else if (nodeType === 'abTestNode') {
+        branchMsg = `のABテスト結果: ${result}`;
+      }
+
+      return {
+        emoji: '🔀',
+        title: `[条件分岐] 「${itemName}」${branchMsg}`,
+        details: `Logic Node: ${getLogicNodeId() || 'unknown'}`
+      };
+    case 'error':
+      return {
+        emoji: '❌',
+        title: `[システムエラー] ${getMeta('message') || '予期せぬエラーが発生しました'}`,
+        details: `Node: ${getMeta('nodeId') || 'unknown'}`
       };
     case 'interaction':
       const patternMap: Record<string, string> = {
@@ -243,22 +306,26 @@ export const logAnalyticsEvent = async (
   // ログフォーマット生成
   const { emoji, title, details } = formatLogMessage(eventType, finalMetadata);
 
+  // DB保存用のメタデータに表示用情報を追加 (メッセージ保存方式)
+  const dbMetadata = {
+    ...finalMetadata,
+    display_emoji: emoji,
+    display_title: title
+  };
+
   // コンソール出力の改善 (グループ化で見やすく)
   // Preview/Devモード、またはProductionでログ確認したい場合に見やすい形式で出力
   const style = `font-weight: bold; font-size: 1.1em; ${env === 'production' ? 'color: #10b981;' : 'color: #3b82f6;'}`;
   console.groupCollapsed(`%c${emoji} ${title}`, style);
   console.log(`%cEnvironment: ${env}`, 'color: gray; font-size: 0.9em;');
   if (details) console.log(`%cDetails: ${details}`, 'color: #555;');
-  console.log('Metadata:', finalMetadata);
+  console.log('Metadata:', dbMetadata);
   console.groupEnd();
 
   if (!pid) return;
 
   // PreviewやDevelopment環境ではDBへの保存を行わない
   if (env !== 'production') {
-    // 従来の "[Analytics] Skipping..." はグループ内に隠蔽または不要なら出さない
-    // ここではグループ外に出して明確にするか、グループ内で済ますか。
-    // ユーザー要望は「分かりやすく」なので、グループ外に警告色で出すと目立つ。
     console.log(`%c🚧 [Preview Mode] DB保存はスキップされました`, 'color: #f59e0b; font-style: italic;');
     return;
   }
@@ -271,7 +338,7 @@ export const logAnalyticsEvent = async (
         session_id: sessionId,
         event_type: eventType,
         node_id: metadata.nodeId || null,
-        metadata: finalMetadata,
+        metadata: dbMetadata,
       });
 
     if (error) {
