@@ -404,8 +404,11 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
-        color: item.data.color || '#333333',
+
+        // Typography styles
+        color: item.data.textColor || item.data.color || '#333333',
         fontSize: item.data.fontSize ? `${item.data.fontSize}px` : '15px',
+        textAlign: item.data.textAlign || 'left',
 
         // 枠線の制御
         border: (item.data.showBorder === false) ? 'none' : undefined,
@@ -418,8 +421,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
         // テーマ変数の適用
         fontFamily: 'var(--theme-font-family, inherit)',
-        // @ts-ignore
-        borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
+        borderRadius: item.data.borderRadius ? `${item.data.borderRadius}px` : ((item.style as any)?.borderRadius ? `${(item.style as any).borderRadius}px` : '0px'),
         overflow: isInput ? 'visible' : 'hidden',
       }}
       onClick={handleClick}

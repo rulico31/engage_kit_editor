@@ -86,8 +86,8 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     display: isGroup ? 'block' : 'flex',
     // テーマ変数の適用
     fontFamily: 'var(--theme-font-family, inherit)',
-    // @ts-ignore - 個別のborderRadius設定を使用
-    borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
+    // @ts-ignore - 個別のborderRadius設定を使用 (data優先、fallback to style)
+    borderRadius: item.data?.borderRadius ? `${item.data.borderRadius}px` : ((typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px'),
     // 重なり順 (zIndex)
     zIndex: item.zIndex || 0,
     // 選択時はリサイズハンドルを表示するためoverflowをvisibleに
@@ -145,8 +145,9 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   }
 
   const textStyle: React.CSSProperties = {
-    color: item.data?.color || '#333333',
+    color: item.data?.textColor || item.data?.color || '#333333',
     fontSize: `${item.data?.fontSize || 15}px`,
+    textAlign: item.data?.textAlign || 'left',
     width: '100%', // 親に合わせる
     height: '100%',
   };

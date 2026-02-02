@@ -18,6 +18,9 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean,
     useEffect(() => {
         if (!projectId || !isEnabled) return;
 
+        // Initialize device tracking
+        const deviceInfo = initializeDeviceTracking();
+
         // 1. インタラクション追跡 (真の離脱点検出用)
         const handleInteraction = (e: MouseEvent | TouchEvent) => {
             const target = e.target as HTMLElement;
@@ -47,7 +50,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean,
                     duration: 20,
                     session_id: sessionId,
                     page_id: pageId,
-                    page_name: pageName
+                    page_name: pageName,
+                    device_info: deviceInfo
                 }, projectId);
                 console.log('[Analytics] idle_hesitation triggered after 20s inactivity');
             }, 20000);
@@ -64,7 +68,7 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean,
             clickTimestamps = clickTimestamps.filter(t => now - t < 1000);
             clickTimestamps.push(now);
 
-            if (clickTimestamps.length >= 3) {
+            if (clickTimestamps.length >= 5) { // Increased threshold to 5 clicks
                 // クリックされたターゲット要素の特定
                 const target = e.target as HTMLElement;
                 const nodeElement = target.closest('[data-node-id]');
@@ -95,7 +99,8 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean,
                     target_node_type: targetNodeType,
                     item_name: targetNodeName, // Added
                     page_id: pageId,
-                    page_name: pageName
+                    page_name: pageName,
+                    device_info: deviceInfo
                 }, projectId);
 
                 clickTimestamps = []; // リセット

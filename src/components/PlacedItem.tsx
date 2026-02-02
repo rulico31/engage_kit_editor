@@ -174,13 +174,16 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
         opacity: itemState.opacity,
         transform: `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`,
         transition: itemState.transition || 'none',
-        color: item.data.color || '#333333',
+
+        // Typography styles
+        color: item.data.textColor || item.data.color || '#333333',
+        fontSize: item.data.fontSize ? `${item.data.fontSize}px` : undefined,
+        textAlign: item.data.textAlign || 'left',
 
         // 枠線の制御（入力欄はCSSで制御するためここではborder指定をスキップする場合もあるが、一貫性のため残す）
         border: (item.data.showBorder === false) ? 'none' : undefined,
         backgroundColor: (item.data.isTransparent) ? 'transparent' : (item.data?.backgroundColor || (item.style as any)?.backgroundColor || undefined),
-        // @ts-ignore
-        borderRadius: (typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px',
+        borderRadius: item.data.borderRadius ? `${item.data.borderRadius}px` : ((item.style as any)?.borderRadius ? `${(item.style as any).borderRadius}px` : '0px'),
         overflow: 'hidden',
       }}
       onClick={handleClick}

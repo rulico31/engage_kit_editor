@@ -363,11 +363,13 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                     {(item.type === 'input' || item.type === 'textarea' || item.name.startsWith("テキスト入力欄")) && (
                         <div className="prop-group">
                             <div className="prop-label">プレースホルダー</div>
-                            <input
-                                type="text"
+                            {/* Always use textarea to allow newlines in placeholder */}
+                            <textarea
                                 value={item.data?.placeholder || ""}
                                 onChange={(e) => handleDataChange("placeholder", e.target.value)}
-                                className="prop-input"
+                                className="prop-textarea"
+                                rows={2}
+                                style={{ resize: 'vertical', minHeight: '60px' }}
                                 placeholder="入力例..."
                             />
                         </div>
@@ -479,6 +481,104 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                         placeholder="例: office"
                                     />
                                 </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </AccordionSection>
+            )}
+
+            {/* Typography (Text-only Items) */}
+            {(item.type === 'text' || item.type === 'button' || item.type === 'choice' || item.name.startsWith("テキスト入力欄")) && (
+                <AccordionSection title="タイポグラフィ (Typography)" defaultOpen={true}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+                        {/* Text Color */}
+                        <div className="prop-group">
+                            <div className="prop-label">文字色 (Text Color)</div>
+                            <div className="prop-color-picker-wrapper">
+                                <input
+                                    type="color"
+                                    value={item.data?.textColor || "#000000"}
+                                    onChange={(e) => handleDataChange("textColor", e.target.value)}
+                                    className="prop-color-picker"
+                                />
+                                <input
+                                    type="text"
+                                    value={item.data?.textColor || ""}
+                                    onChange={(e) => handleDataChange("textColor", e.target.value)}
+                                    className="prop-input"
+                                    style={{ fontFamily: 'monospace' }}
+                                    placeholder="#000000"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Font Size */}
+                        <div className="prop-group">
+                            <div className="prop-label">文字サイズ (Font Size)</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                    type="number"
+                                    value={item.data?.fontSize || 14}
+                                    onChange={(e) => handleDataChange("fontSize", parseInt(e.target.value) || 14)}
+                                    className="prop-input"
+                                    min="8"
+                                    max="72"
+                                    style={{ flex: 1 }}
+                                />
+                                <span style={{ fontSize: '11px', color: '#888' }}>px</span>
+                            </div>
+                        </div>
+
+                        {/* Text Alignment */}
+                        <div className="prop-group">
+                            <div className="prop-label">文字揃え (Text Alignment)</div>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                                {(['left', 'center', 'right'] as const).map((align) => (
+                                    <button
+                                        key={align}
+                                        onClick={() => handleDataChange("textAlign", align)}
+                                        className="prop-button"
+                                        style={{
+                                            flex: 1,
+                                            padding: '6px',
+                                            fontSize: '11px',
+                                            background: item.data?.textAlign === align ? '#8b5cf6' : '#333',
+                                            borderColor: item.data?.textAlign === align ? '#8b5cf6' : '#444',
+                                            color: item.data?.textAlign === align ? '#fff' : '#ccc'
+                                        }}
+                                    >
+                                        {align === 'left' && '左'}
+                                        {align === 'center' && '中央'}
+                                        {align === 'right' && '右'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Border Radius */}
+                        <div className="prop-group">
+                            <div className="prop-label">角丸 (Border Radius)</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="50"
+                                    value={item.data?.borderRadius || 0}
+                                    onChange={(e) => handleDataChange("borderRadius", parseInt(e.target.value) || 0)}
+                                    style={{ flex: 1 }}
+                                />
+                                <input
+                                    type="number"
+                                    value={item.data?.borderRadius || 0}
+                                    onChange={(e) => handleDataChange("borderRadius", parseInt(e.target.value) || 0)}
+                                    className="prop-input"
+                                    min="0"
+                                    max="100"
+                                    style={{ width: '60px' }}
+                                />
+                                <span style={{ fontSize: '11px', color: '#888' }}>px</span>
                             </div>
                         </div>
 

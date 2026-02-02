@@ -33,8 +33,8 @@ export async function getFunnelData(projectId: string): Promise<FunnelAnalytics>
             return { totalSessions: 0, pages: [] };
         }
 
-        // ページごとのビュー数を集計
-        const pageViewCounts: Record<string, { count: number; name: string }> = {};
+        // ページごとのビュー数と最初の出現時刻を集計
+        const pageViewCounts: Record<string, { count: number; name: string; firstSeen: string }> = {};
 
         logs.forEach((log) => {
             const pageId = log.metadata?.pageId;
@@ -42,14 +42,16 @@ export async function getFunnelData(projectId: string): Promise<FunnelAnalytics>
 
             if (pageId) {
                 if (!pageViewCounts[pageId]) {
-                    pageViewCounts[pageId] = { count: 0, name: pageName };
+                    pageViewCounts[pageId] = { count: 0, name: pageName, firstSeen: log.created_at };
                 }
                 pageViewCounts[pageId].count++;
             }
         });
 
-        // ページ順序を取得（メタデータから）
-        const pageOrder = Object.keys(pageViewCounts);
+        // ページ順序を最初の出現時刻でソート（時系列順）
+        const pageOrder = Object.keys(pageViewCounts).sort((a, b) => {
+            return new Date(pageViewCounts[a].firstSeen).getTime() - new Date(pageViewCounts[b].firstSeen).getTime();
+        });
 
         // 全体のセッション数（最初のページのビュー数）
         const totalSessions = pageOrder.length > 0 ? pageViewCounts[pageOrder[0]].count : 0;

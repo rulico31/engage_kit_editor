@@ -66,6 +66,7 @@ export interface PlacedItemType {
     src?: string;
     backgroundColor?: string;
     color?: string;
+    textColor?: string; // Typography text color override
     fontSize?: number;
     fontFamily?: string;
     textAlign?: 'left' | 'center' | 'right';
