@@ -38,6 +38,10 @@ interface PageStoreState {
   pageOrder: string[];
   selectedPageId: string | null;
 
+  // クリップボード管理
+  copiedItems: PlacedItemType[];
+  copiedLogics: Record<string, NodeGraph>;
+
   // 履歴管理
   history: HistoryState[];
   historyIndex: number;
@@ -48,6 +52,8 @@ interface PageStoreState {
   setSelectedPageId: (pageId: string) => void;
   addPage: (name?: string) => void;
   deletePage: (pageId: string) => void;
+  duplicatePage: (pageId: string) => void;
+  reorderPages: (oldIndex: number, newIndex: number) => void;
   updatePageName: (pageId: string, name: string) => void;
   updatePage: (pageId: string, updates: Partial<PageData>) => void; // 型を簡略化
 
@@ -56,6 +62,8 @@ interface PageStoreState {
   updateItem: (id: string, updates: Partial<PlacedItemType> | { data: any }, options?: { addToHistory?: boolean; immediate?: boolean }) => void;
   updateItems: (updates: { id: string, props: Partial<PlacedItemType> }[], addToHistory?: boolean) => void;
   deleteItems: (ids: string[]) => void;
+  copyItems: (ids: string[]) => void;
+  pasteItems: (pastePosition?: { x: number; y: number } | null) => void;
 
   // コメント管理（アートボード用）
   addComment: (comment: Omit<CommentType, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -112,6 +120,10 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   pageOrder: ["page-1"],
   selectedPageId: "page-1",
 
+  // クリップボード初期値
+  copiedItems: [],
+  copiedLogics: {},
+
   history: [{
     placedItems: [],
     comments: [],
@@ -164,6 +176,90 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
+  duplicatePage: (pageId: string) => {
+    const { pages, pageOrder } = get();
+    const originalPage = pages[pageId];
+    if (!originalPage) return;
+
+    // 新しいページIDを生成
+    const newPageId = `page-${Date.now()}`;
+
+    // アイテムIDのマッピング（古いID -> 新しいID）
+    const itemIdMap = new Map<string, string>();
+
+    // アイテムを深くコピーし、新しいIDを割り当て
+    const newItems = originalPage.placedItems.map(item => {
+      const newItemId = `${item.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      itemIdMap.set(item.id, newItemId);
+      return {
+        ...JSON.parse(JSON.stringify(item)),
+        id: newItemId
+      };
+    });
+
+    // ロジックグラフをコピーし、IDを更新
+    const newLogics: Record<string, NodeGraph> = {};
+    Object.entries(originalPage.allItemLogics || {}).forEach(([oldItemId, graph]) => {
+      const newItemId = itemIdMap.get(oldItemId);
+      if (!newItemId) return;
+
+      // ノードIDのマッピング
+      const nodeIdMap = new Map<string, string>();
+
+      // ノードをコピーし、新しいIDを割り当て
+      const newNodes = graph.nodes.map(node => {
+        const newNodeId = `${node.type}_${newItemId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        nodeIdMap.set(node.id, newNodeId);
+        return {
+          ...JSON.parse(JSON.stringify(node)),
+          id: newNodeId
+        };
+      });
+
+      // エッジをコピーし、ノードIDを更新
+      const newEdges = graph.edges.map(edge => ({
+        ...JSON.parse(JSON.stringify(edge)),
+        id: `${nodeIdMap.get(edge.source)}-${nodeIdMap.get(edge.target)}`,
+        source: nodeIdMap.get(edge.source) || edge.source,
+        target: nodeIdMap.get(edge.target) || edge.target
+      }));
+
+      newLogics[newItemId] = {
+        nodes: newNodes,
+        edges: newEdges,
+        comments: graph.comments ? JSON.parse(JSON.stringify(graph.comments)) : undefined
+      };
+    });
+
+    // コメントをコピー
+    const newComments = originalPage.comments ? JSON.parse(JSON.stringify(originalPage.comments)).map((comment: any) => ({
+      ...comment,
+      id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    })) : [];
+
+    // 新しいページを作成
+    const newPage = {
+      id: newPageId,
+      name: `${originalPage.name} (コピー)`,
+      placedItems: newItems,
+      allItemLogics: newLogics,
+      comments: newComments,
+      backgroundColor: originalPage.backgroundColor,
+      backgroundImage: originalPage.backgroundImage ? JSON.parse(JSON.stringify(originalPage.backgroundImage)) : undefined
+    };
+
+    // ページを追加
+    set(state => ({
+      pages: {
+        ...state.pages,
+        [newPageId]: newPage
+      },
+      pageOrder: [...state.pageOrder, newPageId],
+      selectedPageId: newPageId
+    }));
+    get().commitHistory();
+  },
+
   updatePageName: (pageId: string, name: string) => {
     set(state => ({
       pages: {
@@ -171,6 +267,16 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         [pageId]: { ...state.pages[pageId], name }
       }
     }));
+    get().commitHistory();
+  },
+
+  reorderPages: (oldIndex: number, newIndex: number) => {
+    set(state => {
+      const newOrder = [...state.pageOrder];
+      const [movedPage] = newOrder.splice(oldIndex, 1);
+      newOrder.splice(newIndex, 0, movedPage);
+      return { pageOrder: newOrder };
+    });
     get().commitHistory();
   },
 
@@ -376,6 +482,127 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
       };
     });
+    get().commitHistory();
+  },
+
+  copyItems: (ids: string[]) => {
+    const state = get();
+    const pageId = state.selectedPageId;
+    if (!pageId) return;
+
+    const page = state.pages[pageId];
+    const itemsToCopy = page.placedItems.filter(item => ids.includes(item.id));
+
+    // ロジックグラフもコピー
+    const logicsToCopy: Record<string, NodeGraph> = {};
+    ids.forEach(id => {
+      if (page.allItemLogics[id]) {
+        logicsToCopy[id] = JSON.parse(JSON.stringify(page.allItemLogics[id]));
+      }
+    });
+
+    set({
+      copiedItems: JSON.parse(JSON.stringify(itemsToCopy)),
+      copiedLogics: logicsToCopy
+    });
+  },
+
+  pasteItems: (pastePosition?: { x: number; y: number } | null) => {
+    const state = get();
+    const pageId = state.selectedPageId;
+    if (!pageId || state.copiedItems.length === 0) return;
+
+    const page = state.pages[pageId];
+    const itemIdMap = new Map<string, string>();
+
+    // 複数アイテムの場合、全体の中心を計算
+    let centerX = 0;
+    let centerY = 0;
+
+    if (pastePosition && state.copiedItems.length > 0) {
+      // コピーしたアイテムの中心を計算
+      state.copiedItems.forEach(item => {
+        centerX += (item.x || 0) + ((item.width || 0) / 2);
+        centerY += (item.y || 0) + ((item.height || 0) / 2);
+      });
+      centerX /= state.copiedItems.length;
+      centerY /= state.copiedItems.length;
+    }
+
+    // コピーしたアイテムに新しいIDを割り当て、位置を調整
+    const newItems = state.copiedItems.map(item => {
+      const newItemId = `${item.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      itemIdMap.set(item.id, newItemId);
+
+      let newX: number;
+      let newY: number;
+
+      if (pastePosition) {
+        // カーソル位置を基準に配置（カーソル位置が全体の中心に来るように）
+        const offsetX = (item.x || 0) - centerX;
+        const offsetY = (item.y || 0) - centerY;
+        newX = pastePosition.x + offsetX;
+        newY = pastePosition.y + offsetY;
+      } else {
+        // デフォルト: 元の位置から少しずらす
+        newX = (item.x || 0) + 20;
+        newY = (item.y || 0) + 20;
+      }
+
+      return {
+        ...item,
+        id: newItemId,
+        x: newX,
+        y: newY,
+        mobileX: (item.mobileX || 0) + 10,
+        mobileY: (item.mobileY || 0) + 10
+      };
+    });
+
+    // ロジックグラフも新しいIDでコピー
+    const newLogics = { ...page.allItemLogics };
+    state.copiedItems.forEach(item => {
+      const newItemId = itemIdMap.get(item.id);
+      if (!newItemId || !state.copiedLogics[item.id]) return;
+
+      const graph = state.copiedLogics[item.id];
+      const nodeIdMap = new Map<string, string>();
+
+      // ノードIDを更新
+      const newNodes = graph.nodes.map(node => {
+        const newNodeId = `${node.type}_${newItemId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        nodeIdMap.set(node.id, newNodeId);
+        return {
+          ...node,
+          id: newNodeId
+        };
+      });
+
+      // エッジのID参照を更新
+      const newEdges = graph.edges.map(edge => ({
+        ...edge,
+        id: `${nodeIdMap.get(edge.source)}-${nodeIdMap.get(edge.target)}`,
+        source: nodeIdMap.get(edge.source) || edge.source,
+        target: nodeIdMap.get(edge.target) || edge.target
+      }));
+
+      newLogics[newItemId] = {
+        nodes: newNodes,
+        edges: newEdges,
+        comments: graph.comments ? JSON.parse(JSON.stringify(graph.comments)) : undefined
+      };
+    });
+
+    set(state => ({
+      pages: {
+        ...state.pages,
+        [pageId]: {
+          ...page,
+          placedItems: [...page.placedItems, ...newItems],
+          allItemLogics: newLogics
+        }
+      }
+    }));
     get().commitHistory();
   },
 

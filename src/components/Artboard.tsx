@@ -140,6 +140,60 @@ const Artboard: React.FC = () => {
     selectedIds
   } = useArtboardLogic(artboardRef);
 
+  // マウス位置を追跡（ペースト位置計算用）
+  const lastMousePosRef = React.useRef<{ x: number; y: number } | null>(null);
+
+  // キーボードショートカット処理
+  React.useEffect(() => {
+    if (isPreviewing) return; // プレビュー中は無効
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isCtrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
+
+      // 入力フィールドにフォーカスがある場合はスキップ
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      // Ctrl+C / Cmd+C: コピー
+      if (isCtrlOrCmd && e.key === 'c') {
+        e.preventDefault();
+        if (selectedIds.length > 0) {
+          usePageStore.getState().copyItems(selectedIds);
+        }
+      }
+
+      // Ctrl+V / Cmd+V: ペースト
+      if (isCtrlOrCmd && e.key === 'v') {
+        e.preventDefault();
+        // マウス位置が記録されていて、アートボードのrectが取得できる場合はカーソル位置に配置
+        const artboardRect = artboardRef.current?.getBoundingClientRect();
+        if (lastMousePosRef.current && artboardRect) {
+          const artboardX = (lastMousePosRef.current.x - artboardRect.left) / zoomLevel;
+          const artboardY = (lastMousePosRef.current.y - artboardRect.top) / zoomLevel;
+          usePageStore.getState().pasteItems({ x: artboardX, y: artboardY });
+        } else {
+          usePageStore.getState().pasteItems();
+        }
+      }
+
+      // Delete / Backspace: 削除
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (selectedIds.length > 0) {
+          deleteItems(selectedIds);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isPreviewing, selectedIds, deleteItems, zoomLevel]);
+
   // コメントの選択状態
   const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
 
@@ -405,6 +459,9 @@ const Artboard: React.FC = () => {
           height: `${artboardHeight}px`
         }}
         onClick={handleArtboardBackgroundClick}
+        onMouseMove={(e) => {
+          lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+        }}
       >
         {showGridOverlay && <div className="artboard-grid-overlay" style={gridStyle} />}
         {renderChildren(undefined)}
@@ -447,7 +504,24 @@ const Artboard: React.FC = () => {
       {contextMenu?.visible && (
         <ContextMenu
           x={contextMenu.x} y={contextMenu.y} selectedCount={selectedIds.length}
+          copiedItemsCount={usePageStore.getState().copiedItems.length}
           onDelete={() => { deleteItems(selectedIds); setContextMenu(null); }}
+          onCopy={() => {
+            usePageStore.getState().copyItems(selectedIds);
+            setContextMenu(null);
+          }}
+          onPaste={() => {
+            // 画面座標をアートボード内座標に変換
+            const artboardRect = artboardRef.current?.getBoundingClientRect();
+            if (artboardRect) {
+              const artboardX = (contextMenu.x - artboardRect.left) / zoomLevel;
+              const artboardY = (contextMenu.y - artboardRect.top) / zoomLevel;
+              usePageStore.getState().pasteItems({ x: artboardX, y: artboardY });
+            } else {
+              usePageStore.getState().pasteItems();
+            }
+            setContextMenu(null);
+          }}
           onAddComment={() => {
             // 画面座標をアートボード内座標に変換
             const artboardRect = artboardRef.current?.getBoundingClientRect();

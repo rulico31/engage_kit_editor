@@ -1,13 +1,13 @@
 // src/components/LeftPanel.tsx
 
 import React, { useRef } from "react";
-import { useDrag } from "react-dnd";
+import { useDrag, useDrop } from "react-dnd";
 import { ItemTypes } from "../ItemTypes";
 import "./LeftPanel.css";
 import { usePageStore } from "../stores/usePageStore";
 import { useSelectionStore } from "../stores/useSelectionStore";
 import { PageNameModal } from "./PageNameModal";
-import { Edit2 } from "lucide-react";
+import { Edit2, Copy } from "lucide-react";
 
 // --- レイヤーパネルのインポート (内部コンポーネント) ---
 const LayerPanel: React.FC = () => {
@@ -39,8 +39,159 @@ const LayerPanel: React.FC = () => {
 };
 
 // --- ページリスト (左下) ---
+interface PageListItemProps {
+  pageId: string;
+  pageName: string;
+  isSelected: boolean;
+  isRenaming: boolean;
+  editName: string;
+  index: number;
+  onSelect: () => void;
+  onRenameStart: (e: React.MouseEvent) => void;
+  onDuplicate: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
+  onEditNameChange: (value: string) => void;
+  onRenameSave: () => void;
+  onRenameKeyDown: (e: React.KeyboardEvent) => void;
+  editInputRef: React.RefObject<HTMLInputElement | null>;
+  canDelete: boolean;
+  movePageItem: (dragIndex: number, hoverIndex: number) => void;
+}
+
+const PageListItem: React.FC<PageListItemProps> = ({
+  pageId,
+  pageName,
+  isSelected,
+  isRenaming,
+  editName,
+  index,
+  onSelect,
+  onRenameStart,
+  onDuplicate,
+  onDelete,
+  onEditNameChange,
+  onRenameSave,
+  onRenameKeyDown,
+  editInputRef,
+  canDelete,
+  movePageItem,
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  const [{ isDragging }, drag] = useDrag({
+    type: ItemTypes.PAGE,
+    item: { index, pageId },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  const [, drop] = useDrop({
+    accept: ItemTypes.PAGE,
+    hover: (item: { index: number; pageId: string }, monitor) => {
+      if (!ref.current) {
+        return;
+      }
+      const dragIndex = item.index;
+      const hoverIndex = index;
+
+      // Don't replace items with themselves
+      if (dragIndex === hoverIndex) {
+        return;
+      }
+
+      // Determine rectangle on screen
+      const hoverBoundingRect = ref.current?.getBoundingClientRect();
+
+      // Get vertical middle
+      const hoverMiddleY =
+        (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+
+      // Determine mouse position
+      const clientOffset = monitor.getClientOffset();
+
+      // Get pixels to the top
+      const hoverClientY = clientOffset!.y - hoverBoundingRect.top;
+
+      // Only perform the move when the mouse has crossed half of the items height
+      // When dragging downwards, only move when the cursor is below 50%
+      // When dragging upwards, only move when the cursor is above 50%
+
+      // Dragging downwards
+      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) {
+        return;
+      }
+
+      // Dragging upwards
+      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) {
+        return;
+      }
+
+      // Time to actually perform the action
+      movePageItem(dragIndex, hoverIndex);
+
+      // Note: we're mutating the monitor item here!
+      // Generally it's better to avoid mutations,
+      // but it's good here for the sake of performance
+      // to avoid expensive index searches.
+      item.index = hoverIndex;
+    },
+  });
+
+  drag(drop(ref));
+
+  return (
+    <div
+      ref={ref}
+      className={`page-list-item ${isSelected ? "selected" : ""}`}
+      onClick={() => !isRenaming && onSelect()}
+      style={{ opacity: isDragging ? 0.5 : 1, cursor: 'move' }}
+    >
+      {isRenaming ? (
+        <input
+          ref={editInputRef}
+          className="page-name-input"
+          value={editName}
+          onChange={(e) => onEditNameChange(e.target.value)}
+          onBlur={onRenameSave}
+          onKeyDown={onRenameKeyDown}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <>
+          <span className="page-name" title={pageName}>{pageName}</span>
+          <div className="page-actions">
+            <button
+              className="page-rename-btn"
+              onClick={onDuplicate}
+              title="ページを複製"
+            >
+              <Copy size={12} />
+            </button>
+            <button
+              className="page-rename-btn"
+              onClick={onRenameStart}
+              title="名前を変更"
+            >
+              <Edit2 size={12} />
+            </button>
+            {canDelete && (
+              <button
+                className="page-delete-btn"
+                onClick={onDelete}
+                title="削除"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 const PageList: React.FC = () => {
-  const { pages, pageOrder, selectedPageId, addPage, setSelectedPageId, deletePage, updatePageName } = usePageStore(state => ({
+  const { pages, pageOrder, selectedPageId, addPage, setSelectedPageId, deletePage, updatePageName, duplicatePage, reorderPages } = usePageStore(state => ({
     pages: state.pages,
     pageOrder: state.pageOrder,
     selectedPageId: state.selectedPageId,
@@ -48,6 +199,8 @@ const PageList: React.FC = () => {
     setSelectedPageId: state.setSelectedPageId,
     deletePage: state.deletePage,
     updatePageName: state.updatePageName,
+    duplicatePage: state.duplicatePage,
+    reorderPages: state.reorderPages,
   }));
 
   const [isModalOpen, setIsModalOpen] = React.useState(false);
@@ -98,53 +251,37 @@ const PageList: React.FC = () => {
     }
   };
 
+  const movePageItem = (dragIndex: number, hoverIndex: number) => {
+    reorderPages(dragIndex, hoverIndex);
+  };
+
   return (
     <div className="page-list-container">
       <div className="page-list-scroll">
-        {pageOrder.map((pageId) => {
+        {pageOrder.map((pageId, index) => {
           const page = pages[pageId];
           const isRenaming = renamingPageId === pageId;
 
           return (
-            <div
+            <PageListItem
               key={pageId}
-              className={`page-list-item ${selectedPageId === pageId ? "selected" : ""}`}
-              onClick={() => !isRenaming && setSelectedPageId(pageId)}
-            >
-              {isRenaming ? (
-                <input
-                  ref={editInputRef}
-                  className="page-name-input"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onBlur={handleRenameSave}
-                  onKeyDown={handleRenameKeyDown}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <>
-                  <span className="page-name" title={page.name}>{page.name}</span>
-                  <div className="page-actions">
-                    <button
-                      className="page-rename-btn"
-                      onClick={(e) => handleRenameStart(e, pageId, page.name)}
-                      title="名前を変更"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-                    {pageOrder.length > 1 && (
-                      <button
-                        className="page-delete-btn"
-                        onClick={(e) => { e.stopPropagation(); deletePage(pageId); }}
-                        title="削除"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+              pageId={pageId}
+              pageName={page.name}
+              isSelected={selectedPageId === pageId}
+              isRenaming={isRenaming}
+              editName={editName}
+              index={index}
+              onSelect={() => setSelectedPageId(pageId)}
+              onRenameStart={(e) => handleRenameStart(e, pageId, page.name)}
+              onDuplicate={(e) => { e.stopPropagation(); duplicatePage(pageId); }}
+              onDelete={(e) => { e.stopPropagation(); deletePage(pageId); }}
+              onEditNameChange={setEditName}
+              onRenameSave={handleRenameSave}
+              onRenameKeyDown={handleRenameKeyDown}
+              editInputRef={editInputRef}
+              canDelete={pageOrder.length > 1}
+              movePageItem={movePageItem}
+            />
           );
         })}
       </div>

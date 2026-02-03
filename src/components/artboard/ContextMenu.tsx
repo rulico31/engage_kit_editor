@@ -5,7 +5,10 @@ interface ContextMenuProps {
   x: number;
   y: number;
   selectedCount: number;
+  copiedItemsCount: number;
   onDelete: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
   onAddComment: () => void;
   onClose: () => void;
 }
@@ -14,7 +17,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   x,
   y,
   selectedCount,
+  copiedItemsCount,
   onDelete,
+  onCopy,
+  onPaste,
   onAddComment,
   onClose
 }) => {
@@ -36,6 +42,31 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           onClick={onAddComment}
         >
           <span>💬 コメントを追加</span>
+        </div>
+        <div className="context-menu-separator" />
+        <div
+          className={`context-menu-item ${selectedCount === 0 ? "disabled" : ""}`}
+          onClick={() => {
+            if (selectedCount > 0) {
+              onCopy();
+              onClose();
+            }
+          }}
+        >
+          <span>コピー (Ctrl+C)</span>
+          <span className="shortcut-hint">Ctrl+C</span>
+        </div>
+        <div
+          className={`context-menu-item ${copiedItemsCount === 0 ? "disabled" : ""}`}
+          onClick={() => {
+            if (copiedItemsCount > 0) {
+              onPaste();
+              onClose();
+            }
+          }}
+        >
+          <span>ペースト (Ctrl+V)</span>
+          <span className="shortcut-hint">Ctrl+V</span>
         </div>
         <div className="context-menu-separator" />
         <div
