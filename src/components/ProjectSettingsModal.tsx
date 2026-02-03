@@ -299,9 +299,10 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({ onCl
             </div>
 
             {/* 警告モーダル */}
-            {showWarningModal && validationResult && (
+            {showWarningModal && validationResult && projectMeta && (
                 <PublishWarningModal
                     validationResult={validationResult}
+                    projectData={projectMeta.data}
                     onClose={() => setShowWarningModal(false)}
                     onProceed={handleForcePublish}
                 />

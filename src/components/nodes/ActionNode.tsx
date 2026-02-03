@@ -3,7 +3,6 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import { Eye, EyeOff, ToggleLeft, Zap } from "lucide-react";
 import { usePageStore } from "../../stores/usePageStore";
 import "./ActionNode.css";
-import type { PropertyConfig } from "../../types";
 
 const ActionNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
   // ストアからアイテムリストを取得して、IDから名前を引けるようにする
@@ -88,7 +87,7 @@ const ActionNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
 
 export default memo(ActionNode);
 
-export const actionNodeConfig: any = {
+export const actionNodeConfig = {
   title: "表示切り替え設定",
   properties: [
     {

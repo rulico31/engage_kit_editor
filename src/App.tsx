@@ -10,7 +10,6 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import PublishModal from "./components/PublishModal";
 import { PublishWarningModal } from "./components/PublishWarningModal";
 import { useProjectStore } from "./stores/useProjectStore";
-import { useSelectionStore } from "./stores/useSelectionStore";
 import { usePageStore } from "./stores/usePageStore";
 import { useAuthStore } from "./stores/useAuthStore";
 import { ToastContainer } from "./components/UI/Toast";
@@ -115,112 +114,6 @@ const App: React.FC = () => {
       setCurrentRoute("viewer");
     }
   }, []);
-
-  // Global Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Input/Textarea handling for Undo/Redo
-      const activeElement = document.activeElement as HTMLElement;
-      const isInput = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
-
-      // Undo: Ctrl+Z
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        if (isInput) {
-          // Force blur to save current state
-          activeElement.blur();
-          e.preventDefault();
-          // Wait for blur to commit history, then undo
-          setTimeout(() => {
-            usePageStore.getState().undo();
-          }, 50);
-          return;
-        }
-
-        // Normal undo if not input
-        e.preventDefault();
-        usePageStore.getState().undo();
-        return;
-      }
-
-      // Redo: Ctrl+Y or Ctrl+Shift+Z (also works when input is focused)
-      if (((e.ctrlKey || e.metaKey) && e.key === 'y') || ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')) {
-        if (isInput) {
-          activeElement.blur();
-        }
-        e.preventDefault();
-        usePageStore.getState().redo();
-        return;
-      }
-
-      // Ignore other keys if input is focused (standard behavior)
-      if (isInput) {
-        return;
-      }
-
-      const { deleteItems, updateItem } = usePageStore.getState();
-      const { selectedIds } = useSelectionStore.getState();
-      // Save: Ctrl+S
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (currentRoute === 'editor') {
-          saveProject().catch(e => {
-            console.error(e);
-            alert("保存に失敗しました");
-          });
-        }
-      }
-      // Delete: Delete or Backspace
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        // ノードエディタでノードが選択されている場合はスキップ
-        const { tabs, activeTabId } = useSelectionStore.getState();
-        const activeEntry = tabs.find(t => t.id === activeTabId);
-        if (activeEntry && activeEntry.type === 'node') return;
-
-        // ノードエディタにフォーカスがある、またはマウスが乗っている場合は、グローバル削除をスキップ
-        // (ReactFlow側でノード/エッジ削除が処理されるため)
-        if (
-          (activeElement && activeElement.closest('.node-editor-wrapper')) ||
-          document.querySelector('.node-editor-wrapper:hover')
-        ) {
-          console.log('🛡️ Skipping global delete: NodeEditor is active/hovered');
-          return;
-        }
-
-        if (selectedIds.length > 0) {
-          console.log('🗑️ Executing global delete for items:', selectedIds);
-          e.preventDefault();
-          deleteItems(selectedIds);
-        }
-      }
-
-
-      // Arrow keys movement
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        if (selectedIds.length > 0) {
-          e.preventDefault();
-          const shift = e.shiftKey ? 10 : 1;
-          const updates = selectedIds.map(id => {
-            const item = usePageStore.getState().pages[usePageStore.getState().selectedPageId!]?.placedItems.find(p => p.id === id);
-            if (!item) return null;
-            let { x, y } = item;
-            if (e.key === 'ArrowUp') y -= shift;
-            if (e.key === 'ArrowDown') y += shift;
-            if (e.key === 'ArrowLeft') x -= shift;
-            if (e.key === 'ArrowRight') x += shift;
-            return { id, x, y };
-          }).filter(Boolean);
-
-          if (updates.length > 0) {
-            // Batch update logic would be better but simple loop for now
-            updates.forEach(u => u && updateItem(u.id, { x: u.x, y: u.y }));
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentRoute, saveProject]);
 
   const handleCreateProject = async (name: string) => {
     await createProject(name);

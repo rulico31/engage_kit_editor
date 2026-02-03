@@ -14,6 +14,10 @@ interface EditorSettingsState {
   // Focus management
   pendingFocusNodeId: string | null;
 
+  // Zoom management
+  zoomLevel: number;
+  setZoomLevel: (zoom: number | ((prev: number) => number)) => void;
+
   // Actions
   toggleGrid: () => void;
   setShowGrid: (show: boolean) => void;
@@ -33,6 +37,7 @@ export const useEditorSettingsStore = create<EditorSettingsState>((set, get) => 
   isPreviewing: false,
   isMobileView: false,
   pendingFocusNodeId: null,
+  zoomLevel: 1.0,
 
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   setShowGrid: (show) => set({ showGrid: show }),
@@ -40,6 +45,9 @@ export const useEditorSettingsStore = create<EditorSettingsState>((set, get) => 
   setGridSize: (size) => set({ gridSize: size }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setPendingFocusNodeId: (id) => set({ pendingFocusNodeId: id }),
+  setZoomLevel: (zoom) => set((state) => ({
+    zoomLevel: typeof zoom === 'function' ? zoom(state.zoomLevel) : zoom
+  })),
   togglePreview: () => {
     const newState = !get().isPreviewing;
     set({ isPreviewing: newState });

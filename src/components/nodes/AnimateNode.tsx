@@ -136,7 +136,7 @@ const AnimateNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
 
 export default memo(AnimateNode);
 
-export const animateNodeConfig: any[] = [
+export const animateNodeConfig: { title: string; properties: PropertyConfig[] }[] = [
   {
     title: "ターゲット",
     properties: [

@@ -1,13 +1,20 @@
 import type { Edge, Node } from "reactflow";
 
 export interface ProjectData {
-  id: string;
-  name: string;
-  pages: PageType[];
-  owner_id: string;
-  is_published: boolean;
+  id?: string; // Optional during creation
+  projectName: string;
+  pages: Record<string, PageData>;
+  pageOrder: string[];
+  owner_id?: string;
+  is_published?: boolean;
   public_url?: string;
   settings?: ProjectSettings;
+  variables?: Record<string, any>;
+  theme?: ThemeConfig;
+  cloud_id?: string;
+  version?: number;
+  dataRetentionPeriod?: number;
+  deviceType?: 'desktop' | 'mobile';
   created_at?: string;
   updated_at?: string;
 }
@@ -35,12 +42,18 @@ export interface PageType {
   backgroundImage?: BackgroundImage;
 }
 
+export interface PageData extends PageType {
+  allItemLogics: Record<string, NodeGraph>;
+  comments: CommentType[];
+}
+
 export interface BackgroundImage {
+  src?: string; // Compatibility
   url: string;
   opacity: number;
   scale: number;
   position: { x: number; y: number };
-  displayMode: 'cover' | 'contain' | 'tile' | 'fixed'; // 背景画像の表示モード
+  displayMode: 'cover' | 'contain' | 'tile' | 'fixed' | 'stretch' | 'custom'; // 背景画像の表示モード
 }
 
 export interface PlacedItemType {
@@ -106,7 +119,41 @@ export interface PlacedItemType {
     zoom?: number;
   };
   style?: any; // Added to support direct style access
+  groupId?: string; // Grouping support
+  displayName?: string; // Display name override
 }
+
+export interface CommentType {
+  id: string;
+  content: string;
+  x: number;
+  y: number;
+  createdAt: number;
+  updatedAt?: number;
+  isMinimized?: boolean;
+}
+
+export interface SavedProject {
+  id: string;
+  name: string;
+  data: ProjectData;
+  user_id: string;
+  is_published: boolean;
+  published_data: any;
+  cloud_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ThemeConfig {
+  primaryColor: string;
+  accentColor?: string;
+  fontFamily: string;
+  borderRadius?: number;
+  backgroundColor?: string;
+}
+
+export type ViewMode = 'design' | 'logic' | 'split' | 'dashboard';
 
 export interface VariableState {
   [key: string]: any;
@@ -122,6 +169,7 @@ export interface PreviewState {
 export interface NodeGraph {
   nodes: Node[];
   edges: Edge[];
+  comments?: CommentType[];
 }
 
 export interface PropertySelectOption {

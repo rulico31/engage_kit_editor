@@ -18,8 +18,11 @@ const initialProjectData: ProjectData = {
     "page-1": {
       id: "page-1",
       name: "Page 1",
+      nodes: [],
+      edges: [],
       placedItems: [],
-      allItemLogics: {}
+      allItemLogics: {},
+      comments: []
     }
   },
   pageOrder: ["page-1"],

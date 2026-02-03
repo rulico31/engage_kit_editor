@@ -395,7 +395,7 @@ export const NodePropertiesEditor: React.FC<{ node: Node }> = ({ node }) => {
 
   // デフォルト値を反映したデータを作成
   const effectiveData = { ...node.data };
-  configs.forEach((config: any) => {
+  configs.forEach((config: { title: string; properties: PropertyConfig[] }) => {
     if (config?.properties) {
       config.properties.forEach((prop: PropertyConfig) => {
         if (effectiveData[prop.name] === undefined && prop.defaultValue !== undefined) {
@@ -411,7 +411,7 @@ export const NodePropertiesEditor: React.FC<{ node: Node }> = ({ node }) => {
     <div className="properties-panel-content">
       {baseInfo}
 
-      {configs.map((config, index) => (
+      {configs.map((config: { title: string; properties: PropertyConfig[] }, index: number) => (
         <AccordionSection key={index} title={config.title} defaultOpen={true}>
           {config.properties.map((prop: PropertyConfig) => {
             // 条件付き表示の評価

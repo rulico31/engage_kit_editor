@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { usePageStore } from "../../stores/usePageStore";
 import { useSelectionStore } from "../../stores/useSelectionStore";
 import { useEditorSettingsStore } from "../../stores/useEditorSettingsStore";
+import type { PlacedItemType } from "../../types";
 
 export const snapToGrid = (value: number, size: number | null, min: number = -Infinity): number => {
   if (size === null) return Math.max(min, value);
@@ -12,10 +13,12 @@ export const snapToGrid = (value: number, size: number | null, min: number = -In
 
 export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | null>) => {
   // ストアからの状態取得
-  const { isPreviewing, gridSize } = useEditorSettingsStore(state => ({
+  const { isPreviewing, gridSize, zoomLevel, setZoomLevel } = useEditorSettingsStore(state => ({
     isPreviewing: state.isPreviewing,
     gridSize: state.gridSize,
     viewMode: state.viewMode,
+    zoomLevel: state.zoomLevel,
+    setZoomLevel: state.setZoomLevel,
   }));
 
   const { deleteItems, updateItems } = usePageStore(state => ({
@@ -30,7 +33,6 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
   const placedItems = usePageStore(s => s.selectedPageId ? s.pages[s.selectedPageId]?.placedItems || [] : []);
 
   // ローカルステート
-  const [zoomLevel, setZoomLevel] = useState(1.0);
   const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number } | null>(null);
 
   // ドラッグ用のRef
@@ -39,59 +41,7 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
   const dragStartItemStates = useRef<Record<string, { x: number, y: number }>>({});
   const ignoreNextClickRef = useRef(false);
 
-  // --- キーボードショートカット (Zoom, Delete, Grouping) ---
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (useEditorSettingsStore.getState().isPreviewing) return;
-
-      // Zoom
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === "=" || e.key === "+" || e.key === ";") {
-          e.preventDefault();
-          setZoomLevel(prev => Math.min(prev + 0.1, 5.0));
-        } else if (e.key === "-") {
-          e.preventDefault();
-          setZoomLevel(prev => Math.max(prev - 0.1, 0.2));
-        } else if (e.key === "0") {
-          e.preventDefault();
-          setZoomLevel(1.0);
-        }
-      }
-
-      // Delete / Backspace
-      if (e.key === "Delete" || e.key === "Backspace") {
-        const activeEl = document.activeElement;
-        const isInput = activeEl?.tagName === "INPUT" || activeEl?.tagName === "TEXTAREA" || (activeEl as HTMLElement)?.isContentEditable;
-        if (isInput) return;
-
-        const currentViewMode = useEditorSettingsStore.getState().viewMode;
-        if (currentViewMode === 'logic') return;
-        if (currentViewMode === 'split') {
-          if (
-            activeEl?.closest('.react-flow') ||
-            activeEl?.closest('.node-editor') ||
-            activeEl?.closest('.node-editor-wrapper') ||
-            document.querySelector('.node-editor-wrapper:hover')
-          ) {
-            console.log('🛡️ useArtboardLogic: Skipping delete (NodeEditor active/hovered)');
-            return;
-          }
-        }
-
-        const { tabs, activeTabId } = useSelectionStore.getState();
-        const activeEntry = tabs.find(t => t.id === activeTabId);
-        if (activeEntry && activeEntry.type === 'node') return;
-
-        const currentSelectedIds = useSelectionStore.getState().selectedIds;
-        if (currentSelectedIds.length > 0) {
-          e.preventDefault();
-          deleteItems(currentSelectedIds);
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteItems]);
+  // --- ショートカットは useKeyboardShortcuts.ts に移行済み ---
 
   // --- ドラッグ移動ロジック ---
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -143,7 +93,7 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
     window.removeEventListener("mouseup", handleMouseUp);
   }, [handleMouseMove]);
 
-  const handleItemDragStart = useCallback((e: React.MouseEvent, itemId: string, handleItemSelect: any) => {
+  const handleItemDragStart = useCallback((e: React.MouseEvent, itemId: string, handleItemSelect: (id: string, label: string, isMulti: boolean) => void) => {
     if (isPreviewing) return;
     ignoreNextClickRef.current = false;
 
@@ -182,11 +132,11 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
 
     const isMobileView = useEditorSettingsStore.getState().isMobileView;
     const initialStates: Record<string, { x: number, y: number }> = {};
-    placedItems.forEach(p => {
+    placedItems.forEach((p: PlacedItemType) => {
       if (validTargets.has(p.id)) {
         // モバイルビューの場合は mobileX/mobileY を、未設定なら x/y をフォールバック
-        const x = isMobileView && p.mobileX !== undefined ? p.mobileX : p.x;
-        const y = isMobileView && p.mobileY !== undefined ? p.mobileY : p.y;
+        const x = isMobileView && p.mobileX !== undefined ? p.mobileX : (p.x ?? 0);
+        const y = isMobileView && p.mobileY !== undefined ? p.mobileY : (p.y ?? 0);
         initialStates[p.id] = { x, y };
       }
     });
@@ -198,7 +148,6 @@ export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | n
   }, [isPreviewing, placedItems, selectedIds, zoomLevel, artboardRef, handleMouseMove, handleMouseUp]);
 
   return {
-    zoomLevel,
     ignoreNextClickRef,
     contextMenu,
     setContextMenu,

@@ -12,6 +12,7 @@ import {
 } from 'reactflow';
 import type { PlacedItemType, NodeGraph, ProjectData, CommentType, PageData } from '../types';
 import { useSelectionStore } from './useSelectionStore';
+import { useEditorSettingsStore } from './useEditorSettingsStore';
 import { ensureMobileLayout } from '../lib/layoutUtils';
 
 // Undo/Redo履歴の最大数
@@ -40,7 +41,9 @@ interface PageStoreState {
 
   // クリップボード管理
   copiedItems: PlacedItemType[];
+
   copiedLogics: Record<string, NodeGraph>;
+  copiedNodes: Node[]; // ★追加: コピーされたノード
 
   // 履歴管理
   history: HistoryState[];
@@ -63,7 +66,12 @@ interface PageStoreState {
   updateItems: (updates: { id: string, props: Partial<PlacedItemType> }[], addToHistory?: boolean) => void;
   deleteItems: (ids: string[]) => void;
   copyItems: (ids: string[]) => void;
+
   pasteItems: (pastePosition?: { x: number; y: number } | null) => void;
+
+  // ノード操作（コピペ用）
+  copyNodes: (ids: string[]) => void;
+  pasteNodes: (position?: { x: number; y: number } | null) => void;
 
   // コメント管理（アートボード用）
   addComment: (comment: Omit<CommentType, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -112,6 +120,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     "page-1": {
       id: "page-1",
       name: "Page 1",
+      nodes: [],
+      edges: [],
       placedItems: [],
       allItemLogics: {},
       comments: []
@@ -122,7 +132,9 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
   // クリップボード初期値
   copiedItems: [],
+
   copiedLogics: {},
+  copiedNodes: [],
 
   history: [{
     placedItems: [],
@@ -132,6 +144,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       "page-1": {
         id: "page-1",
         name: "Page 1",
+        nodes: [],
+        edges: [],
         placedItems: [],
         allItemLogics: {},
         comments: []
@@ -152,7 +166,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     set(state => ({
       pages: {
         ...state.pages,
-        [newId]: { id: newId, name: name || `Page ${state.pageOrder.length + 1}`, placedItems: [], allItemLogics: {}, comments: [] }
+        [newId]: { id: newId, name: name || `Page ${state.pageOrder.length + 1}`, nodes: [], edges: [], placedItems: [], allItemLogics: {}, comments: [] }
       },
       pageOrder: [...state.pageOrder, newId],
       selectedPageId: newId
@@ -177,7 +191,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   duplicatePage: (pageId: string) => {
-    const { pages, pageOrder } = get();
+    const { pages } = get();
     const originalPage = pages[pageId];
     if (!originalPage) return;
 
@@ -188,7 +202,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     const itemIdMap = new Map<string, string>();
 
     // アイテムを深くコピーし、新しいIDを割り当て
-    const newItems = originalPage.placedItems.map(item => {
+    const newItems = originalPage.placedItems.map((item: PlacedItemType) => {
       const newItemId = `${item.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       itemIdMap.set(item.id, newItemId);
       return {
@@ -199,7 +213,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
 
     // ロジックグラフをコピーし、IDを更新
     const newLogics: Record<string, NodeGraph> = {};
-    Object.entries(originalPage.allItemLogics || {}).forEach(([oldItemId, graph]) => {
+    Object.entries(originalPage.allItemLogics || {}).forEach(([oldItemId, graph]: [string, NodeGraph]) => {
       const newItemId = itemIdMap.get(oldItemId);
       if (!newItemId) return;
 
@@ -232,7 +246,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     });
 
     // コメントをコピー
-    const newComments = originalPage.comments ? JSON.parse(JSON.stringify(originalPage.comments)).map((comment: any) => ({
+    const newComments = originalPage.comments ? JSON.parse(JSON.stringify(originalPage.comments)).map((comment: CommentType) => ({
       ...comment,
       id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     })) : [];
@@ -243,6 +257,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       name: `${originalPage.name} (コピー)`,
       placedItems: newItems,
       allItemLogics: newLogics,
+      nodes: [],
+      edges: [],
       comments: newComments,
       backgroundColor: originalPage.backgroundColor,
       backgroundImage: originalPage.backgroundImage ? JSON.parse(JSON.stringify(originalPage.backgroundImage)) : undefined
@@ -320,6 +336,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         "page-1": {
           id: "page-1",
           name: "Page 1",
+          nodes: [],
+          edges: [],
           placedItems: [],
           allItemLogics: {},
           comments: []
@@ -335,6 +353,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
           "page-1": {
             id: "page-1",
             name: "Page 1",
+            nodes: [],
+            edges: [],
             placedItems: [],
             allItemLogics: {},
             comments: []
@@ -357,7 +377,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const page = state.pages[pageId];
       if (!page) return state;
 
-      const newItems = page.placedItems.map(item => ensureMobileLayout(item));
+      const newItems = page.placedItems.map((item: PlacedItemType) => ensureMobileLayout(item));
 
       // 変更があるか確認（ディープチェックはコストが高いので、ここでは簡易的に常に更新オブジェクトを作成）
       // 厳密には、何かが変わった場合のみ更新すべきだが、ensureMobileLayoutは常に新しいオブジェクトを返す可能性がある
@@ -430,7 +450,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
 
-      const newItems = page.placedItems.map(item => {
+      const newItems = page.placedItems.map((item: PlacedItemType) => {
         if (item.id !== id) return item;
         if ('data' in updates) {
           return {
@@ -459,7 +479,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const newItems = [...page.placedItems];
 
       updatesList.forEach(({ id, props }) => {
-        const idx = newItems.findIndex(i => i.id === id);
+        const idx = newItems.findIndex((i: PlacedItemType) => i.id === id);
         if (idx !== -1) {
           newItems[idx] = { ...newItems[idx], ...props };
         }
@@ -491,7 +511,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     if (!pageId) return;
 
     const page = state.pages[pageId];
-    const itemsToCopy = page.placedItems.filter(item => ids.includes(item.id));
+    const itemsToCopy = page.placedItems.filter((item: PlacedItemType) => ids.includes(item.id));
 
     // ロジックグラフもコピー
     const logicsToCopy: Record<string, NodeGraph> = {};
@@ -515,18 +535,48 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     const page = state.pages[pageId];
     const itemIdMap = new Map<string, string>();
 
-    // 複数アイテムの場合、全体の中心を計算
+    const isMobileView = useEditorSettingsStore.getState().isMobileView;
+
+    // 複数アイテムの場合、全体のバウンディングボックスの中心を計算
     let centerX = 0;
     let centerY = 0;
+    let centerMobileX = 0;
+    let centerMobileY = 0;
 
-    if (pastePosition && state.copiedItems.length > 0) {
-      // コピーしたアイテムの中心を計算
-      state.copiedItems.forEach(item => {
-        centerX += (item.x || 0) + ((item.width || 0) / 2);
-        centerY += (item.y || 0) + ((item.height || 0) / 2);
-      });
-      centerX /= state.copiedItems.length;
-      centerY /= state.copiedItems.length;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minMX = Infinity, minMY = Infinity, maxMX = -Infinity, maxMY = -Infinity;
+
+    state.copiedItems.forEach(item => {
+      const x = item.x || 0, y = item.y || 0, w = item.width || 0, h = item.height || 0;
+      if (x < minX) minX = x; if (y < minY) minY = y; if (x + w > maxX) maxX = x + w; if (y + h > maxY) maxY = y + h;
+
+      const mx = item.mobileX || 0, my = item.mobileY || 0, mw = item.mobileWidth || 0, mh = item.mobileHeight || 0;
+      if (mx < minMX) minMX = mx; if (my < minMY) minMY = my; if (mx + mw > maxMX) maxMX = mx + mw; if (my + mh > maxMY) maxMY = my + mh;
+    });
+
+    centerX = (minX + maxX) / 2;
+    centerY = (minY + maxY) / 2;
+    centerMobileX = (minMX + maxMX) / 2;
+    centerMobileY = (minMY + maxMY) / 2;
+
+    // ペースト基準位置の決定（提供されない場合は現在の中央＝重なり配置）
+    const targetPos = pastePosition || (isMobileView
+      ? { x: centerMobileX, y: centerMobileY }
+      : { x: centerX, y: centerY });
+
+    // 移動量の計算
+    let dx: number, dy: number, dMX: number, dMY: number;
+
+    if (isMobileView) {
+      dMX = targetPos.x - centerMobileX;
+      dMY = targetPos.y - centerMobileY;
+      dx = dMX * (1000 / 375);
+      dy = dMY * (1000 / 375);
+    } else {
+      dx = targetPos.x - centerX;
+      dy = targetPos.y - centerY;
+      dMX = dx * (375 / 1000);
+      dMY = dy * (375 / 1000);
     }
 
     // コピーしたアイテムに新しいIDを割り当て、位置を調整
@@ -534,28 +584,13 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const newItemId = `${item.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       itemIdMap.set(item.id, newItemId);
 
-      let newX: number;
-      let newY: number;
-
-      if (pastePosition) {
-        // カーソル位置を基準に配置（カーソル位置が全体の中心に来るように）
-        const offsetX = (item.x || 0) - centerX;
-        const offsetY = (item.y || 0) - centerY;
-        newX = pastePosition.x + offsetX;
-        newY = pastePosition.y + offsetY;
-      } else {
-        // デフォルト: 元の位置から少しずらす
-        newX = (item.x || 0) + 20;
-        newY = (item.y || 0) + 20;
-      }
-
       return {
         ...item,
         id: newItemId,
-        x: newX,
-        y: newY,
-        mobileX: (item.mobileX || 0) + 10,
-        mobileY: (item.mobileY || 0) + 10
+        x: (item.x || 0) + dx,
+        y: (item.y || 0) + dy,
+        mobileX: (item.mobileX || 0) + dMX,
+        mobileY: (item.mobileY || 0) + dMY
       };
     });
 
@@ -607,7 +642,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- コメント管理 ---
-  addComment: (commentData) => {
+  addComment: (commentData: Omit<CommentType, 'id' | 'createdAt' | 'updatedAt'>) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
@@ -627,12 +662,12 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  updateComment: (commentId, updates) => {
+  updateComment: (commentId: string, updates: Partial<CommentType>) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
 
-      const newComments = (page.comments || []).map(c => {
+      const newComments = (page.comments || []).map((c: CommentType) => {
         if (c.id === commentId) {
           return { ...c, ...updates };
         }
@@ -646,12 +681,12 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  deleteComment: (commentId) => {
+  deleteComment: (commentId: string) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const page = state.pages[pageId];
 
-      const newComments = (page.comments || []).filter(c => c.id !== commentId);
+      const newComments = (page.comments || []).filter((c: CommentType) => c.id !== commentId);
 
       return {
         pages: { ...state.pages, [pageId]: { ...page, comments: newComments } }
@@ -661,7 +696,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- コメント管理（ノードエディタ用） ---
-  addGraphComment: (commentData) => {
+  addGraphComment: (commentData: Omit<CommentType, 'id' | 'createdAt' | 'updatedAt'>) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
@@ -694,7 +729,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  updateGraphComment: (commentId, updates) => {
+  updateGraphComment: (commentId: string, updates: Partial<CommentType>) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
@@ -703,7 +738,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const page = state.pages[pageId];
       const currentGraph = page.allItemLogics[activeGraphId] || { nodes: [], edges: [] };
 
-      const newComments = (currentGraph.comments || []).map(c => {
+      const newComments = (currentGraph.comments || []).map((c: CommentType) => {
         if (c.id === commentId) {
           return { ...c, ...updates };
         }
@@ -726,7 +761,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  deleteGraphComment: (commentId) => {
+  deleteGraphComment: (commentId: string) => {
     set(state => {
       const pageId = state.selectedPageId!;
       const activeGraphId = useSelectionStore.getState().activeLogicGraphId;
@@ -735,7 +770,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const page = state.pages[pageId];
       const currentGraph = page.allItemLogics[activeGraphId] || { nodes: [], edges: [] };
 
-      const newComments = (currentGraph.comments || []).filter(c => c.id !== commentId);
+      const newComments = (currentGraph.comments || []).filter((c: CommentType) => c.id !== commentId);
 
       return {
         pages: {
@@ -754,6 +789,108 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
 
+
+
+
+  // --- ノードのコピペ ---
+  copyNodes: (ids: string[]) => {
+    const state = get();
+    const pageId = state.selectedPageId;
+    const activeLogicGraphId = useSelectionStore.getState().activeLogicGraphId;
+
+    if (!pageId || !activeLogicGraphId) return;
+
+    const page = state.pages[pageId];
+    const graph = page.allItemLogics[activeLogicGraphId];
+    if (!graph) return;
+
+    // 選択されたノードを抽出
+    const nodesToCopy = graph.nodes.filter(node => ids.includes(node.id));
+
+    set({ copiedNodes: JSON.parse(JSON.stringify(nodesToCopy)) });
+    console.log('[usePageStore] Copied nodes:', nodesToCopy.length);
+  },
+
+  pasteNodes: (position?: { x: number; y: number } | null) => {
+    const state = get();
+    const pageId = state.selectedPageId;
+    const activeLogicGraphId = useSelectionStore.getState().activeLogicGraphId;
+
+    if (!pageId || !activeLogicGraphId || state.copiedNodes.length === 0) return;
+
+    const page = state.pages[pageId];
+    const graph = page.allItemLogics[activeLogicGraphId];
+    if (!graph) return;
+
+    // 中心座標を計算
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    state.copiedNodes.forEach(node => {
+      if (node.position.x < minX) minX = node.position.x;
+      if (node.position.y < minY) minY = node.position.y;
+      if (node.position.x > maxX) maxX = node.position.x;
+      if (node.position.y > maxY) maxY = node.position.y;
+    });
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // ペースト位置の決定（指定がない場合は少しずらす）
+    // ※注意: positionはReactFlowの座標系であることを期待
+    // マウス位置を指定されない場合は、元の位置から少しずらす
+    const targetPos = position || { x: centerX + 50, y: centerY + 50 };
+
+    const dx = targetPos.x - centerX;
+    const dy = targetPos.y - centerY;
+
+    // 新しいノードを作成
+    const newNodes = state.copiedNodes.map(node => {
+      const newNodeId = `${node.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      return {
+        ...node,
+        id: newNodeId,
+        position: {
+          x: node.position.x + dx,
+          y: node.position.y + dy
+        },
+        data: {
+          ...node.data,
+          label: node.data.label ? `${node.data.label} (コピー)` : node.data.label
+        },
+        selected: true // 新しいノードを選択状態に
+      };
+    });
+
+    // 既存のノードの選択を解除
+    const existingNodes = graph.nodes.map(n => ({ ...n, selected: false }));
+
+    // グラフ更新
+    const updatedGraph = {
+      ...graph,
+      nodes: [...existingNodes, ...newNodes]
+    };
+
+    set({
+      pages: {
+        ...state.pages,
+        [pageId]: {
+          ...page,
+          allItemLogics: {
+            ...page.allItemLogics,
+            [activeLogicGraphId]: updatedGraph
+          }
+        }
+      }
+    });
+
+    // 選択状態を更新
+    // Note: useSelectionStoreの更新はコンポーネント側で行われることが多いが、
+    // ここでIDだけはとれるので、複数選択としてセットする
+    useSelectionStore.getState().setSelection(newNodes.map(n => n.id));
+
+    get().commitHistory();
+    console.log('[usePageStore] Pasted nodes:', newNodes.length);
+  },
 
   // --- 重なり順 ---
   moveItemToFront: (id: string) => {
@@ -810,7 +947,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
       const page = state.pages[pageId];
       const items = [...page.placedItems];
 
-      items.sort((a, b) => a.y - b.y);
+      items.sort((a, b) => (a.y ?? 0) - (b.y ?? 0));
 
       let currentY = 20;
       const newItems = items.map(item => {
@@ -818,8 +955,8 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
         newItem.mobileX = 20;
         newItem.mobileY = currentY;
         newItem.mobileWidth = 335;
-        newItem.mobileHeight = item.height;
-        currentY += newItem.mobileHeight + 20;
+        newItem.mobileHeight = item.height ?? 0;
+        currentY += (newItem.mobileHeight ?? 0) + 20;
         return newItem;
       });
 
@@ -1041,8 +1178,6 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   undo: () => {
-    const currentState = get();
-
     set(state => {
       if (state.historyIndex <= 0) {
         return state;
@@ -1062,8 +1197,6 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   redo: () => {
-    const currentState = get();
-
     set(state => {
       if (state.historyIndex >= state.history.length - 1) {
         return state;

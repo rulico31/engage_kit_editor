@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { logAnalyticsEvent, detectEnvironment } from "../lib/analytics";
+import { initializeDeviceTracking } from "../lib/DeviceDetector";
 
 /**
  * レイジクリック、ヘジテーション、離脱、インタラクション追跡を行うフック

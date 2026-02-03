@@ -3,10 +3,12 @@
 // CORS対応済み（Dynamic Origin + Credentials）
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+// @ts-ignore
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 console.log("Analytics Beacon Function initialized")
 
+// @ts-ignore
 Deno.serve(async (req: Request) => {
     // 1. CORS Headers Setup
     // sendBeaconは 'credentials: include' (Cookie送信) を伴う場合があるため、
@@ -59,7 +61,9 @@ Deno.serve(async (req: Request) => {
         // Service Role Keyを使用してRLSをバイパスして書き込む
         // (クライアントからの直接書き込みだが、内容はログなので今回は許容。
         //  厳密にはJWT検証すべきだがBeaconはAuthヘッダを送りにくい制約があるためServiceRoleで書く)
+        // @ts-ignore
         const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+        // @ts-ignore
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
         const supabase = createClient(supabaseUrl, supabaseServiceKey)

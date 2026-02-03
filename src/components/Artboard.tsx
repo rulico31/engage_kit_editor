@@ -18,6 +18,7 @@ import { Comment } from "./artboard/Comment";
 import { ContextMenu } from "./artboard/ContextMenu";
 import { useArtboardLogic, snapToGrid } from "./artboard/useArtboardLogic";
 import ConfirmationModal from "./ConfirmationModal";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 
 const Artboard: React.FC = () => {
   // ストアデータの取得
@@ -41,13 +42,15 @@ const Artboard: React.FC = () => {
     handleBackgroundClick: state.handleBackgroundClick,
   }));
 
-  const { isPreviewing, gridSize, showGrid, isMobileView, pendingFocusNodeId, setPendingFocusNodeId } = useEditorSettingsStore(state => ({
+  const { isPreviewing, gridSize, showGrid, isMobileView, pendingFocusNodeId, setPendingFocusNodeId, zoomLevel, setZoomLevel } = useEditorSettingsStore(state => ({
     isPreviewing: state.isPreviewing,
     gridSize: state.gridSize,
     showGrid: state.showGrid,
     isMobileView: state.isMobileView,
     pendingFocusNodeId: state.pendingFocusNodeId,
-    setPendingFocusNodeId: state.setPendingFocusNodeId
+    setPendingFocusNodeId: state.setPendingFocusNodeId,
+    zoomLevel: state.zoomLevel,
+    setZoomLevel: state.setZoomLevel,
   }));
 
   const { previewState, variables, onItemEvent, onVariableChange, initPreview, stopPreview } = usePreviewStore(state => ({
@@ -95,6 +98,14 @@ const Artboard: React.FC = () => {
 
   const artboardRef = useRef<HTMLDivElement>(null);
 
+  // グローバルショートカットの設定
+  useKeyboardShortcuts({
+    currentRoute: "editor",
+    zoomLevel,
+    setZoomLevel,
+    artboardRef
+  });
+
   // Focus Management (Scrolling)
   React.useEffect(() => {
     if (pendingFocusNodeId && artboardRef.current) {
@@ -132,7 +143,6 @@ const Artboard: React.FC = () => {
 
   // useArtboardLogic hook
   const {
-    zoomLevel,
     contextMenu,
     setContextMenu,
     handleItemDragStart,
@@ -143,56 +153,6 @@ const Artboard: React.FC = () => {
   // マウス位置を追跡（ペースト位置計算用）
   const lastMousePosRef = React.useRef<{ x: number; y: number } | null>(null);
 
-  // キーボードショートカット処理
-  React.useEffect(() => {
-    if (isPreviewing) return; // プレビュー中は無効
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const isCtrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
-
-      // 入力フィールドにフォーカスがある場合はスキップ
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      // Ctrl+C / Cmd+C: コピー
-      if (isCtrlOrCmd && e.key === 'c') {
-        e.preventDefault();
-        if (selectedIds.length > 0) {
-          usePageStore.getState().copyItems(selectedIds);
-        }
-      }
-
-      // Ctrl+V / Cmd+V: ペースト
-      if (isCtrlOrCmd && e.key === 'v') {
-        e.preventDefault();
-        // マウス位置が記録されていて、アートボードのrectが取得できる場合はカーソル位置に配置
-        const artboardRect = artboardRef.current?.getBoundingClientRect();
-        if (lastMousePosRef.current && artboardRect) {
-          const artboardX = (lastMousePosRef.current.x - artboardRect.left) / zoomLevel;
-          const artboardY = (lastMousePosRef.current.y - artboardRect.top) / zoomLevel;
-          usePageStore.getState().pasteItems({ x: artboardX, y: artboardY });
-        } else {
-          usePageStore.getState().pasteItems();
-        }
-      }
-
-      // Delete / Backspace: 削除
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        if (selectedIds.length > 0) {
-          deleteItems(selectedIds);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isPreviewing, selectedIds, deleteItems, zoomLevel]);
 
   // コメントの選択状態
   const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
@@ -313,6 +273,9 @@ const Artboard: React.FC = () => {
         y: snappedY,
         width: pcWidth,
         height: pcHeight,
+        position: { x: snappedX, y: snappedY },
+        size: { width: pcWidth, height: pcHeight },
+        zIndex: placedItems.length + 1,
 
         // モバイル用プロパティを初期設定
         mobileX,
@@ -345,7 +308,7 @@ const Artboard: React.FC = () => {
 
       // displayModeに応じてスタイルを切り替え
       const displayMode = backgroundImage.displayMode || 'cover';
-      const position = backgroundImage.position || 'center center';
+      const position = backgroundImage.position ? `${backgroundImage.position.x}px ${backgroundImage.position.y}px` : 'center center';
       const scale = backgroundImage.scale || 1;
 
       switch (displayMode) {
@@ -398,14 +361,14 @@ const Artboard: React.FC = () => {
 
   // レンダリング用関数
   const renderChildren = useCallback((parentId: string | undefined) => {
-    return placedItems.filter(item => item.groupId === parentId).map(item => (
+    return placedItems.filter((item: PlacedItemType) => item.groupId === parentId).map((item: PlacedItemType) => (
       <MemoizedArtboardItem
         key={item.id}
         item={item}
         renderChildren={renderChildren}
         onItemSelect={onArtboardItemSelect}
         // ★修正: ドラッグ開始時もコメント選択を解除する
-        onItemDragStart={(e, id) => {
+        onItemDragStart={(e: React.MouseEvent, id: string) => {
           setSelectedCommentId(null);
           handleItemDragStart(e, id, handleItemSelect);
         }}
