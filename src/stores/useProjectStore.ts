@@ -42,6 +42,7 @@ interface ProjectStoreState {
   unpublishProject: () => Promise<boolean>;
   updateProjectName: (name: string) => void;
   updateTheme: (theme: ThemeConfig) => void;
+  duplicateProject: (projectId: string) => Promise<string | null>;
 }
 
 export const useProjectStore = create<ProjectStoreState>((set, get) => ({
@@ -337,5 +338,81 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       error: null,
     });
     usePageStore.getState().loadFromData(initialProjectData);
+  },
+
+  // --- プロジェクト複製 ---
+  duplicateProject: async (projectId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      // 1. 元のプロジェクトを取得
+      const { data: originalProject, error: fetchError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!originalProject) throw new Error('プロジェクトが見つかりません');
+
+      // 2. ユーザー情報を取得
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
+      // 3. 全プロジェクトを取得して重複しない名前を生成
+      const { data: allProjects } = await supabase
+        .from('projects')
+        .select('name')
+        .eq('user_id', userId);
+
+      // 4. ベース名を抽出（末尾の数字を除去）
+      const baseName = originalProject.name.replace(/\d+$/, '');
+
+      // 5. 既存の連番を検索
+      const existingNumbers: number[] = [];
+      allProjects?.forEach(p => {
+        const match = p.name.match(new RegExp(`^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`));
+        if (match) {
+          existingNumbers.push(parseInt(match[1], 10));
+        }
+      });
+
+      // 6. 次に利用可能な番号を決定
+      let nextNumber = 1;
+      while (existingNumbers.includes(nextNumber)) {
+        nextNumber++;
+      }
+
+      const newName = `${baseName}${nextNumber}`;
+
+      // 7. プロジェクトデータをコピー（公開関連情報は除外）
+      const newProjectData = {
+        ...originalProject.data,
+        projectName: newName
+      };
+
+      // 8. 新しいプロジェクトを作成
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          name: newName,
+          data: newProjectData,
+          user_id: userId,
+          // cloud_id, is_published, published_dataは新規プロジェクトなので含めない
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      set({ isLoading: false });
+      useToastStore.getState().addToast(`プロジェクト「${newName}」を作成しました`, "success");
+      return data.id;
+
+    } catch (err: any) {
+      console.error('複製エラー:', err);
+      set({ error: err.message, isLoading: false });
+      useToastStore.getState().addToast("プロジェクトの複製に失敗しました", "error");
+      return null;
+    }
   }
 }));

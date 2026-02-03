@@ -40,6 +40,10 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
+  // Duplicate State
+  const [isDuplicating, setIsDuplicating] = useState(false); // 複製中のローディング状態
+
+
   // ユーザー情報を取得
   const user = useAuthStore(state => state.user);
 
@@ -327,6 +331,34 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
     }
   };
 
+  // 複製ボタンクリック
+  const handleDuplicateClick = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+
+    // ログインチェック
+    if (!user) {
+      alert('プロジェクトを複製するには、GoogleまたはMicrosoftアカウントでログインしてください。');
+      return;
+    }
+
+    setIsDuplicating(true);
+    try {
+      const { duplicateProject } = await import('../stores/useProjectStore').then(m => m.useProjectStore.getState());
+      const newProjectId = await duplicateProject(project.id);
+
+      if (newProjectId) {
+        // プロジェクトリストを再取得
+        await fetchProjects();
+      }
+    } catch (err) {
+      console.error("複製エラー:", err);
+      alert("プロジェクトの複製に失敗しました");
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
+
   // スクロール検知用のstate
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -502,6 +534,13 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
                         ✏️
                       </button>
                       <button
+                        className="duplicate-project-btn"
+                        onClick={(e) => handleDuplicateClick(e, project)}
+                        title="プロジェクトを複製"
+                      >
+                        📋
+                      </button>
+                      <button
                         className="delete-project-btn"
                         onClick={(e) => handleDeleteClick(e, project)}
                         title="プロジェクトを削除"
@@ -551,8 +590,8 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
         />
 
         {/* 全画面ローディングオーバーレイ */}
-        {(isProjectLoading || isDeleting) && (
-          <LoadingOverlay message={isDeleting ? "プロジェクトを削除中..." : "Editorを起動中..."} />
+        {(isProjectLoading || isDeleting || isDuplicating) && (
+          <LoadingOverlay message={isDeleting ? "プロジェクトを削除中..." : isDuplicating ? "プロジェクトを複製中..." : "Editorを起動中..."} />
         )}
 
         {/* テンプレート選択モーダル */}

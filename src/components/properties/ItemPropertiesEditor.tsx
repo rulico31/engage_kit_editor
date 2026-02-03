@@ -29,6 +29,22 @@ interface Props {
 
 export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) => {
     const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+    const [focusedField, setFocusedField] = useState<string | null>(null);
+    const [tempValue, setTempValue] = useState<string>("");
+
+    // 安全なparseInt - NaNの場合のみフォールバック値を使用
+    const safeParseInt = (value: string, fallback: number): number => {
+        const parsed = parseInt(value);
+        return isNaN(parsed) ? fallback : parsed;
+    };
+
+    // フォーカス中の値を取得
+    const getDisplayValue = (fieldName: string, propValue: any, fallback: any) => {
+        if (focusedField === fieldName) {
+            return tempValue;
+        }
+        return propValue ?? fallback;
+    };
 
     // 共通の更新ハンドラ (data配下のプロパティ更新用)
     const handleDataChange = (key: string, value: any) => {
@@ -108,8 +124,19 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                                 <input
                                     type="number"
-                                    value={getX()}
-                                    onChange={(e) => handleRootChange("x", parseInt(e.target.value) || 0)}
+                                    value={getDisplayValue("x", (item as any).x ?? (item as any).position?.x, 0)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleRootChange("x", safeParseInt(e.target.value, 0));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("x");
+                                        setTempValue(String(getX()));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     className="prop-input"
                                     style={{ paddingLeft: '26px' }}
                                 />
@@ -121,8 +148,19 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
                                     type="number"
-                                    value={getY()}
-                                    onChange={(e) => handleRootChange("y", parseInt(e.target.value) || 0)}
+                                    value={getDisplayValue("y", (item as any).y ?? (item as any).position?.y, 0)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleRootChange("y", safeParseInt(e.target.value, 0));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("y");
+                                        setTempValue(String(getY()));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     className="prop-input"
                                     style={{ paddingLeft: '26px' }}
                                 />
@@ -138,8 +176,19 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                                 <input
                                     type="number"
-                                    value={getWidth()}
-                                    onChange={(e) => handleRootChange("width", parseInt(e.target.value) || 0)}
+                                    value={getDisplayValue("width", (item as any).width ?? (item as any).size?.width, 100)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleRootChange("width", safeParseInt(e.target.value, 0));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("width");
+                                        setTempValue(String(getWidth()));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     className="prop-input"
                                     style={{ paddingLeft: '26px' }}
                                 />
@@ -151,8 +200,19 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
                                     type="number"
-                                    value={getHeight()}
-                                    onChange={(e) => handleRootChange("height", parseInt(e.target.value) || 0)}
+                                    value={getDisplayValue("height", (item as any).height ?? (item as any).size?.height, 40)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleRootChange("height", safeParseInt(e.target.value, 0));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("height");
+                                        setTempValue(String(getHeight()));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     className="prop-input"
                                     style={{ paddingLeft: '26px' }}
                                 />
@@ -392,8 +452,19 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <input
                                     type="number"
-                                    value={item.data?.score || 0}
-                                    onChange={(e) => handleDataChange("score", parseInt(e.target.value) || 0)}
+                                    value={getDisplayValue("score", item.data?.score, 0)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleDataChange("score", safeParseInt(e.target.value, 0));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("score");
+                                        setTempValue(String(item.data?.score || 0));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     className="prop-input"
                                     style={{ flex: 1, borderColor: '#4c4c52' }}
                                 />
@@ -520,8 +591,19 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <input
                                     type="number"
-                                    value={item.data?.fontSize || 14}
-                                    onChange={(e) => handleDataChange("fontSize", parseInt(e.target.value) || 14)}
+                                    value={getDisplayValue("fontSize", item.data?.fontSize, 14)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleDataChange("fontSize", safeParseInt(e.target.value, 14));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("fontSize");
+                                        setTempValue(String(item.data?.fontSize || 14));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     className="prop-input"
                                     min="8"
                                     max="72"
@@ -565,14 +647,36 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                     type="range"
                                     min="0"
                                     max="50"
-                                    value={item.data?.borderRadius || 0}
-                                    onChange={(e) => handleDataChange("borderRadius", parseInt(e.target.value) || 0)}
+                                    value={getDisplayValue("borderRadius", item.data?.borderRadius, 0)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleDataChange("borderRadius", safeParseInt(e.target.value, 0));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("borderRadius");
+                                        setTempValue(String(item.data?.borderRadius || 0));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     style={{ flex: 1 }}
                                 />
                                 <input
                                     type="number"
-                                    value={item.data?.borderRadius || 0}
-                                    onChange={(e) => handleDataChange("borderRadius", parseInt(e.target.value) || 0)}
+                                    value={getDisplayValue("borderRadiusNumber", item.data?.borderRadius, 0)}
+                                    onChange={(e) => {
+                                        setTempValue(e.target.value);
+                                        handleDataChange("borderRadius", safeParseInt(e.target.value, 0));
+                                    }}
+                                    onFocus={() => {
+                                        setFocusedField("borderRadiusNumber");
+                                        setTempValue(String(item.data?.borderRadius || 0));
+                                    }}
+                                    onBlur={() => {
+                                        setFocusedField(null);
+                                        setTempValue("");
+                                    }}
                                     className="prop-input"
                                     min="0"
                                     max="100"
@@ -667,8 +771,19 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                             <Layers size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                             <input
                                 type="number"
-                                value={getZIndex()}
-                                onChange={(e) => handleRootChange("zIndex", parseInt(e.target.value) || 0)}
+                                value={getDisplayValue("zIndex", (item as any).zIndex, 0)}
+                                onChange={(e) => {
+                                    setTempValue(e.target.value);
+                                    handleRootChange("zIndex", safeParseInt(e.target.value, 0));
+                                }}
+                                onFocus={() => {
+                                    setFocusedField("zIndex");
+                                    setTempValue(String(getZIndex()));
+                                }}
+                                onBlur={() => {
+                                    setFocusedField(null);
+                                    setTempValue("");
+                                }}
                                 className="prop-input"
                                 style={{ paddingLeft: '26px' }}
                             />
