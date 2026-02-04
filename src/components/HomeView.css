@@ -147,6 +147,36 @@
   transform: translateY(0);
 }
 
+.import-project-btn {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  color: #e4e4e7;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-project-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.import-project-btn:active {
+  transform: translateY(0);
+}
+
 .google-login-btn,
 .microsoft-login-btn,
 .logout-btn {
@@ -473,7 +503,8 @@
 
 .rename-project-btn,
 .delete-project-btn,
-.duplicate-project-btn {
+.duplicate-project-btn,
+.export-project-btn {
   background: rgba(102, 126, 234, 0.1);
   border: 1px solid rgba(102, 126, 234, 0.2);
   color: #667eea;
@@ -494,7 +525,8 @@
 
 .project-card:hover .rename-project-btn,
 .project-card:hover .delete-project-btn,
-.project-card:hover .duplicate-project-btn {
+.project-card:hover .duplicate-project-btn,
+.project-card:hover .export-project-btn {
   opacity: 1;
   transform: scale(1);
 }
@@ -505,7 +537,8 @@
   transform: scale(1.05);
 }
 
-.duplicate-project-btn:hover {
+.duplicate-project-btn:hover,
+.export-project-btn:hover {
   background: rgba(102, 126, 234, 0.2);
   border-color: rgba(102, 126, 234, 0.4);
   transform: scale(1.05);

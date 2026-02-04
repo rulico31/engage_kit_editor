@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import "./HomeView.css";
 import { supabase } from "../lib/supabaseClient";
 import ConfirmModal from "./ConfirmModal";
@@ -42,6 +42,10 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
 
   // Duplicate State
   const [isDuplicating, setIsDuplicating] = useState(false); // 複製中のローディング状態
+
+  // Import/Export State
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
 
   // ユーザー情報を取得
@@ -358,6 +362,88 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
     }
   };
 
+  // エクスポート処理
+  const handleExportProject = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    try {
+      // 1. プロジェクトの詳細データを取得 (データ内の名前が古い可能性があるため、nameも取得して上書きする)
+      const { data, error } = await supabase
+        .from("projects")
+        .select("name, data")
+        .eq("id", project.id)
+        .single();
+
+      if (error) throw error;
+      if (!data?.data) throw new Error("プロジェクトデータが見つかりません");
+
+      // 内部データ(dataカラム)のprojectNameはリネーム時に更新されないため、
+      // データベース上の最新のnameで上書きする
+      const projectData = {
+        ...data.data,
+        projectName: data.name
+      };
+
+      // 2. JSONファイルとして書き出し
+      const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${project.name}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("エクスポートエラー:", err);
+      alert("プロジェクトのエクスポートに失敗しました");
+    }
+  };
+
+  // インポート処理
+  const handleImportProject = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const projectData = JSON.parse(content);
+
+        // プロジェクト名の決定 (インポートされたデータまたはファイル名から)
+        const projectName = projectData.projectName || file.name.replace(/\.[^/.]+$/, "");
+
+        // 新規プロジェクトとして保存
+        const { error } = await supabase
+          .from("projects")
+          .insert({
+            name: projectName,
+            data: projectData,
+            user_id: user.id
+          });
+
+        if (error) throw error;
+
+        // 一覧を再取得
+        await fetchProjects();
+        alert("プロジェクトをインポートしました");
+      } catch (err) {
+        console.error("インポートエラー:", err);
+        alert("プロジェクトのインポートに失敗しました。ファイル形式が正しくない可能性があります。");
+      } finally {
+        setIsImporting(false);
+        // 同じファイルを再度選択できるようにリセット
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.onerror = () => {
+      alert("ファイルの読み込みに失敗しました");
+      setIsImporting(false);
+    };
+    reader.readAsText(file);
+  };
+
 
   // スクロール検知用のstate
   const [isScrolled, setIsScrolled] = useState(false);
@@ -393,6 +479,26 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
             >
               + 新規プロジェクト
             </button>
+
+            {/* インポートボタン */}
+            {user && (
+              <>
+                <button
+                  className="import-project-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="JSONファイルをインポート"
+                >
+                  📥 インポート
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImportProject}
+                  accept=".json"
+                  style={{ display: 'none' }}
+                />
+              </>
+            )}
 
             {/* 認証ボタン（Google/Microsoftログイン or ログアウト） */}
             {!user ? (
@@ -534,6 +640,13 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
                         ✏️
                       </button>
                       <button
+                        className="export-project-btn"
+                        onClick={(e) => handleExportProject(e, project)}
+                        title="JSONとしてエクスポート"
+                      >
+                        📥
+                      </button>
+                      <button
                         className="duplicate-project-btn"
                         onClick={(e) => handleDuplicateClick(e, project)}
                         title="プロジェクトを複製"
@@ -590,8 +703,8 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
         />
 
         {/* 全画面ローディングオーバーレイ */}
-        {(isProjectLoading || isDeleting || isDuplicating) && (
-          <LoadingOverlay message={isDeleting ? "プロジェクトを削除中..." : isDuplicating ? "プロジェクトを複製中..." : "Editorを起動中..."} />
+        {(isProjectLoading || isDeleting || isDuplicating || isImporting) && (
+          <LoadingOverlay message={isDeleting ? "プロジェクトを削除中..." : isDuplicating ? "プロジェクトを複製中..." : isImporting ? "プロジェクトをインポート中..." : "Editorを起動中..."} />
         )}
 
         {/* テンプレート選択モーダル */}
