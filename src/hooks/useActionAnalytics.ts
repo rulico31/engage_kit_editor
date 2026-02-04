@@ -14,8 +14,6 @@ export const useActionAnalytics = (projectId: string | null, isEnabled: boolean,
     const lastInteractionTypeRef = useRef<string | null>(null);
     const lastInteractionNameRef = useRef<string | null>(null); // Added
 
-    const interactionTimerRef = useRef<number>(Date.now());
-
     useEffect(() => {
         if (!projectId || !isEnabled) return;
 

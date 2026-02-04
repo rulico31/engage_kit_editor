@@ -207,7 +207,7 @@ export const fetchProjectStats = async (projectId: string, environment?: string)
     };
 };
 
-export const fetchDailyStats = async (projectId: string, environment?: string) => {
+export const fetchDailyStats = async (projectId: string, _environment?: string) => {
     // Note: Daily Stats table is pre-aggregated, so we can't easily filter by metadata environment 
     // unless we re-aggregate from logs or add env column to daily_stats table.
     // For now, we return all data but log a warning or TODO.

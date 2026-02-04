@@ -27,7 +27,7 @@ interface TimelineEvent {
     node_name?: string;
 }
 
-export const MicroJourneyModal: React.FC<Props> = ({ sessionId, leadId, onClose }) => {
+export const MicroJourneyModal: React.FC<Props> = ({ sessionId, leadId: _leadId, onClose }) => {
     const [events, setEvents] = useState<TimelineEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const projectMeta = useProjectStore(state => state.projectMeta);

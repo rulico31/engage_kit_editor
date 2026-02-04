@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from "reactflow";
 import { Zap, MousePointerClick, Image as ImageIcon, Type, Target } from "lucide-react";
 import { usePageStore } from "../../stores/usePageStore";
 import "./EventNode.css";
-import type { PropertyConfig } from "../../types";
+
 
 const EventNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
   // ストアからアイテムリストを取得して、IDから名前を引けるようにする

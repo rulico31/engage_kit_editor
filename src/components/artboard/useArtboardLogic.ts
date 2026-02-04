@@ -13,12 +13,11 @@ export const snapToGrid = (value: number, size: number | null, min: number = -In
 
 export const useArtboardLogic = (artboardRef: React.RefObject<HTMLDivElement | null>) => {
   // ストアからの状態取得
-  const { isPreviewing, gridSize, zoomLevel, setZoomLevel } = useEditorSettingsStore(state => ({
+  const { isPreviewing, gridSize, zoomLevel } = useEditorSettingsStore(state => ({
     isPreviewing: state.isPreviewing,
     gridSize: state.gridSize,
     viewMode: state.viewMode,
     zoomLevel: state.zoomLevel,
-    setZoomLevel: state.setZoomLevel,
   }));
 
   const { deleteItems, updateItems } = usePageStore(state => ({

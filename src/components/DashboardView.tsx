@@ -522,11 +522,6 @@ const DashboardView: React.FC = () => {
         setShowExportModal(false);
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const toggleColumn = (col: string) => {
-        setExportColumns(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]);
-    };
-
     // --- Data Preparation for Visuals ---
 
     // Device Ratio for Chart
