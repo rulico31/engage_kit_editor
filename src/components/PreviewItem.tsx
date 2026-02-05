@@ -378,7 +378,15 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
     );
   }
   else {
-    content = item.data.text || name;
+    content = (
+      <div className="item-text-content" style={{
+        textAlign: item.data.textAlign || 'left',
+        width: '100%',
+        height: '100%'
+      }}>
+        {item.data.text || name}
+      </div>
+    );
   }
 
   // クラス名の動的生成

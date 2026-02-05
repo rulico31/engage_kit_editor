@@ -13,8 +13,8 @@
   word-break: break-word;
   overflow-wrap: break-word;
   /* 追加: 確実に折り返し */
-  line-height: 1.5;
-  /* 追加: 行の高さを明示的に設定 */
+  line-height: normal;
+  /* 行の高さをデフォルトに戻す */
 
   box-sizing: border-box;
   flex-shrink: 0;
@@ -23,11 +23,11 @@
   /* 自動拡大防止 */
   cursor: default;
 
-  /* 中央揃え */
+  /* 配置設定: エディタ(Artboard.css)と統一 */
   display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
   padding: 10px 12px;
   overflow: hidden;
 }

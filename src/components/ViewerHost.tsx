@@ -253,6 +253,27 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // テーマ設定の取得 (published_content から)
+  // @ts-ignore - projectData は Supabase の行データを含んでいるため
+  const theme = projectData?.published_content?.theme;
+
+  // テーマ変数のCSSプロパティ生成
+  const themeStyles = useMemo(() => {
+    const defaults = {
+      fontFamily: 'system-ui',
+      accentColor: '#3b82f6',
+      backgroundColor: '#ffffff',
+      borderRadius: 8
+    };
+    const current = { ...defaults, ...theme };
+    return {
+      '--theme-font-family': current.fontFamily,
+      '--theme-accent-color': current.accentColor,
+      '--theme-background-color': current.backgroundColor,
+      '--theme-border-radius': `${current.borderRadius}px`,
+    } as React.CSSProperties;
+  }, [theme]);
+
   // 現在のページの背景設定を取得
   const currentPage = previewState.currentPageId ? pages[previewState.currentPageId] : null;
   const backgroundColor = currentPage?.backgroundColor || '#ffffff';
@@ -260,6 +281,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   // 背景画像のスタイル
   const backgroundStyle: React.CSSProperties = {
+    ...themeStyles, // テーマ変数を追加
     backgroundColor: backgroundColor,
     backgroundImage: backgroundImage?.src ? `url(${backgroundImage.src})` : 'none',
     backgroundSize: backgroundImage?.displayMode === 'cover' ? 'cover' :

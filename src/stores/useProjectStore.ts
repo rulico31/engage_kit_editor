@@ -190,7 +190,8 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       pages: pageState.pages,
       pageOrder: pageState.pageOrder,
       variables: {},
-      cloud_id: projectMeta?.cloud_id
+      cloud_id: projectMeta?.cloud_id,
+      theme: projectMeta?.data?.theme,
     };
 
     // forceがfalseの場合はバリデーションを実行
@@ -213,7 +214,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       const { error } = await supabase
         .from('projects')
         .update({
-          published_data: minifiedData,
+          published_content: minifiedData,
           is_published: true,
           updated_at: new Date().toISOString(),
         })

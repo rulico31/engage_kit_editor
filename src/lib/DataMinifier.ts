@@ -17,7 +17,8 @@ export class DataMinifier {
             pages: this.minifyPages(projectData.pages),
             pageOrder: projectData.pageOrder,
             variables: projectData.variables,
-            cloud_id: projectData.cloud_id
+            cloud_id: projectData.cloud_id,
+            theme: projectData.theme
         };
     }
 
@@ -33,10 +34,12 @@ export class DataMinifier {
                 name: pageData.name,
                 placedItems: pageData.placedItems, // Viewer表示に必要なのでそのまま保持
                 allItemLogics: this.minifyAllItemLogics(pageData.allItemLogics),
-                // comments は削除（エディタ専用）
+                nodes: [], // Viewerでは不要だが型定義上必要
+                edges: [], // Viewerでは不要だが型定義上必要
+                comments: [], // Viewerでは不要だが型定義上必要
                 backgroundColor: pageData.backgroundColor,
                 backgroundImage: pageData.backgroundImage
-            };
+            } as any;
         });
 
         return minifiedPages;
