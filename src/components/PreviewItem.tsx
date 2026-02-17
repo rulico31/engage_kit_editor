@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./PreviewItem.css";
 import { usePreviewStore } from "../stores/usePreviewStore";
-import { useProjectStore } from "../stores/useProjectStore"; // Added
+import { useProjectStore } from "../stores/useProjectStore";
+import { usePageStore } from "../stores/usePageStore";
 import { InputTracker } from "../lib/InputTracker";
 import { logAnalyticsEvent } from "../lib/analytics";
 import { validateInput } from "../lib/validation";
@@ -49,6 +50,61 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   const handleClick = async () => {
     console.log("📍 PreviewItem clicked:", name, id);
+
+    // [NEW] 自身が入力項目の場合、最新の値を確実に variables に反映させる
+    if (isInput) {
+      onVariableChange(variableName, inputValue);
+    }
+
+    // [NEW] 外部リンク遷移または送信前にバリデーションチェック
+    // 自身、またはページ上の全入力項目のバリデーションが必要なアクションの場合
+    if (item.data.linkUrl || item.data.actionType === 'submit') {
+      const { pages, selectedPageId } = usePageStore.getState();
+      const currentPage = pages[selectedPageId!];
+
+      if (currentPage) {
+        let hasValidationError = false;
+        const updates: Record<string, any> = {};
+        // 最新の variables を直接取得 (クロージャ対策 + 上記の反映後)
+        const currentVars = usePreviewStore.getState().variables;
+
+        // ページ内の全アイテムをチェック
+        currentPage.placedItems.forEach((pi: PlacedItemType) => {
+          const isInputItem = pi.name.startsWith("テキスト入力欄") || pi.type === 'input';
+          if (isInputItem) { // バリデーションが必要な全ての入力項目
+            const vName = pi.data.variableName || pi.id;
+            const val = currentVars[vName];
+
+            const errorMsg = validateInput(val, {
+              required: !!pi.data.required,
+              inputType: pi.data.inputType,
+              enableCountryCode: pi.data.enableCountryCode
+            });
+
+            if (errorMsg) {
+              hasValidationError = true;
+              updates[pi.id] = { ...previewState[pi.id], error: errorMsg };
+            } else if (previewState[pi.id]?.error) {
+              // 修正済みならエラーを消す
+              updates[pi.id] = { ...previewState[pi.id], error: null };
+            }
+          }
+        });
+
+        // エラー状態を一括更新
+        if (Object.keys(updates).length > 0) {
+          setPreviewState((prev: PreviewState) => ({
+            ...prev,
+            ...updates
+          }));
+        }
+
+        if (hasValidationError) {
+          console.warn('🛑 Validation failed. Blocking action.');
+          return;
+        }
+      }
+    }
 
     // [NEW] 隠し変数の保存 (onItemEvent経由 - 疎結合の維持)
     // 変数名と値が両方設定されている場合のみ実行

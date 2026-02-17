@@ -32,6 +32,7 @@ const initialProjectData: ProjectData = {
 interface ProjectStoreState {
   currentProjectId: string | null;
   projectMeta: SavedProject | null;
+  projectsMetadata: Partial<SavedProject>[]; // プロジェクト一覧用キャッシュ
   isLoading: boolean;
   error: string | null;
 
@@ -51,6 +52,7 @@ interface ProjectStoreState {
 export const useProjectStore = create<ProjectStoreState>((set, get) => ({
   currentProjectId: null,
   projectMeta: null,
+  projectsMetadata: [],
   isLoading: false,
   error: null,
 
@@ -79,6 +81,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
       set({
         currentProjectId: data.id,
         projectMeta: data as SavedProject,
+        projectsMetadata: [data, ...get().projectsMetadata],
         isLoading: false
       });
       useToastStore.getState().addToast("プロジェクトを作成しました", "success");
@@ -338,6 +341,7 @@ export const useProjectStore = create<ProjectStoreState>((set, get) => ({
     set({
       currentProjectId: null,
       projectMeta: null,
+      projectsMetadata: [],
       isLoading: false,
       error: null,
     });

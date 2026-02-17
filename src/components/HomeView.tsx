@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import ConfirmModal from "./ConfirmModal";
 import { TemplateSelectionModal } from "./TemplateSelectionModal";
 import { useAuthStore } from "../stores/useAuthStore";
+import { useProjectStore } from "../stores/useProjectStore";
 import { AccountMenu } from "./Auth/AccountMenu";
 import LoadingOverlay from "./LoadingOverlay";
 
@@ -50,15 +51,16 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
 
   // ユーザー情報を取得
   const user = useAuthStore(state => state.user);
+  const { projectsMetadata } = useProjectStore();
 
   // アカウントメニューの状態
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   // プロジェクト一覧を取得（useCallbackで安定した参照を保つ）
-  const fetchProjects = useCallback(async () => {
+  const fetchProjects = useCallback(async (showLoading = true) => {
     console.log('[HomeView] fetchProjects called');
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       if (!user) {
         setProjects([]);
         setIsLoading(false);
@@ -67,12 +69,17 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
 
       const { data, error } = await supabase
         .from("projects")
-        .select("*")
+        .select("id, name, created_at, updated_at")
         .eq('user_id', user.id) // ★ 自分のが所有するプロジェクトのみ取得
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
-      setProjects(data || []);
+
+      const projectList = data || [];
+      setProjects(projectList);
+
+      // ストアのキャッシュを更新
+      useProjectStore.setState({ projectsMetadata: projectList });
     } catch (err) {
       console.error("Error fetching projects:", err);
     } finally {
@@ -80,10 +87,18 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
     }
   }, [user]);
 
-  // 初回ロード（fetchProjectsは意図的に依存配列から除外 - 初回のみ実行したいため）
+  // 初回ロード
   useEffect(() => {
     if (user) {
-      fetchProjects();
+      // キャッシュがあれば先に表示
+      if (projectsMetadata && projectsMetadata.length > 0) {
+        setProjects(projectsMetadata as Project[]);
+        setIsLoading(false);
+        // バックグラウンドで最新を取得（ローディングは出さない）
+        fetchProjects(false);
+      } else {
+        fetchProjects(true);
+      }
     } else {
       setProjects([]);
       setIsLoading(false);
@@ -91,40 +106,18 @@ const HomeView: React.FC<HomeViewProps> = ({ onCreateProject, onOpenProject }) =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // タブ復帰時のステイルなローディング状態をクリーンアップ
+  // タブ復帰時のチェック
   useEffect(() => {
     const handleVisibility = () => {
-      console.log('[HomeView] visibilitychange:', document.visibilityState, 'isLoading:', isLoading);
       if (document.visibilityState === 'visible') {
-        // isLoading（プロジェクト一覧取得中）のステイル状態をチェック
-        // 再取得ではなくローディング状態をリセットするだけ
-        // (バックグラウンドでfetchが完了していれば既にデータは取得されている)
-        if (isLoading) {
-          console.warn('[HomeView] Tab returned while loading, resetting loading state...');
-          // 少し待ってからリセット（fetchが完了している可能性を待つ）
-          setTimeout(() => {
-            setIsLoading(false);
-          }, 300);
-        }
-
-        // isProjectLoading（プロジェクトを開く処理中）のステイル状態をチェック
-        if (isProjectLoading) {
-          setTimeout(() => {
-            setIsProjectLoading(prev => {
-              if (prev) {
-                console.warn('[HomeView] Stale project loading state detected, resetting...');
-                return false;
-              }
-              return prev;
-            });
-          }, 500);
-        }
+        // バックグラウンドで更新（ユーザーを待たせない）
+        if (user) fetchProjects(false);
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isLoading, isProjectLoading]);
+  }, [user, fetchProjects]);
 
 
   const handleTemplateSelect = (templateId: string | null) => {

@@ -37,6 +37,7 @@ import { HotLeadsTable } from "./dashboard/HotLeadsTable";
 import { RageClickTable } from "./dashboard/RageClickTable";
 import { ItemScatterPlot } from "./dashboard/ItemScatterPlot";
 import { DashboardDetailModal } from "./dashboard/DashboardDetailModal";
+import { BatchCreateModal } from "./dashboard/BatchCreateModal";
 
 // Local interface for pages with item logics (used by projectMeta.data.pages)
 interface PageWithLogics {
@@ -86,6 +87,7 @@ const DashboardView: React.FC = () => {
     // エクスポート設定用のState
     const [showExportModal, setShowExportModal] = useState(false);
     const [showDropoutModal, setShowDropoutModal] = useState(false);
+    const [showBatchModal, setShowBatchModal] = useState(false); // [NEW] 一括作成モーダル
     const [exportStartDate, setExportStartDate] = useState<string>("");
     const [exportEndDate, setExportEndDate] = useState<string>("");
     const [exportColumns, setExportColumns] = useState<string[]>([]);
@@ -1159,6 +1161,9 @@ const DashboardView: React.FC = () => {
                     <button className="action-btn" onClick={handleExportClick}>
                         CSVエクスポート
                     </button>
+                    <button className="action-btn primary" onClick={() => setShowBatchModal(true)}>
+                        一括作成
+                    </button>
                 </div>
             </div>
 
@@ -1239,6 +1244,11 @@ const DashboardView: React.FC = () => {
                 onItemClick={handleJumpToEditor}
             />
 
+            {/* [NEW] 一括作成モーダル */}
+            <BatchCreateModal
+                isOpen={showBatchModal}
+                onClose={() => setShowBatchModal(false)}
+            />
         </div>
     );
 };

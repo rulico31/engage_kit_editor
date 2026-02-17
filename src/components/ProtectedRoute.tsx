@@ -21,7 +21,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, onRedi
     }, [isInitialized, user, onRedirect]);
 
     // 初期化中はローディング表示
-    if (!isInitialized) {
+    // ※ ユーザーが既に存在する場合は、初期化完了を待たずに表示を開始してチラつきを抑える
+    if (!isInitialized && !user) {
         return (
             <div style={{
                 display: 'flex',

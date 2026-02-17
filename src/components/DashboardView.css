@@ -34,6 +34,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .dashboard-title h1 {
@@ -43,6 +45,7 @@
   margin: 0;
   background: linear-gradient(to right, #fff, #a1a1aa);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -56,6 +59,7 @@
 .dashboard-actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .filter-select {
@@ -246,10 +250,10 @@
   margin-bottom: 24px;
 }
 
-.stat-card {
-  /* Legacy card styling handled by classes now, or mapped to bento-card */
-  /* Keeping minimally for backward compatibility if needed */
-}
+/* .stat-card {
+   Legacy card styling handled by classes now, or mapped to bento-card 
+   Keeping minimally for backward compatibility if needed 
+} */
 
 /* Charts Area adjustments */
 .recharts-cartesian-grid-horizontal line,
