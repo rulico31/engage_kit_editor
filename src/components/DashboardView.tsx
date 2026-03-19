@@ -530,6 +530,7 @@ const DashboardView: React.FC = () => {
     const deviceData = [
         { name: 'Mobile', value: stats?.deviceBreakdown.mobile || 0, color: '#3b82f6' },
         { name: 'Desktop', value: stats?.deviceBreakdown.desktop || 0, color: '#10b981' },
+        { name: 'Tablet', value: stats?.deviceBreakdown.tablet || 0, color: '#f59e0b' },
     ];
 
 
@@ -586,14 +587,25 @@ const DashboardView: React.FC = () => {
                                 </ResponsiveContainer>
                             </div>
                             <div className="flex gap-4 text-xs text-zinc-400 mt-2">
-                                <div className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                    <span>モバイル: {hasData ? ((deviceData[0].value / (deviceData[0].value + deviceData[1].value || 1)) * 100).toFixed(1) : '0.0'}%</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                    <span>パソコン: {hasData ? ((deviceData[1].value / (deviceData[0].value + deviceData[1].value || 1)) * 100).toFixed(1) : '0.0'}%</span>
-                                </div>
+                                {(() => {
+                                    const total = (deviceData[0].value + deviceData[1].value + deviceData[2].value) || 1;
+                                    return (
+                                        <>
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                <span>モバイル: {hasData ? ((deviceData[0].value / total) * 100).toFixed(1) : '0.0'}%</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                <span>パソコン: {hasData ? ((deviceData[1].value / total) * 100).toFixed(1) : '0.0'}%</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                                <span>タブレット: {hasData ? ((deviceData[2].value / total) * 100).toFixed(1) : '0.0'}%</span>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </>
                     ) : (
