@@ -1,9 +1,9 @@
 import React from "react";
 import "./Header.css";
 import type { ViewMode } from "../types";
-// import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
+import { useEditorSettingsStore } from "../stores/useEditorSettingsStore";
 import { usePageStore } from "../stores/usePageStore";
-// import { usePreviewStore } from "../stores/usePreviewStore";
+
 import { useAuthStore } from "../stores/useAuthStore";
 
 interface HeaderProps {
@@ -11,7 +11,7 @@ interface HeaderProps {
   isPreviewing: boolean;
   onGoHome: () => void;
   onSave: () => void;
-  onTogglePreview: () => void;
+  onTogglePreview: (startFromBeginning?: boolean) => void;
   onEnterFullscreen: () => void;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
@@ -31,7 +31,6 @@ const IconRedo = () => (
   </svg>
 );
 
-/*
 const IconDesktop = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" />
@@ -43,7 +42,6 @@ const IconMobile = () => (
     <rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" />
   </svg>
 );
-*/
 
 const IconHome = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -101,16 +99,10 @@ const Header: React.FC<HeaderProps> = ({
     canRedo: state.canRedo
   }));
 
-  /* Unused due to hidden device switcher
   const { user, signOut } = useAuthStore();
 
   const isMobileView = useEditorSettingsStore((state) => state.isMobileView);
   const setIsMobileView = useEditorSettingsStore((state) => state.setIsMobileView);
-  */
-  const { user, signOut } = useAuthStore();
-
-  // const isMobileView = useEditorSettingsStore((state) => state.isMobileView);
-  // const setIsMobileView = useEditorSettingsStore((state) => state.setIsMobileView);
 
   // デバッグ: userの状態を確認
 
@@ -171,19 +163,15 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* 右側：アクション */}
       <div className="header-right">
-        {/* Device Switcher (Hidden) */}
-        {/*
+        {/* Device Switcher */}
         <div className="device-switcher-group">
           <button
             className={`device-switch-btn ${!isMobileView ? 'active' : ''}`}
             onClick={() => {
               if (!isMobileView) return;
               setIsMobileView(false);
-              if (isPreviewing) {
-                usePreviewStore.getState().updateLayoutForViewMode(false);
-              }
             }}
-            title="PCモード"
+            title="PCレイアウト (基準)"
           >
             <IconDesktop />
           </button>
@@ -191,18 +179,30 @@ const Header: React.FC<HeaderProps> = ({
             className={`device-switch-btn ${isMobileView ? 'active' : ''}`}
             onClick={() => {
               if (isMobileView) return;
-              usePageStore.getState().syncMobileLayouts();
               setIsMobileView(true);
-              if (isPreviewing) {
-                usePreviewStore.getState().updateLayoutForViewMode(true);
-              }
             }}
-            title="モバイルモード"
+            title="スマホ専用レイアウト"
           >
             <IconMobile />
           </button>
+          {/* 自動再配置ボタン: スマホレイアウト時のみ表示 */}
+          {isMobileView && (
+            <button
+              className="auto-stack-btn"
+              onClick={() => {
+                if (window.confirm('現在のPC版の配置を元に、スマホ用に縦積み再配置しますか？\n(手動で調整したスマホ版設定も上書きされます)')) {
+                  usePageStore.getState().autoStackItems();
+                }
+              }}
+              title="スマホレイアウトを自動生成する"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              </svg>
+              <span>自動で再配置</span>
+            </button>
+          )}
         </div>
-        */}
 
         <button className="icon-button-ghost" onClick={onSave} title="下書き保存">
           <IconCloud />
@@ -218,12 +218,28 @@ const Header: React.FC<HeaderProps> = ({
           <IconMaximize />
         </button>
 
-        <button
-          className={`preview-toggle-button ${isPreviewing ? "is-previewing" : ""}`}
-          onClick={onTogglePreview}
-        >
-          {isPreviewing ? <><IconStop /> <span>停止</span></> : <><IconPlay /> <span>プレビュー</span></>}
-        </button>
+        <div className="preview-group">
+          <button
+            className={`preview-toggle-button ${isPreviewing ? "is-previewing" : ""}`}
+            onClick={() => onTogglePreview(false)}
+            title={isPreviewing ? "プレビュー停止" : "現在のページからプレビュー"}
+          >
+            {isPreviewing ? <><IconStop /> <span>停止</span></> : <><IconPlay /> <span>プレビュー</span></>}
+          </button>
+
+          {!isPreviewing && (
+            <button
+              className="preview-more-button"
+              onClick={() => onTogglePreview(true)}
+              title="一番最初からプレビュー"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>
+              </svg>
+              最初から
+            </button>
+          )}
+        </div>
 
         <button className="publish-button" onClick={onPublish}>
           公開

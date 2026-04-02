@@ -23,16 +23,26 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   item,
   previewState,
   setPreviewState,
+  isMobile = false,
   projectId: propProjectId, // Rename to avoid conflict with local variable if any, or just use it
 }) => {
   const { id, name } = item;
   const itemState = previewState[id];
 
-  // ★ ミニチュア方式: 常にPC座標・サイズのみ使用
-  const x = itemState?.x ?? item.x;
-  const y = itemState?.y ?? item.y;
-  const width = item.width;
-  const height = item.height;
+  // isMobile=true の場合はモバイル専用座標・サイズを優先して使用
+  // モバイル座標が未設定の場合は PC 座標にフォールバック
+  const x = isMobile
+    ? (itemState?.x ?? item.mobileX ?? item.x)
+    : (itemState?.x ?? item.x);
+  const y = isMobile
+    ? (itemState?.y ?? item.mobileY ?? item.y)
+    : (itemState?.y ?? item.y);
+  const width = isMobile
+    ? (item.mobileWidth ?? item.width)
+    : item.width;
+  const height = isMobile
+    ? (item.mobileHeight ?? item.height)
+    : item.height;
 
   const onItemEvent = usePreviewStore(state => state.handleItemEvent);
   const onVariableChange = usePreviewStore(state => state.handleVariableChangeFromItem);
@@ -325,12 +335,18 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
   if (isImage) {
     if (item.data.src) {
+      // 画像の縦横比（aspect-ratio）
+      // PC版の width/height から元の比率を計算して保持
+      const pcWidth = item.width ?? 100;
+      const pcHeight = item.height ?? 100;
+      const imageAspectRatio = pcWidth > 0 && pcHeight > 0 ? `${pcWidth} / ${pcHeight}` : undefined;
       content = (
         <img
           src={item.data.src}
           alt={item.data.text || "image"}
           className="preview-image-content"
           draggable={false}
+          style={{ aspectRatio: imageAspectRatio, width: '100%', height: '100%', objectFit: 'contain' }}
           onLoad={() => {
             onItemEvent("onImageLoad", id);
           }}
@@ -471,7 +487,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
         // Typography styles
         color: item.data.textColor || item.data.color || '#333333',
-        fontSize: item.data.fontSize ? `${item.data.fontSize}px` : '15px',
+        fontSize: isMobile ? `${item.mobileFontSize ?? (item.data.fontSize || 15) * 0.7}px` : (item.data.fontSize ? `${item.data.fontSize}px` : '15px'),
         textAlign: item.data.textAlign || 'left',
 
         // 枠線の制御

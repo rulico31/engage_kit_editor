@@ -1,5 +1,5 @@
-import React from "react";
 import { useState } from "react";
+import { useEditorSettingsStore } from "../../stores/useEditorSettingsStore";
 import type { PlacedItemType } from "../../types";
 import { AccordionSection } from "./SharedComponents";
 import ImageCropModal from "../ImageCropModal";
@@ -46,6 +46,8 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
         return propValue ?? fallback;
     };
 
+    const isMobileView = useEditorSettingsStore(state => state.isMobileView);
+
     // 共通の更新ハンドラ (data配下のプロパティ更新用)
     const handleDataChange = (key: string, value: any) => {
         onItemUpdate(item.id, {
@@ -58,16 +60,36 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
 
     // ルートレベルのプロパティ更新ハンドラ (x, y, width, height, etc.)
     const handleRootChange = (key: string, value: any) => {
+        // モイス表示ならモバイル用プロパティを更新
+        const actualKey = isMobileView ?
+            (key === 'x' ? 'mobileX' :
+                key === 'y' ? 'mobileY' :
+                    key === 'width' ? 'mobileWidth' :
+                        key === 'height' ? 'mobileHeight' : key)
+            : key;
+
         onItemUpdate(item.id, {
-            [key]: value
+            [actualKey]: value
         }, { addToHistory: true });
     };
 
     // ヘルパ: 安全な値の取得
-    const getX = () => (item as any).x ?? (item as any).position?.x ?? 0;
-    const getY = () => (item as any).y ?? (item as any).position?.y ?? 0;
-    const getWidth = () => (item as any).width ?? (item as any).size?.width ?? 100;
-    const getHeight = () => (item as any).height ?? (item as any).size?.height ?? 40;
+    const getX = () => {
+        if (isMobileView) return item.mobileX ?? item.x ?? (item as any).position?.x ?? 0;
+        return item.x ?? (item as any).position?.x ?? 0;
+    };
+    const getY = () => {
+        if (isMobileView) return item.mobileY ?? item.y ?? (item as any).position?.y ?? 0;
+        return item.y ?? (item as any).position?.y ?? 0;
+    };
+    const getWidth = () => {
+        if (isMobileView) return item.mobileWidth ?? item.width ?? (item as any).size?.width ?? 100;
+        return item.width ?? (item as any).size?.width ?? 100;
+    };
+    const getHeight = () => {
+        if (isMobileView) return item.mobileHeight ?? item.height ?? (item as any).size?.height ?? 40;
+        return item.height ?? (item as any).size?.height ?? 40;
+    };
     const getZIndex = () => (item as any).zIndex ?? 0;
 
     // アイコン取得
@@ -124,7 +146,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                                 <input
                                     type="number"
-                                    value={getDisplayValue("x", (item as any).x ?? (item as any).position?.x, 0)}
+                                    value={getDisplayValue("x", isMobileView ? (item.mobileX ?? item.x) : (item.x ?? (item as any).position?.x), 0)}
                                     onChange={(e) => {
                                         setTempValue(e.target.value);
                                         handleRootChange("x", safeParseInt(e.target.value, 0));
@@ -148,7 +170,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Move size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
                                     type="number"
-                                    value={getDisplayValue("y", (item as any).y ?? (item as any).position?.y, 0)}
+                                    value={getDisplayValue("y", isMobileView ? (item.mobileY ?? item.y) : (item.y ?? (item as any).position?.y), 0)}
                                     onChange={(e) => {
                                         setTempValue(e.target.value);
                                         handleRootChange("y", safeParseInt(e.target.value, 0));
@@ -176,7 +198,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                                 <input
                                     type="number"
-                                    value={getDisplayValue("width", (item as any).width ?? (item as any).size?.width, 100)}
+                                    value={getDisplayValue("width", isMobileView ? (item.mobileWidth ?? item.width) : (item.width ?? (item as any).size?.width), 100)}
                                     onChange={(e) => {
                                         setTempValue(e.target.value);
                                         handleRootChange("width", safeParseInt(e.target.value, 0));
@@ -200,7 +222,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                                 <Maximize size={12} style={{ position: 'absolute', left: 8, top: '50%', color: '#666', transform: 'translateY(-50%) rotate(90deg)' }} />
                                 <input
                                     type="number"
-                                    value={getDisplayValue("height", (item as any).height ?? (item as any).size?.height, 40)}
+                                    value={getDisplayValue("height", isMobileView ? (item.mobileHeight ?? item.height) : (item.height ?? (item as any).size?.height), 40)}
                                     onChange={(e) => {
                                         setTempValue(e.target.value);
                                         handleRootChange("height", safeParseInt(e.target.value, 0));

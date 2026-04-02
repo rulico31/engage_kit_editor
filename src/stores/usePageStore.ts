@@ -13,7 +13,7 @@ import {
 import type { PlacedItemType, NodeGraph, ProjectData, CommentType, PageData } from '../types';
 import { useSelectionStore } from './useSelectionStore';
 import { useEditorSettingsStore } from './useEditorSettingsStore';
-import { ensureMobileLayout } from '../lib/layoutUtils';
+import { ensureMobileLayout, calculateAutoMobileStack } from '../lib/layoutUtils';
 
 // Undo/Redo履歴の最大数
 const MAX_HISTORY = 20;
@@ -402,6 +402,29 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
   },
 
   // --- アイテム操作 ---
+  autoStackItems: () => {
+    set(state => {
+      const pageId = state.selectedPageId;
+      if (!pageId) return state;
+
+      const page = state.pages[pageId];
+      if (!page) return state;
+
+      const newItems = calculateAutoMobileStack(page.placedItems);
+
+      return {
+        pages: {
+          ...state.pages,
+          [pageId]: {
+            ...page,
+            placedItems: newItems
+          }
+        }
+      };
+    });
+    get().commitHistory();
+  },
+
   addItem: (item: PlacedItemType) => {
     set(state => {
       const pageId = state.selectedPageId!;
@@ -940,32 +963,7 @@ export const usePageStore = create<PageStoreState>((set, get) => ({
     get().commitHistory();
   },
 
-  // --- 自動レイアウト ---
-  autoStackItems: () => {
-    set(state => {
-      const pageId = state.selectedPageId!;
-      const page = state.pages[pageId];
-      const items = [...page.placedItems];
 
-      items.sort((a, b) => (a.y ?? 0) - (b.y ?? 0));
-
-      let currentY = 20;
-      const newItems = items.map(item => {
-        const newItem = { ...item };
-        newItem.mobileX = 20;
-        newItem.mobileY = currentY;
-        newItem.mobileWidth = 335;
-        newItem.mobileHeight = item.height ?? 0;
-        currentY += (newItem.mobileHeight ?? 0) + 20;
-        return newItem;
-      });
-
-      return {
-        pages: { ...state.pages, [pageId]: { ...page, placedItems: newItems } }
-      };
-    });
-    get().commitHistory();
-  },
 
   // --- Node Operations (Basic) ---
   updateNodeData: (nodeId: string, data: any, options?: { addToHistory?: boolean; historyDebounce?: boolean }) => {

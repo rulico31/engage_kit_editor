@@ -81,15 +81,20 @@
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   color: var(--text-primary);
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 0 16px; /* Removed vertical padding, use height */
+  height: 36px !important;   /* Force override global 24px */
+  width: auto !important;    /* Force override global 24px */
+  border-radius: 8px !important; /* Force override global border-radius */
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .action-btn:hover {
@@ -583,6 +588,7 @@
   border-radius: 8px;
   transition: all 0.2s;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .control-group:hover {
@@ -609,4 +615,25 @@
 .filter-select option {
   background-color: #18181b;
   color: #fff;
+}
+
+/* Fix for Analytics Tab Buttons */
+.dashboard-actions .action-btn {
+  padding: 6px 12px;
+  height: 32px !important; /* Force override global 24px */
+  width: auto !important;  /* Force override global 24px */
+  border-radius: 8px !important;
+  font-size: 13px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.dashboard-actions .action-btn.primary {
+  padding: 6px 16px;
+  height: 32px;
+  font-size: 13px;
+}
+
+.dashboard-actions .action-btn:active {
+  transform: translateY(1px);
 }

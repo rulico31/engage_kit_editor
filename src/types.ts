@@ -69,6 +69,7 @@ export interface PlacedItemType {
   mobileY?: number;
   mobileWidth?: number;
   mobileHeight?: number;
+  mobileFontSize?: number;
   position: { x: number; y: number };
   size: { width: number; height: number };
   zIndex: number;
@@ -139,6 +140,7 @@ export interface SavedProject {
   data: ProjectData;
   user_id: string;
   is_published: boolean;
+  published_url?: string;
   published_data: any;
   cloud_id?: string;
   created_at: string;

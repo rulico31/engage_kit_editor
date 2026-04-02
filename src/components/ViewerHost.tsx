@@ -8,7 +8,7 @@ import "./Artboard.css";
 import { logAnalyticsEvent } from "../lib/analytics";
 import { ViewerErrorBoundary } from "./ViewerErrorBoundary";
 import { initializeUTMTracking } from "../lib/UTMTracker";
-import { initializeDeviceTracking } from "../lib/DeviceDetector";
+import { initializeDeviceTracking, getDeviceInfo } from "../lib/DeviceDetector";
 import { useActionAnalytics } from "../hooks/useActionAnalytics";
 
 interface ViewerHostProps {
@@ -143,14 +143,26 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         console.log('[ViewerHost] First page ID:', firstPageId);
 
         if (firstPageId) {
+          // デバイス判定（UserAgentベースの判定を優先）
+          const deviceInfo = getDeviceInfo();
+          const isActuallyMobile = deviceInfo.device_type === 'mobile';
+
           // 全アイテムの初期表示状態を作成
           const initialItemStates: Record<string, any> = {};
           Object.values(normalizedPages).forEach((page: any) => {
             (page.placedItems || []).forEach((item: any) => {
+              // モバイルモード時はモバイル座標を優先
+              const initialX = isActuallyMobile && item.mobileX !== undefined 
+                ? item.mobileX 
+                : (item.x ?? item.position?.x ?? 0);
+              const initialY = isActuallyMobile && item.mobileY !== undefined 
+                ? item.mobileY 
+                : (item.y ?? item.position?.y ?? 0);
+
               initialItemStates[item.id] = {
                 isVisible: item.data?.initialVisibility !== false,
-                x: item.x ?? item.position?.x ?? 0,
-                y: item.y ?? item.position?.y ?? 0,
+                x: initialX,
+                y: initialY,
                 opacity: 1,
                 scale: 1,
                 rotation: 0,
@@ -167,10 +179,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
             ...initialItemStates
           } as any);
 
-          // 履歴インデックスの初期化を明示的に行う
+          // 履歴インデックスとモバイル状態の初期化
           usePreviewStore.setState({
             navigationHistory: [{ pageId: firstPageId, visitedAt: Date.now() }],
-            currentHistoryIndex: 0
+            currentHistoryIndex: 0,
+            isMobile: isActuallyMobile
           });
 
           // プロジェクトIDを明示的にセット
@@ -236,16 +249,36 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   // レイアウト計算
   const FIXED_WIDTH = 1000;
+  const MOBILE_WIDTH = 375;
+  const MOBILE_BREAKPOINT = 480; // 480px未満をスマホとして扱う（タブレットはPC版縮小表示）
   const FIXED_HEIGHT = 700; // 基準の高さ
 
   const [scale, setScale] = useState(1);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
       const windowWidth = window.innerWidth;
-      // 1000pxより小さい場合のみ縮小
-      const newScale = windowWidth < FIXED_WIDTH ? windowWidth / FIXED_WIDTH : 1;
-      setScale(newScale);
+      const deviceInfo = getDeviceInfo();
+      
+      // UserAgent判定または画面幅判定
+      if (deviceInfo.device_type === 'mobile' || windowWidth < MOBILE_BREAKPOINT) {
+        // スマホ：スケーリングせず375px等倍表示
+        setIsMobileDevice(true);
+        setScale(1);
+        // store側のisMobileも同期させる（再表示時などのため）
+        if (!usePreviewStore.getState().isMobile) {
+          usePreviewStore.setState({ isMobile: true });
+        }
+      } else {
+        // PC・タブレット：1000pxより小さい場合のみ縮小（従来通り）
+        setIsMobileDevice(false);
+        const newScale = windowWidth < FIXED_WIDTH ? windowWidth / FIXED_WIDTH : 1;
+        setScale(newScale);
+        if (usePreviewStore.getState().isMobile) {
+          usePreviewStore.setState({ isMobile: false });
+        }
+      }
     };
 
     window.addEventListener('resize', handleResize);
@@ -313,13 +346,19 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   console.log('[ViewerHost] Rendering content:', { currentPageData, placedItems: placedItems.length, currentPageItems });
 
-  const maxY = currentPageItems.reduce((max: number, item: PlacedItemType) => Math.max(max, item.position.y + item.size.height), FIXED_HEIGHT);
+  const maxY = isMobileDevice
+    ? currentPageItems.reduce((max: number, item: PlacedItemType) => {
+        const mobileY = item.mobileY ?? item.position.y * 0.375;
+        const mobileH = item.mobileHeight ?? item.size.height * 0.45;
+        return Math.max(max, mobileY + mobileH);
+      }, FIXED_HEIGHT)
+    : currentPageItems.reduce((max: number, item: PlacedItemType) => Math.max(max, item.position.y + item.size.height), FIXED_HEIGHT);
   const contentHeight = Math.max(FIXED_HEIGHT, maxY + 50); // 余白
 
   console.log('[ViewerHost] About to render main content with', placedItems.length, 'items');
 
   return (
-    <div style={backgroundStyle}>
+    <div style={{ ...backgroundStyle, height: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <div style={{
         width: "100%",
         minHeight: "100%",
@@ -331,19 +370,19 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         paddingBottom: "0px"
       }}>
 
-        {/* コンテンツラッパー: 自動計算された高さを使用 */}
+      {/* コンテンツラッパー: 自動計算された高さを使用 */}
         <div style={{
-          width: `${FIXED_WIDTH * scale}px`,
-          height: `${contentHeight * scale}px`, // スクロール対応のためwrapperHeightではなくコンテンツに合わせる
+          width: isMobileDevice ? `${MOBILE_WIDTH}px` : `${FIXED_WIDTH * scale}px`,
+          height: `${contentHeight * (isMobileDevice ? 1 : scale)}px`,
           position: "relative",
           overflow: "hidden", // はみ出し防止
         }}>
 
-          {/* 中身: scale変換 */}
+          {/* 中身: scale変換（モバイル時はスケールなし） */}
           <div style={{
-            width: `${FIXED_WIDTH}px`,
+            width: isMobileDevice ? `${MOBILE_WIDTH}px` : `${FIXED_WIDTH}px`,
             height: `${contentHeight}px`,
-            transform: `scale(${scale})`,
+            transform: isMobileDevice ? 'none' : `scale(${scale})`,
             transformOrigin: "top left",
             position: "absolute",
             top: 0,
@@ -356,7 +395,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
                 previewState={previewState}
                 setPreviewState={setPreviewState}
                 allItemLogics={allItemLogics}
-                isMobile={false}
+                isMobile={isMobileDevice}
                 projectId={projectId || undefined} // Pass projectId
               />
             </ViewerErrorBoundary>

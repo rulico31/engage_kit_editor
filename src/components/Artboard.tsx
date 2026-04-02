@@ -375,7 +375,7 @@ const Artboard: React.FC = () => {
         selectedIds={selectedIds}
         activeTabId={activeTabId}
         isPreviewing={isPreviewing}
-        isMobileView={useEditorSettingsStore.getState().isMobileView}
+        isMobileView={isMobileView}
         previewState={previewState}
         onItemEvent={onItemEvent}
         variables={variables}
@@ -384,7 +384,7 @@ const Artboard: React.FC = () => {
         onItemUpdate={handleItemUpdate}
       />
     ));
-  }, [placedItems, onArtboardItemSelect, handleItemDragStart, selectedIds, activeTabId, isPreviewing, previewState, onItemEvent, variables, onVariableChange, handleItemSelect, zoomLevel, handleItemUpdate]);
+  }, [placedItems, onArtboardItemSelect, handleItemDragStart, selectedIds, activeTabId, isPreviewing, isMobileView, previewState, onItemEvent, variables, onVariableChange, handleItemSelect, zoomLevel, handleItemUpdate]);
 
   const MemoizedArtboardItem = useMemo(() => React.memo(ArtboardItem), []);
 
@@ -394,8 +394,21 @@ const Artboard: React.FC = () => {
 
 
   // アートボードのサイズ決定
-  const artboardWidth = isMobileView ? 375 : 1000;
-  const artboardHeight = isMobileView ? 667 : 700;
+  // モバイル時は「はみ出し」を確認しやすくするため、標準の375pxより広めに設定（ガイド表示用）
+  const artboardWidth = isMobileView ? 450 : 1000;
+  
+  // スマホビュー時の最大高さを算出（要素がはみ出さないように）
+  const mobileMaxHeight = useMemo(() => {
+    if (!isMobileView) return 700;
+    const maxY = placedItems.reduce((acc, item) => {
+      const h = item.mobileHeight ?? 0;
+      const y = item.mobileY ?? 0;
+      return Math.max(acc, y + h);
+    }, 0);
+    return Math.max(667, maxY + 40); // 40pxの余裕を持たせる
+  }, [placedItems, isMobileView]);
+
+  const artboardHeight = isMobileView ? mobileMaxHeight : 700;
 
   return (
     <div
@@ -404,7 +417,8 @@ const Artboard: React.FC = () => {
         width: "100%",
         height: "100%",
         position: "relative",
-        overflow: "auto"
+        overflow: "auto",
+        WebkitOverflowScrolling: "touch"
       }}
       onContextMenu={(e) => { e.preventDefault(); if (!isPreviewing) setContextMenu({ visible: true, x: e.clientX, y: e.clientY }); }}
     >
@@ -428,6 +442,94 @@ const Artboard: React.FC = () => {
       >
         {showGridOverlay && <div className="artboard-grid-overlay" style={gridStyle} />}
         {renderChildren(undefined)}
+
+        {/* モバイルビュー時の境界線（Fold Line & Safety Line） */}
+        {isMobileView && !isPreviewing && (
+          <>
+            {/* 1. 縦方向のファーストビュー境界 (667px) */}
+            <div
+              title="スマホ（iPhone 8等）でページを開いた際、スクロールせずに最初に見える範囲（ファーストビュー）の目安です。重要な情報は、この線より上に配置することを推奨します。"
+              style={{
+                position: 'absolute',
+                top: `${667}px`,
+                left: 0,
+                width: '100%',
+                cursor: 'help',
+                pointerEvents: 'auto', // ツールチップ表示のためautoに変更
+                zIndex: 9998,
+              }}
+            >
+              {/* 境界線本体 */}
+              <div style={{
+                width: '100%',
+                height: '2px',
+                background: 'linear-gradient(90deg, transparent, #3b82f6 10%, #3b82f6 90%, transparent)',
+                opacity: 0.7,
+              }} />
+              {/* ラベル */}
+              <div style={{
+                position: 'absolute',
+                right: '4px',
+                top: '4px',
+                fontSize: '10px',
+                color: '#3b82f6',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                background: 'rgba(255,255,255,0.85)',
+                padding: '1px 5px',
+                borderRadius: '3px',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+              }}>
+                📱 縦の表示境界 (667px)
+              </div>
+            </div>
+
+            {/* 2. 横方向の表示境界 (350px) */}
+            {/* iframeのデフォルトサイズや余白を考慮した安全ライン */}
+            <div
+              title="HTMLのデフォルト設定での iframe は、何も指定しないと「幅300px・高さ150px程度の、細い枠線がついた小さな四角」として表示される仕様になっています。この線は、その枠線や余白の設定を解除した際に、一般的なスマホで安全に表示される範囲を示しています。"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: `${350}px`,
+                height: '100%',
+                width: '10px', // ホバーしやすくするために少し幅を持たせる
+                cursor: 'help',
+                pointerEvents: 'auto',
+                zIndex: 9998,
+                transform: 'translateX(-4px)', // 10pxの幅を中央に寄せる
+              }}
+            >
+              {/* 境界線本体 */}
+              <div style={{
+                height: '100%',
+                width: '2px',
+                margin: '0 auto',
+                background: 'linear-gradient(180deg, transparent, #10b981 10%, #10b981 90%, transparent)',
+                opacity: 0.7,
+              }} />
+              {/* ラベル */}
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                left: '12px',
+                fontSize: '10px',
+                color: '#10b981',
+                fontWeight: 700,
+                letterSpacing: '0.01em',
+                background: 'rgba(255,255,255,0.85)',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                pointerEvents: 'none',
+              }}>
+                📱 横の安全範囲 (350px)
+              </div>
+            </div>
+          </>
+        )}
 
         {/* コメント表示（プレビュー時は非表示） */}
         {!isPreviewing && comments.map(comment => {

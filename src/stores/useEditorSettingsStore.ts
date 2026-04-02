@@ -48,7 +48,7 @@ export const useEditorSettingsStore = create<EditorSettingsState>((set, get) => 
   setZoomLevel: (zoom) => set((state) => ({
     zoomLevel: typeof zoom === 'function' ? zoom(state.zoomLevel) : zoom
   })),
-  togglePreview: () => {
+  togglePreview: (startFromBeginning?: boolean) => {
     const newState = !get().isPreviewing;
     set({ isPreviewing: newState });
 
@@ -56,7 +56,7 @@ export const useEditorSettingsStore = create<EditorSettingsState>((set, get) => 
     if (newState) {
       // プレビューをONにするとき - 動的インポートで循環参照を避ける
       import('../stores/usePreviewStore').then(({ usePreviewStore }) => {
-        usePreviewStore.getState().initPreview();
+        usePreviewStore.getState().initPreview(startFromBeginning, get().isMobileView);
       });
     } else {
       // プレビューをOFFにするとき

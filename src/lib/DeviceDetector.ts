@@ -68,24 +68,41 @@ class DeviceDetector {
      * @returns デバイスタイプ
      */
     private detectDeviceType(result: UAParser.IResult): 'mobile' | 'tablet' | 'desktop' {
-        const deviceType = result.device.type;
+        // 1. ライブラリが提供するデバイスタイプを優先
+        const type = result.device.type;
+        if (type === 'mobile') return 'mobile';
+        if (type === 'tablet') return 'tablet';
 
-        if (deviceType === 'mobile') {
-            return 'mobile';
-        }
+        // 2. iPadOS対応（Mac OSとして認識される場合がある）
+        const isMac = result.os.name === 'Mac OS';
+        const isIOS = result.os.name === 'iOS';
+        const hasTouch = (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
 
-        if (deviceType === 'tablet') {
+        // iPadOSのSafariはデスクトップ用サイト表示時にMac OSとして振る舞うため、タッチポイントで救い上げる
+        if ((isMac || isIOS) && hasTouch) {
+            // 確実にiPadが含まれているか、単にタッチがあるMac(iPad Pro等)をタブレットとする
+            if (/iPad/i.test(navigator.userAgent)) return 'tablet';
+            if (/iPhone|iPod/i.test(navigator.userAgent)) return 'mobile';
+            // それ以外（iPad Proの最新版など、UAで判別不能な場合でもタッチがあればタブレット）
             return 'tablet';
         }
 
-        // デバイスタイプが不明な場合、画面幅で判定
-        const width = window.innerWidth;
-        if (width < 768) {
-            return 'mobile';
-        } else if (width < 1024) {
+        // 3. Android対応の補正
+        if (result.os.name === 'Android') {
+            // モバイルブラウザ特有の文字列が含まれていればスマホ、なければタブレット
+            return /Mobile/i.test(navigator.userAgent) ? 'mobile' : 'tablet';
+        }
+
+        // 4. 追加補正：User-AgentでDesktop判定されても、画面幅とタッチ情報からタブレットを救済
+        const windowWidth = window.innerWidth || 0;
+        const hasAnyTouch = (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+        
+        // 481px〜1200pxかつタッチ操作があれば、実質タブレットとして扱う
+        if (windowWidth >= 481 && windowWidth <= 1200 && hasAnyTouch) {
             return 'tablet';
         }
 
+        // デフォルト
         return 'desktop';
     }
 

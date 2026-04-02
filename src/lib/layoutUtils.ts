@@ -24,43 +24,25 @@ export const calculateMobileLayout = (item: { x: number, y: number, width: numbe
     let mobileY = 0;
 
     // 高さの計算（基本はアスペクト比維持だが、少し大きめに補正）
-    // 単純な0.375倍だと小さくなりすぎるため、少し係数を上げる(0.45倍程度)か、最小値を確保する
     const heightRatio = SCALE_RATIO * 1.2;
     mobileH = Math.round(item.height * heightRatio);
 
     // 幅とX座標の計算
     if (isWide) {
-        // 幅広アイテムは、スマホ幅の90%に設定して中央寄せ
         mobileW = Math.round(MOBILE_WIDTH * 0.9);
         mobileX = Math.round((MOBILE_WIDTH - mobileW) / 2);
     } else if (isCentered) {
-        // 中央にあるアイテムは、幅をスケーリングしつつ中央寄せを維持
-        // ただし、単純縮小だと小さすぎる場合は少し幅を持たせる
-        const widthRatio = Math.max(SCALE_RATIO, 0.5); // 最低でも半分くらいのスケール感
+        const widthRatio = Math.max(SCALE_RATIO, 0.5);
         mobileW = Math.round(item.width * widthRatio);
-        // 画面幅を超えないようにクランプ
         if (mobileW > MOBILE_WIDTH * 0.9) mobileW = Math.round(MOBILE_WIDTH * 0.9);
-
         mobileX = Math.round((MOBILE_WIDTH - mobileW) / 2);
     } else {
-        // それ以外（左寄せ・右寄せ等の要素）は、相対位置を維持しつつ配置
-        // X座標の比率計算
-        const xRatio = item.x / (PC_WIDTH - item.width); // 配置可能な領域に対する割合
-
-        // 幅のスケーリング（少し大きめに）
+        const xRatio = item.x / (PC_WIDTH - item.width);
         const widthRatio = Math.max(SCALE_RATIO, 0.45);
         mobileW = Math.round(item.width * widthRatio);
-
-        // 画面からはみ出さないように幅を制限
         if (mobileW > MOBILE_WIDTH * 0.95) mobileW = Math.round(MOBILE_WIDTH * 0.95);
 
-        // X座標の配置（左端なら0、右端なら右寄せになるように補間）
-        // layoutUtilsの単純比例だと中央に寄ってしまうことがあるため、
-        // PCでの「左端からの距離」と「右端からの距離」の比率を維持するイメージ
         if (Number.isFinite(xRatio)) {
-            // xRatioが計算可能な場合（width != PC_WIDTH）
-            // maxMobileXは計算ロジックでは使用していないため削除
-            // 単純な item.x * SCALE_RATIO だと左に寄りがちなので、全体幅に対する比率で配置
             const relativeX = (item.x / PC_WIDTH) * MOBILE_WIDTH;
             mobileX = Math.round(relativeX);
         } else {
@@ -68,32 +50,28 @@ export const calculateMobileLayout = (item: { x: number, y: number, width: numbe
         }
     }
 
-    // 3. 最小サイズの確保 (タップしやすさ・視認性)
     const MIN_WIDTH = 40;
-    const MIN_HEIGHT = 20; // テキストなどの場合もあるので控えめに
-    const TOUCH_MIN_SIZE = 40; // ボタン等の場合
-
     if (mobileW < MIN_WIDTH) mobileW = MIN_WIDTH;
 
-    // タイプによる補正（ボタンや画像は少し大きめに）
-    if (['button', 'image', 'video'].includes(item.type || '')) {
-        if (mobileH < TOUCH_MIN_SIZE) mobileH = TOUCH_MIN_SIZE;
-    } else {
-        if (mobileH < MIN_HEIGHT) mobileH = MIN_HEIGHT;
+    const isActionable = ['button', 'input', 'textarea', 'dropdown'].includes(item.type || '');
+    if (isActionable) {
+        mobileW = Math.round(MOBILE_WIDTH * 0.9);
+        mobileX = Math.round((MOBILE_WIDTH - mobileW) / 2);
+        if (mobileH < 44) mobileH = 44;
     }
 
-    // Y座標: 単純スケーリング (スクロール前提なので位置関係が維持されればOK)
-    // ただしヘッダー等の重なりを避けるため、極端に上すぎる場合は調整してもよいが、今回は単純変換
+    if (item.type === 'image' || item.type === 'video') {
+        const pcRatio = item.width / item.height;
+        if (pcRatio > 0 && !Number.isNaN(pcRatio)) {
+            mobileH = Math.round(mobileW / pcRatio);
+        }
+    }
+
     mobileY = Math.round(item.y * SCALE_RATIO);
 
-    // 最終的なクランプ処理 (画面からはみ出し防止)
     if (mobileX < 0) mobileX = 0;
     if (mobileX + mobileW > MOBILE_WIDTH) {
-        mobileX = MOBILE_WIDTH - mobileW;
-        if (mobileX < 0) { // それでもはみ出る（幅が画面より広い）場合
-            mobileX = 0;
-            mobileW = MOBILE_WIDTH;
-        }
+        mobileX = Math.round((MOBILE_WIDTH - mobileW) / 2);
     }
 
     return {
@@ -104,13 +82,8 @@ export const calculateMobileLayout = (item: { x: number, y: number, width: numbe
     };
 };
 
-/**
- * モバイル配置からPC配置を計算する（逆変換）
- * 基本的にはPC配置をマスターとする運用が推奨されるが、モバイルのみで追加した場合のフォールバック用
- */
 export const calculateDesktopLayout = (item: { mobileX: number, mobileY: number, mobileWidth: number, mobileHeight: number }) => {
     const INV_RATIO = 1 / SCALE_RATIO;
-
     return {
         x: Math.round(item.mobileX * INV_RATIO),
         y: Math.round(item.mobileY * INV_RATIO),
@@ -119,11 +92,7 @@ export const calculateDesktopLayout = (item: { mobileX: number, mobileY: number,
     };
 };
 
-/**
- * アイテムオブジェクトを受け取り、モバイルプロパティが欠落している場合に補完した新しいオブジェクトを返す
- */
 export const ensureMobileLayout = (item: PlacedItemType): PlacedItemType => {
-    // 既にモバイルプロパティが完全に設定されていれば何もしない
     if (
         item.mobileX !== undefined &&
         item.mobileY !== undefined &&
@@ -133,12 +102,11 @@ export const ensureMobileLayout = (item: PlacedItemType): PlacedItemType => {
         return item;
     }
 
-    // 自動計算
     const mobileLayout = calculateMobileLayout({
-        x: item.x,
-        y: item.y,
-        width: item.width,
-        height: item.height,
+        x: item.x ?? 0,
+        y: item.y ?? 0,
+        width: item.width ?? 100,
+        height: item.height ?? 50,
         type: item.type
     });
 
@@ -146,4 +114,156 @@ export const ensureMobileLayout = (item: PlacedItemType): PlacedItemType => {
         ...item,
         ...mobileLayout
     };
+};
+
+/**
+ * PC版の配置を元に、スマホ用に自動で「縦積み（および水平パッキング）」するロジック v3
+ * 
+ * 概要:
+ *   - PC版の Y 座標順にソート。
+ *   - 「欲張りなパッキング」により、可能な限り要素を横に並べる（高さを節約）。
+ *   - 「動的圧縮」時に「絶対重なり防止（押し出し）」を行い、要素の消失を防ぐ。
+ */
+export const calculateAutoMobileStack = (items: PlacedItemType[]): PlacedItemType[] => {
+    if (items.length === 0) return items;
+
+    const STACK_MARGIN = 12; // 基本の縦余白
+    const HORIZONTAL_GAP = 8; // 横並び時の隙間
+    const MOBILE_WIDTH = 375;
+    const CANVAS_SIDE_MARGIN = 20;
+    const AVAILABLE_WIDTH = MOBILE_WIDTH - (CANVAS_SIDE_MARGIN * 2);
+    const TARGET_VIEW_HEIGHT = 667;
+
+    const sortedItems = [...items].sort((a, b) => (a.y ?? 0) - (b.y ?? 0));
+    const resultMap = new Map<string, PlacedItemType>();
+    let currentY = STACK_MARGIN;
+
+    let i = 0;
+    while (i < sortedItems.length) {
+        const rowItems: PlacedItemType[] = [];
+        let head = sortedItems[i];
+        rowItems.push(head);
+        
+        const pcW = head.width ?? 100;
+        const isBlock = pcW > 300 || head.type === 'image' || head.type === 'video';
+
+        if (!isBlock) {
+            let j = i + 1;
+            while (j < sortedItems.length) {
+                const next = sortedItems[j];
+                const nextPcW = next.width ?? 100;
+                const isNextNearY = Math.abs((next.y ?? 0) - (head.y ?? 0)) < 60;
+                const isNextSmall = nextPcW < 250;
+
+                if (isNextNearY && isNextSmall && (rowItems.length < 3)) {
+                    rowItems.push(next);
+                    j++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        const count = rowItems.length;
+        let maxRowHeight = 0;
+
+        if (count > 1) {
+            const itemW = Math.floor((AVAILABLE_WIDTH - (HORIZONTAL_GAP * (count - 1))) / count);
+            rowItems.forEach((item, idx) => {
+                const pcW = item.width ?? 100;
+                const pcH = item.height ?? 50;
+                const r = pcW / pcH;
+                const baseFS = (item.data?.fontSize || 15);
+                const mFS = Math.max(12, Math.round(baseFS * 0.7));
+                const minH = Math.max(44, Math.round(mFS * 1.5));
+                const mX = CANVAS_SIDE_MARGIN + (idx * (itemW + HORIZONTAL_GAP));
+                
+                let mH = (item.type === 'image' || item.type === 'video')
+                    ? Math.max(minH, Math.round(itemW / r))
+                    : minH;
+
+                resultMap.set(item.id, {
+                    ...item,
+                    mobileX: mX,
+                    mobileY: currentY,
+                    mobileWidth: itemW,
+                    mobileHeight: mH,
+                    mobileFontSize: mFS,
+                });
+                maxRowHeight = Math.max(maxRowHeight, mH);
+            });
+            i += count;
+        } else {
+            const item = rowItems[0];
+            const pcW = item.width ?? 100;
+            const pcH = item.height ?? 50;
+            const r = pcW / pcH;
+            const baseFS = (item.data?.fontSize || 15);
+            const mFS = Math.max(12, Math.round(baseFS * 0.7));
+            const minH = (item.type === 'text' || item.type === 'button') 
+                ? Math.max(40, Math.round(mFS * 1.6)) 
+                : 20;
+
+            let mW = AVAILABLE_WIDTH;
+            if (pcW < 200 && (item.type === 'image' || item.type === 'video')) {
+                mW = Math.min(AVAILABLE_WIDTH, Math.round(pcW * 0.9));
+            }
+            const mH = Math.max(minH, Math.round(mW / r));
+            const mX = Math.round((MOBILE_WIDTH - mW) / 2);
+
+            resultMap.set(item.id, {
+                ...item,
+                mobileX: mX,
+                mobileY: currentY,
+                mobileWidth: mW,
+                mobileHeight: mH,
+                mobileFontSize: mFS,
+            });
+            maxRowHeight = mH;
+            i++;
+        }
+        currentY += maxRowHeight + STACK_MARGIN;
+    }
+
+    const finalTotalHeight = currentY;
+    if (finalTotalHeight > TARGET_VIEW_HEIGHT) {
+        const compressionRatio = Math.max(0.65, TARGET_VIEW_HEIGHT / finalTotalHeight);
+        let safeY = STACK_MARGIN;
+        const sortedResultKeys = Array.from(resultMap.keys())
+            .sort((a, b) => (resultMap.get(a)?.mobileY ?? 0) - (resultMap.get(b)?.mobileY ?? 0));
+
+        let groupBuffer: string[] = [];
+        let lastOrigY = -1;
+
+        const flushGroup = () => {
+             if (groupBuffer.length === 0) return;
+             let maxH = 0;
+             groupBuffer.forEach(id => {
+                 const m = resultMap.get(id)!;
+                 const newH = Math.round((m.mobileHeight ?? 0) * (compressionRatio + 0.1));
+                 const newFS = Math.max(10, Math.round((m.mobileFontSize ?? 15) * (compressionRatio + 0.05)));
+                 resultMap.set(id, {
+                     ...m,
+                     mobileY: safeY,
+                     mobileHeight: newH,
+                     mobileFontSize: newFS,
+                 });
+                 maxH = Math.max(maxH, newH);
+             });
+             safeY += maxH + Math.round(STACK_MARGIN * compressionRatio);
+             groupBuffer = [];
+        };
+
+        sortedResultKeys.forEach(id => {
+            const m = resultMap.get(id)!;
+            if (lastOrigY !== -1 && m.mobileY !== lastOrigY) {
+                flushGroup();
+            }
+            groupBuffer.push(id);
+            lastOrigY = m.mobileY ?? 0;
+        });
+        flushGroup();
+    }
+
+    return items.map(item => resultMap.get(item.id) ?? item);
 };

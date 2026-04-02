@@ -75,8 +75,10 @@ interface PreviewStoreState {
   // ページごとの状態スナップショット (戻る機能用)
   pageStateCache: Record<string, PreviewState>;
 
+  isMobile: boolean; // 追加: モバイルモードかどうか
+
   // --- Actions ---
-  initPreview: () => void;
+  initPreview: (startFromBeginning?: boolean, isMobile?: boolean) => void;
   stopPreview: () => void;
 
   setPreviewState: (newState: PreviewState | ((prev: PreviewState) => PreviewState)) => void;
@@ -84,7 +86,7 @@ interface PreviewStoreState {
   setProjectId: (id: string) => void;
 
   // ページ遷移リクエスト処理
-  handlePageChangeRequest: (pageId: string, options?: { skipHistory?: boolean; restoreFromCache?: boolean }) => void;
+  handlePageChangeRequest: (pageId: string, options?: { skipHistory?: boolean; restoreFromCache?: boolean; isMobile?: boolean }) => void;
   handleVariableChangeFromItem: (variableName: string, value: any) => void;
   handleItemEvent: (eventName: string, itemId: string) => void;
 
@@ -122,22 +124,33 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
   nodeRevisitCounts: {},
   projectId: null,
   pageStateCache: {}, // キャッシュ初期化
+  isMobile: false,
 
   // --- Actions ---
 
-  initPreview: () => {
-    const pageId = usePageStore.getState().selectedPageId;
+  initPreview: (startFromBeginning?: boolean, isMobile?: boolean) => {
+    const pageStore = usePageStore.getState();
+    let pageId = pageStore.selectedPageId;
+
+    // 「最初から」の場合は pageOrder の最初のページを使用
+    if (startFromBeginning && pageStore.pageOrder.length > 0) {
+      pageId = pageStore.pageOrder[0];
+      // ページストア側の選択状態も同期させる（描画のため）
+      pageStore.setSelectedPageId(pageId);
+    }
+
     if (!pageId) return;
 
-    const page = usePageStore.getState().pages[pageId];
+    const page = pageStore.pages[pageId];
     if (!page) return;
     const items = page.placedItems;
     const initialPS: PreviewState = { currentPageId: pageId, variables: {}, history: [] };
 
     items.forEach((item: PlacedItemType) => {
       let isVisible = item.data.initialVisibility !== false;
-      const initialX = item.x;
-      const initialY = item.y;
+      // モバイルモード時はモバイル用座標、なければ PC 座標
+      const initialX = isMobile && item.mobileX !== undefined ? item.mobileX : item.x;
+      const initialY = isMobile && item.mobileY !== undefined ? item.mobileY : item.y;
       initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
     });
 
@@ -149,6 +162,7 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
       previewState: initialPS,
       variables: {},
       activeListeners: new Map(),
+      isMobile: !!isMobile,
     });
 
     // 古い計測開始コードは削除
@@ -228,10 +242,13 @@ export const usePreviewStore = create<PreviewStoreState>((set, get) => ({
     } else {
       // 通常の初期化
       const initialPS: PreviewState = { currentPageId: targetPageId, variables: {}, history: [] };
+      const isMobile = options.isMobile ?? get().isMobile;
+
       targetPageData.placedItems.forEach((item: PlacedItemType) => {
         const isVisible = item.data.initialVisibility !== false;
-        const initialX = item.x;
-        const initialY = item.y;
+        // モバイルモード時はモバイル用座標、なければ PC 座標
+        const initialX = isMobile && item.mobileX !== undefined ? item.mobileX : item.x;
+        const initialY = isMobile && item.mobileY !== undefined ? item.mobileY : item.y;
         initialPS[item.id] = { isVisible, x: initialX, y: initialY, opacity: 1, scale: 1, rotation: 0, transition: null };
       });
       nextPreviewState = initialPS;

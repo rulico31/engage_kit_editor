@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useProjectStore } from "../stores/useProjectStore";
 import { usePageStore } from "../stores/usePageStore";
 import { supabase } from "../lib/supabaseClient";
+import { DataMinifier } from "../lib/DataMinifier";
 import type { ProjectData, PlacedItemType } from "../types";
 import "./PublishModal.css";
 
@@ -41,37 +42,11 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
       let fileBody: Blob | File;
       let fileName = "";
 
-      // Blob URLやdata URIの場合は、Imageを経由してCanvasで再描画してから取得
+      // 前提: assetSrc が blob: か data: の場合、fetch(assetSrc) で直接 Blob を取得できる。
+      // Canvas経由の再描画は非常に重いため、必要な場合に限定する。
       if (assetSrc.startsWith("blob:") || assetSrc.startsWith("data:")) {
-        fileBody = await new Promise<Blob>((resolve, reject) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.naturalWidth;
-            canvas.height = img.naturalHeight;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              reject(new Error('Canvas context not available'));
-              return;
-            }
-            ctx.drawImage(img, 0, 0);
-            canvas.toBlob((blob) => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error('Failed to convert canvas to blob'));
-              }
-            }, 'image/png');
-          };
-
-          img.onerror = () => {
-            reject(new Error(`Failed to load image from ${assetSrc.startsWith("blob:") ? "blob URL" : "data URI"}`));
-          };
-
-          img.src = assetSrc;
-        });
+        const res = await fetch(assetSrc);
+        fileBody = await res.blob();
       } else {
         // file:// や通常のパスの場合
         let fetchUrl = assetSrc;
@@ -231,32 +206,37 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
       const totalAssets = itemsToProcess.length + pagesToProcess.length;
       let processedCount = 0;
 
-      // 3. 順次アップロード
-      for (const entry of itemsToProcess) {
-        const { item } = entry;
-        if (item.data.src) {
-          // Use targetProjectId (cloud ID) for storage path
-          const newUrl = await uploadAsset(item.data.src, targetProjectId);
-          item.data.src = newUrl; // URLをSupabaseのものに置換
-        }
-        processedCount++;
-        setProgress(totalAssets > 0 ? Math.round((processedCount / totalAssets) * 100) : 100);
-      }
+      // 3. 並列アップロード (最大同時実行数を制限するための簡易実装)
+      const CONCURRENCY_LIMIT = 5;
+      const allTasks = [
+        ...itemsToProcess.map(entry => async () => {
+          if (entry.item.data.src) {
+            const newUrl = await uploadAsset(entry.item.data.src, targetProjectId);
+            entry.item.data.src = newUrl;
+          }
+        }),
+        ...pagesToProcess.map(entry => async () => {
+          const newUrl = await uploadAsset(entry.bgSrc, targetProjectId);
+          if (publishData.pages[entry.pageId].backgroundImage) {
+            publishData.pages[entry.pageId].backgroundImage!.src = newUrl;
+          }
+        })
+      ];
 
-      for (const entry of pagesToProcess) {
-        const { pageId, bgSrc } = entry;
-        // Use targetProjectId for storage path
-        const newUrl = await uploadAsset(bgSrc, targetProjectId);
-        if (publishData.pages[pageId].backgroundImage) {
-          publishData.pages[pageId].backgroundImage!.src = newUrl;
-        }
-        processedCount++;
-        setProgress(totalAssets > 0 ? Math.round((processedCount / totalAssets) * 100) : 100);
+      // チャンクに分けて実行
+      for (let i = 0; i < allTasks.length; i += CONCURRENCY_LIMIT) {
+        const chunk = allTasks.slice(i, i + CONCURRENCY_LIMIT);
+        await Promise.all(chunk.map(task => task().then(() => {
+          processedCount++;
+          setProgress(totalAssets > 0 ? Math.round((processedCount / totalAssets) * 100) : 100);
+        })));
       }
 
       setPublishStep("saving");
 
       // 4. Supabaseへ公開データを保存
+      const minifiedData = DataMinifier.minifyForPublish(publishData);
+      
       const viewerBaseUrl = import.meta.env.VITE_VIEWER_URL || `${window.location.origin}/viewer.html`;
       // ローカル開発時は localhost:5173/viewer.html になるが、
       // 本番(Vercel等)に上げた場合はそのURLにする必要があるため、後で環境変数などで調整可能にします。
@@ -268,7 +248,7 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
       const { error: dbError } = await supabase
         .from("projects")
         .update({
-          published_content: publishData,
+          published_content: minifiedData,
           is_published: true,
           published_url: publicUrl,
           updated_at: new Date().toISOString(),

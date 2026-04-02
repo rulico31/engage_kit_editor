@@ -126,14 +126,9 @@ const EditorView: React.FC<EditorViewProps> = ({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // 少し待機してローディングを見せる (UX向上)
-      await new Promise(resolve => setTimeout(resolve, 500));
       const success = await saveProject();
       if (success) {
-        // 保存成功時はアラートを出す前にローディングを消すか、あるいは出したままにするか。
-        // ここではアラートが出るので、その前にローディングを消す
         setIsSaving(false);
-        // 少し遅らせてからアラートなどを出すとスムーズだが、既存のフローに従う
         setTimeout(() => alert("プロジェクトを保存しました"), 10);
       } else {
         setIsSaving(false);
@@ -149,8 +144,6 @@ const EditorView: React.FC<EditorViewProps> = ({
   const handlePublishWrapper = async () => {
     setIsPublishing(true);
     try {
-      // バリデーション等の重い処理が走る前にローディング表示を確実に描画させるための待機
-      await new Promise(resolve => setTimeout(resolve, 50));
       await Promise.resolve(onPublish());
     } catch (error) {
       console.error("Publish failed:", error);

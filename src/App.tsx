@@ -90,10 +90,8 @@ const App: React.FC = () => {
             setCurrentRoute('editor');
           } else {
             // クラウドプロジェクトの場合はSupabaseから読み込む
-            setTimeout(async () => {
-              await loadProject(savedProjectId);
-              setCurrentRoute('editor');
-            }, 100);
+            await loadProject(savedProjectId);
+            setCurrentRoute('editor');
           }
         }
       }

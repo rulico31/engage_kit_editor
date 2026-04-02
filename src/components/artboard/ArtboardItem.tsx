@@ -146,7 +146,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
 
   const textStyle: React.CSSProperties = {
     color: item.data?.textColor || item.data?.color || '#333333',
-    fontSize: `${item.data?.fontSize || 15}px`,
+    fontSize: isMobileView ? `${item.mobileFontSize ?? (item.data?.fontSize || 15) * 0.7}px` : `${item.data?.fontSize || 15}px`,
     textAlign: item.data?.textAlign || 'left',
     width: '100%', // 親に合わせる
     height: '100%',
