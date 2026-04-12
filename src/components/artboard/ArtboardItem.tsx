@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Type, Image as ImageIcon, MousePointerClick } from "lucide-react";
 import type { PlacedItemType, PreviewState, VariableState } from "../../types";
 import "../Artboard.css";
 import { ResizeHandles } from "./ResizeHandles";
@@ -75,6 +76,12 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const y = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
   const width = isMobileView && item.mobileWidth !== undefined ? item.mobileWidth : item.width;
   const height = isMobileView && item.mobileHeight !== undefined ? item.mobileHeight : item.height;
+  
+  // 子要素があるかどうかを判定（プレースホルダー表示用）
+  const hasChildren = usePageStore((s) => {
+    if (!s.selectedPageId) return false;
+    return s.pages[s.selectedPageId].placedItems.some(i => i.groupId === item.id);
+  });
 
   // --- スタイルの分離 ---
 
@@ -85,7 +92,8 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     minHeight: height,
     display: isGroup ? 'block' : 'flex',
     // テーマ変数の適用
-    fontFamily: 'var(--theme-font-family, inherit)',
+    // テーマ・ページ・アイテムごとのフォント設定
+    fontFamily: item.data?.fontFamily || 'var(--page-font-family, var(--theme-font-family, inherit))',
     // @ts-ignore - 個別のborderRadius設定を使用 (data優先、fallback to style)
     borderRadius: item.data?.borderRadius ? `${item.data.borderRadius}px` : ((typeof (item.style as any)?.borderRadius === 'number') ? `${(item.style as any).borderRadius}px` : '0px'),
     // 重なり順 (zIndex)
@@ -93,19 +101,41 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     // 選択時はリサイズハンドルを表示するためoverflowをvisibleに
     // また、プレビュー中の入力欄もスクロールバーを表示するためにvisibleにする
     overflow: ((isSelected && !isPreviewing) || (isPreviewing && item.name.startsWith("テキスト入力欄"))) ? 'visible' : 'hidden',
-    // テキスト入力欄の場合はコンテナのパディングを0にする（入力エリアを最大化するため）
-    padding: item.name.startsWith("テキスト入力欄") ? 0 : undefined,
+    // テキスト入力欄またはカスタムHTMLの場合はコンテナのパディングを0にする
+    padding: (item.name.startsWith("テキスト入力欄") || item.type === 'custom_html') ? 0 : undefined,
   };
 
   // 背景色（isTransparentがtrueの場合は強制的にtransparent）
   if (item.data?.isTransparent === true) {
     containerStyle.backgroundColor = 'transparent';
   } else if (item.data?.backgroundColor) {
-    // プロパティパネルで設定された背景色 (data.backgroundColor)
-    containerStyle.backgroundColor = item.data.backgroundColor;
+    // プロパティパネルで設定された背景色
+    const baseColor = item.data.backgroundColor;
+    // 背景の不透明度が設定されている場合はrgbaに変換
+    // ぼかしが設定されている場合、不透明度が指定されていなければデフォルトで半透明(0.5)にする
+    const opacity = item.data.backgroundOpacity ?? (item.data.backdropBlur ? 0.5 : 1);
+    
+    if (opacity < 1) {
+      // Hex to RGBA conversion
+      const color = baseColor.replace('#', '');
+      const r = parseInt(color.substring(0, 2), 16);
+      const g = parseInt(color.substring(2, 4), 16);
+      const b = parseInt(color.substring(4, 6), 16);
+      containerStyle.backgroundColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    } else {
+      containerStyle.backgroundColor = baseColor;
+    }
   } else if (item.style?.backgroundColor) {
-    // 個別に背景色が設定されている場合 (style.backgroundColor - legacy fallback)
     containerStyle.backgroundColor = item.style.backgroundColor;
+  } else if (item.data?.backdropBlur) {
+    // ぼかしがあるが背景色が指定されていない場合、デフォルトの半透明背景を付与
+    containerStyle.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+  }
+
+  // 背面のぼかし (Backdrop Blur)
+  if (item.data?.backdropBlur) {
+    containerStyle.backdropFilter = `blur(${item.data.backdropBlur}px)`;
+    containerStyle.WebkitBackdropFilter = `blur(${item.data.backdropBlur}px)`;
   }
 
   // ボックスシャドウ (Shadow & Glow)
@@ -125,14 +155,19 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   // プレビュー状態の反映 (コンテナ)
   if (isPreviewing && previewState && previewState[item.id]) {
     const itemState = previewState[item.id];
+    containerStyle.position = 'absolute';
+    containerStyle.left = itemState.x;
+    containerStyle.top = itemState.y;
     containerStyle.visibility = itemState.isVisible ? 'visible' : 'hidden';
     containerStyle.opacity = itemState.opacity;
-    containerStyle.transform = `translate(${itemState.x}px, ${itemState.y}px) scale(${itemState.scale}) rotate(${itemState.rotation}deg)`;
+    containerStyle.transform = `scale(${itemState.scale}) rotate(${itemState.rotation}deg)`;
     containerStyle.transition = itemState.transition || 'none';
   } else {
     containerStyle.position = 'absolute';
     containerStyle.left = x;
     containerStyle.top = y;
+    // エディタモードではカスタムCSSによる意図しないトランジションを防止
+    containerStyle.transition = 'none !important';
 
     if (item.data.initialVisibility === false) {
       containerStyle.opacity = 0.5;
@@ -389,8 +424,147 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   if (item.name.startsWith("テキスト入力欄")) itemClassName += " is-input";
   if (isHighlighted && !isPreviewing) itemClassName += " highlighted";
 
+  // アニメーションクラスの追加
+  if (item.data?.animationType && item.data.animationType !== 'none') {
+    itemClassName += ` animate-${item.data.animationType}`;
+    containerStyle.animationDuration = `${item.data.animationDuration ?? 0.5}s`;
+    // プレビュー中でない（エディタモード）場合は一度だけ再生させるか、
+    // あるいはアニメーションを無効化する選択肢もありますが、
+    // ここでは単純にクラスを追加します。
+  }
+
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+  // クイック追加アクション
+  const handleQuickAdd = (type: string) => {
+    const timestamp = Date.now();
+    const id = `${type}-${timestamp}`;
+    
+    let newItem: PlacedItemType = {
+      id,
+      name: `${type === 'text' ? 'テキスト' : type === 'image' ? '画像' : 'ボタン'}-${timestamp}`,
+      type: type as any,
+      groupId: item.id,
+      x: 20,
+      y: 20,
+      width: type === 'image' ? 100 : 160,
+      height: type === 'image' ? 100 : 40,
+      position: { x: 20, y: 20 },
+      size: { width: type === 'image' ? 100 : 160, height: type === 'image' ? 100 : 40 },
+      zIndex: 10,
+      data: {
+        text: type === 'text' ? '新しいテキスト' : type === 'button' ? 'ボタン' : '',
+        fontSize: 16,
+        backgroundColor: type === 'button' ? '#3b82f6' : undefined,
+        textColor: type === 'button' ? '#ffffff' : '#333333',
+        borderRadius: type === 'button' ? 4 : 0,
+      }
+    };
+
+    usePageStore.getState().addItem(newItem);
+    setShowQuickAdd(false);
+  };
+
   if (isGroup) {
     content = null;
+  } else if (item.type === 'box' || item.name.startsWith("ボックス") || (item.name.startsWith("テキスト入力欄") === false && item.type === 'box')) {
+    // ボックス (カラム等のコンテナとしても使用)
+    content = (
+      <div 
+        className="item-box-content" 
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          position: 'relative'
+        }}
+        onClick={(e) => {
+          if (!isPreviewing && item.data?.isPlaceholder && !hasChildren) {
+            e.stopPropagation();
+            setShowQuickAdd(!showQuickAdd);
+          }
+        }}
+      >
+          {/* プレースホルダー表示（エディタモードのみ、かつ子要素がなく、かつプレースホルダーフラグがある場合） */}
+          {(!isPreviewing && item.data?.isPlaceholder && !hasChildren) && (
+            <div 
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+                color: '#8b5cf6',
+                opacity: 0.8,
+                cursor: 'pointer'
+              }}
+            >
+            <div style={{ 
+              width: '40px', 
+              height: '40px', 
+              borderRadius: '50%', 
+              border: '2px dashed #8b5cf6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '24px',
+              fontWeight: 'bold',
+              backgroundColor: showQuickAdd ? 'rgba(139, 92, 246, 0.1)' : 'transparent',
+              transition: 'all 0.2s'
+            }}>+</div>
+            <span style={{ fontSize: '11px', fontWeight: '600' }}>要素を追加</span>
+          </div>
+        )}
+
+        {/* クイック追加メニュー */}
+        {showQuickAdd && (
+          <div 
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              padding: '12px',
+              display: 'flex',
+              gap: '12px',
+              zIndex: 100,
+              border: '1px solid #e5e7eb',
+              animation: 'fadeIn 0.2s ease-out'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => handleQuickAdd('text')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+              className="quick-add-btn"
+            >
+              <Type size={20} color="#4b5563" />
+              <span style={{ fontSize: '10px', color: '#6b7280' }}>テキスト</span>
+            </button>
+            <button 
+              onClick={() => handleQuickAdd('image')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+              className="quick-add-btn"
+            >
+              <ImageIcon size={20} color="#4b5563" />
+              <span style={{ fontSize: '10px', color: '#6b7280' }}>画像</span>
+            </button>
+            <button 
+              onClick={() => handleQuickAdd('button')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'none', border: 'none', cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+              className="quick-add-btn"
+            >
+              <MousePointerClick size={20} color="#4b5563" />
+              <span style={{ fontSize: '10px', color: '#6b7280' }}>ボタン</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
   } else if (item.name.startsWith("ボタン")) {
     content = (
       <button className="item-button-content" style={textStyle}>
@@ -519,6 +693,14 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         />
       </div>
     );
+  } else if (item.type === 'custom_html') {
+    content = (
+      <div 
+        className="item-custom-html-content" 
+        style={{ width: '100%', height: '100%', overflow: isPreviewing ? 'auto' : 'hidden' }}
+        dangerouslySetInnerHTML={{ __html: item.data.html || "" }}
+      />
+    );
   } else {
     // 通常のテキスト
     content = (
@@ -554,6 +736,14 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       data-node-type={item.type || 'unknown'}
     >
       {content}
+      {item.customCss && (
+        <style>
+          {item.customCss.includes('&') || item.customCss.includes('.this-item') 
+            ? item.customCss.replace(/&|\.this-item/g, `[data-node-id="${item.id}"]`)
+            : `[data-node-id="${item.id}"] { ${item.customCss} }`
+          }
+        </style>
+      )}
       {renderChildren(item.id)}
 
       {isSelected && !isPreviewing && (

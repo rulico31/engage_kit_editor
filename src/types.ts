@@ -40,6 +40,7 @@ export interface PageType {
   placedItems: PlacedItemType[];
   backgroundColor?: string;
   backgroundImage?: BackgroundImage;
+  fontFamily?: string;
 }
 
 export interface PageData extends PageType {
@@ -49,11 +50,16 @@ export interface PageData extends PageType {
 
 export interface BackgroundImage {
   src?: string; // Compatibility
-  url: string;
-  opacity: number;
-  scale: number;
-  position: { x: number; y: number };
-  displayMode: 'cover' | 'contain' | 'tile' | 'fixed' | 'stretch' | 'custom'; // 背景画像の表示モード
+  url?: string;
+  opacity?: number;
+  scale?: number;
+  position?: any; // String choice or {x, y}
+  displayMode?: 'cover' | 'contain' | 'tile' | 'fixed' | 'stretch' | 'custom';
+  originalSrc?: string;
+  cropState?: {
+    crop: any;
+    zoom: number;
+  };
 }
 
 export interface PlacedItemType {
@@ -118,8 +124,23 @@ export interface PlacedItemType {
     originalSrc?: string;
     crop?: any; // ReactCrop type
     zoom?: number;
+
+    // Appearance (Glassmorphism)
+    backgroundOpacity?: number;
+    backdropBlur?: number;
+
+    // Animation
+    animationType?: 'none' | 'fade-in' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right' | 'zoom-in';
+    animationDuration?: number;
+
+    // Custom HTML
+    html?: string;
+
+    // Layout / UX
+    isPlaceholder?: boolean;
   };
   style?: any; // Added to support direct style access
+  customCss?: string; // [NEW] Custom CSS per item
   groupId?: string; // Grouping support
   displayName?: string; // Display name override
 }

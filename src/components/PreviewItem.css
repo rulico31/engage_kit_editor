@@ -189,6 +189,14 @@
   transform: translateY(1px);
 }
 
+/* カスタムHTML専用スタイル */
+.preview-item.is-custom-html {
+  padding: 0;
+  display: block;
+  background-color: transparent;
+  border: none;
+}
+
 /* モバイル用のタッチ操作改善 */
 @media (max-width: 768px) {
   .preview-item.is-button {

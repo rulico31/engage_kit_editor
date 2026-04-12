@@ -13,5 +13,6 @@ export const ItemTypes = {
   TEXT: "text",
   BUTTON: "button",
   VIDEO: "video",
+  CUSTOM_HTML: "custom_html",
   COMMENT: "COMMENT"
 };

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useEditorSettingsStore } from "../../stores/useEditorSettingsStore";
 import type { PlacedItemType } from "../../types";
 import { AccordionSection } from "./SharedComponents";
+import { FONT_FAMILIES } from "../../constants/fonts";
 import ImageCropModal from "../ImageCropModal";
 import {
     Type,
@@ -15,7 +16,10 @@ import {
     Move,
 
     ChartBar, // For B2B Score
-    Layers
+    Layers,
+    Sparkles, // For Animation
+    Code,
+    Settings
 } from "lucide-react";
 
 interface Props {
@@ -100,6 +104,7 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
             case 'input': return <AlignLeft size={14} />;
             case 'choice': return <List size={14} />;
             case 'box': return <Box size={14} />;
+            case 'custom_html': return <Code size={14} />;
             default: return <LayoutTemplate size={14} />;
         }
     };
@@ -586,6 +591,30 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                 <AccordionSection title="タイポグラフィ (Typography)" defaultOpen={true}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
+                        {/* Font Family */}
+                        <div className="prop-group">
+                            <div className="prop-label">フォント (Font)</div>
+                            <select
+                                value={item.data?.fontFamily || 'inherit'}
+                                onChange={(e) => handleDataChange("fontFamily", e.target.value)}
+                                className="prop-select"
+                                style={{
+                                    width: '100%',
+                                    padding: '6px',
+                                    background: '#333',
+                                    border: '1px solid #444',
+                                    color: '#eee',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                {FONT_FAMILIES.map(font => (
+                                    <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                                        {font.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         {/* Text Color */}
                         <div className="prop-group">
                             <div className="prop-label">文字色 (Text Color)</div>
@@ -771,6 +800,42 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                         </div>
                     </div>
 
+                    {/* Background Opacity */}
+                    <div className="prop-group">
+                        <div className="prop-label">背景の不透明度 (Opacity)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={(item.data?.backgroundOpacity ?? 1) * 100}
+                                onChange={(e) => handleDataChange("backgroundOpacity", parseInt(e.target.value) / 100)}
+                                style={{ flex: 1 }}
+                            />
+                            <span style={{ fontSize: '11px', color: '#888', width: '30px' }}>
+                                {Math.round((item.data?.backgroundOpacity ?? 1) * 100)}%
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Backdrop Blur */}
+                    <div className="prop-group">
+                        <div className="prop-label">背面のぼかし (Backdrop Blur)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                                type="range"
+                                min="0"
+                                max="20"
+                                value={item.data?.backdropBlur ?? 0}
+                                onChange={(e) => handleDataChange("backdropBlur", parseInt(e.target.value))}
+                                style={{ flex: 1 }}
+                            />
+                            <span style={{ fontSize: '11px', color: '#888', width: '30px' }}>
+                                {item.data?.backdropBlur ?? 0}px
+                            </span>
+                        </div>
+                    </div>
+
                     {/* Border Visibility Checkbox */}
                     <div className="prop-group">
                         <label className="prop-checkbox-row">
@@ -812,6 +877,120 @@ export const ItemPropertiesEditor: React.FC<Props> = ({ item, onItemUpdate }) =>
                         </div>
                     </div>
 
+                </div>
+            </AccordionSection>
+
+            {/* Animation Settings */}
+            <AccordionSection title="アニメーション (Animation)" defaultOpen={false}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fbbf24', marginBottom: '4px' }}>
+                        <Sparkles size={14} />
+                        <span style={{ fontSize: '11px', fontWeight: 600 }}>表示時のアニメーション</span>
+                    </div>
+
+                    {/* Animation Type */}
+                    <div className="prop-group">
+                        <div className="prop-label">タイプ (Type)</div>
+                        <select
+                            value={item.data?.animationType || 'none'}
+                            onChange={(e) => handleDataChange("animationType", e.target.value)}
+                            className="prop-select"
+                            style={{
+                                width: '100%',
+                                padding: '6px',
+                                background: '#333',
+                                border: '1px solid #444',
+                                color: '#eee',
+                                borderRadius: '4px'
+                            }}
+                        >
+                            <option value="none">なし</option>
+                            <option value="fade-in">フェードイン</option>
+                            <option value="slide-up">スライドアップ</option>
+                            <option value="slide-down">スライドダウン</option>
+                            <option value="slide-left">スライド左</option>
+                            <option value="slide-right">スライド右</option>
+                            <option value="zoom-in">ズームイン</option>
+                        </select>
+                    </div>
+
+                    {/* Animation Duration */}
+                    <div className="prop-group">
+                        <div className="prop-label">再生時間 (Duration)</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                                type="range"
+                                min="0.1"
+                                max="3"
+                                step="0.1"
+                                value={item.data?.animationDuration ?? 0.5}
+                                onChange={(e) => handleDataChange("animationDuration", parseFloat(e.target.value))}
+                                style={{ flex: 1 }}
+                            />
+                            <span style={{ fontSize: '11px', color: '#888', width: '35px' }}>
+                                {item.data?.animationDuration ?? 0.5}s
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </AccordionSection>
+
+            {/* Custom HTML Content (Special for custom_html type) */}
+            {item.type === 'custom_html' && (
+                <AccordionSection title="HTMLコード (HTML Content)" defaultOpen={true}>
+                    <div className="prop-group">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', marginBottom: '8px' }}>
+                            <Code size={14} />
+                            <span style={{ fontSize: '11px', fontWeight: 600 }}>HTML / CSS / JS</span>
+                        </div>
+                        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+                            埋め込みたいHTMLコードを入力してください。スクリプトも記述可能です。
+                        </div>
+                        <textarea
+                            value={item.data?.html || ""}
+                            onChange={(e) => handleDataChange("html", e.target.value)}
+                            className="prop-textarea"
+                            rows={8}
+                            style={{ 
+                                resize: 'vertical', 
+                                minHeight: '150px', 
+                                fontFamily: 'monospace',
+                                fontSize: '11px'
+                            }}
+                            placeholder="<div>Hello!</div>"
+                        />
+                    </div>
+                </AccordionSection>
+            )}
+
+            {/* Advanced Settings (Custom CSS for ALL items) */}
+            <AccordionSection title="詳細設定 (Advanced)" defaultOpen={false}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6366f1', marginBottom: '4px' }}>
+                        <Settings size={14} />
+                        <span style={{ fontSize: '11px', fontWeight: 600 }}>カスタムスタイル</span>
+                    </div>
+
+                    <div className="prop-group">
+                        <div className="prop-label">カスタムCSS (Per Item CSS)</div>
+                        <div style={{ fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+                            この要素だけに適用するCSSを入力してください。<br/>
+                            例: <code>:hover {"{ opacity: 0.7; }"}</code>
+                        </div>
+                        <textarea
+                            value={item.customCss || ""}
+                            onChange={(e) => onItemUpdate(item.id, { customCss: e.target.value }, { addToHistory: true })}
+                            className="prop-textarea"
+                            rows={5}
+                            style={{ 
+                                resize: 'vertical', 
+                                minHeight: '100px', 
+                                fontFamily: 'monospace',
+                                fontSize: '11px'
+                            }}
+                            placeholder=":hover { transform: scale(1.05); }"
+                        />
+                    </div>
                 </div>
             </AccordionSection>
         </div >

@@ -9,11 +9,13 @@ body,
 #root {
   margin: 0;
   padding: 0;
-  width: 100vw;  /* 画面の幅 100% */
-  height: 100vh; /* 画面の高さ 100% */
+  width: 100vw;
+  /* 画面の幅 100% */
+  height: 100vh;
+  /* 画面の高さ 100% */
 
   /* 意図しないスクロールバーを隠す */
-  overflow: hidden; 
+  overflow: hidden;
 
   /* App.cssで設定したダークテーマの背景色と文字色をこちらに移動 */
   background-color: #1e1e1e;
@@ -40,26 +42,33 @@ body,
 
 /* スクロールバー全体の幅・高さ */
 ::-webkit-scrollbar {
-  width: 8px;   /* 縦スクロールバーの幅 */
-  height: 8px;  /* 横スクロールバーの高さ */
+  width: 8px;
+  /* 縦スクロールバーの幅 */
+  height: 8px;
+  /* 横スクロールバーの高さ */
 }
 
 /* スクロールバーの背景（トラック） */
 ::-webkit-scrollbar-track {
-  background: #1e1e1e; /* アプリ背景色に合わせる */
+  background: #1e1e1e;
+  /* アプリ背景色に合わせる */
   border-radius: 4px;
 }
 
 /* スクロールバーの持ち手（サム） */
 ::-webkit-scrollbar-thumb {
-  background-color: #444; /* 少し明るいグレー */
-  border-radius: 4px;     /* 丸みをつける */
-  border: 2px solid #1e1e1e; /* 余白を作るためのボーダー（背景色と同じにする） */
+  background-color: #444;
+  /* 少し明るいグレー */
+  border-radius: 4px;
+  /* 丸みをつける */
+  border: 2px solid #1e1e1e;
+  /* 余白を作るためのボーダー（背景色と同じにする） */
 }
 
 /* 持ち手にホバーした時 */
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #666; /* より明るくして反応を示す */
+  background-color: #666;
+  /* より明るくして反応を示す */
 }
 
 /* スクロールバーの交差部分（右下など） */

@@ -449,6 +449,18 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
       </>
     );
   }
+  else if (item.type === 'custom_html') {
+    content = (
+      <div 
+        className="preview-custom-html-content" 
+        style={{ width: '100%', height: '100%', overflow: 'auto' }}
+        dangerouslySetInnerHTML={{ __html: item.data.html || "" }}
+      />
+    );
+  }
+  else if (item.type === 'box') {
+    content = null; // Box は中身を表示しない (コンテナとしてのみ機能)
+  }
   else {
     content = (
       <div className="item-text-content" style={{
@@ -462,7 +474,12 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   }
 
   // クラス名の動的生成
-  const itemClassName = `preview-item ${isButton ? "is-button" : ""} ${isInput ? "is-input" : ""}`;
+  let itemClassName = `preview-item ${isButton ? "is-button" : ""} ${isInput ? "is-input" : ""} ${item.type === 'custom_html' ? "is-custom-html" : ""}`;
+
+  // アニメーションクラスの追加
+  if (item.data?.animationType && item.data.animationType !== 'none') {
+    itemClassName += ` animate-${item.data.animationType}`;
+  }
 
   return (
     <div
@@ -492,21 +509,50 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
 
         // 枠線の制御
         border: (item.data.showBorder === false) ? 'none' : undefined,
+        padding: item.type === 'custom_html' ? 0 : undefined,
 
         // 背景色: 透明 -> data.backgroundColor -> style.backgroundColor
         // @ts-ignore
         backgroundColor: (item.data.isTransparent)
           ? 'transparent'
-          : (item.data?.backgroundColor || (item.style as any)?.backgroundColor || undefined),
+          : (item.data?.backgroundColor)
+            ? (item.data.backgroundOpacity !== undefined && item.data.backgroundOpacity < 1)
+              ? (() => {
+                const color = item.data.backgroundColor.replace('#', '');
+                const r = parseInt(color.substring(0, 2), 16);
+                const g = parseInt(color.substring(2, 4), 16);
+                const b = parseInt(color.substring(4, 6), 16);
+                return `rgba(${r}, ${g}, ${b}, ${item.data.backgroundOpacity})`;
+              })()
+              : item.data.backgroundColor
+            : (item.style as any)?.backgroundColor || undefined,
+
+        // 背面のぼかし (Backdrop Blur)
+        // @ts-ignore
+        backdropFilter: item.data?.backdropBlur ? `blur(${item.data.backdropBlur}px)` : undefined,
+        // @ts-ignore
+        WebkitBackdropFilter: item.data?.backdropBlur ? `blur(${item.data.backdropBlur}px)` : undefined,
 
         // テーマ変数の適用
-        fontFamily: 'var(--theme-font-family, inherit)',
+        fontFamily: item.data?.fontFamily || 'var(--page-font-family, var(--theme-font-family, inherit))',
         borderRadius: item.data.borderRadius ? `${item.data.borderRadius}px` : ((item.style as any)?.borderRadius ? `${(item.style as any).borderRadius}px` : '0px'),
         overflow: isInput ? 'visible' : 'hidden',
+
+        // アニメーション時間
+        // @ts-ignore
+        animationDuration: item.data?.animationType && item.data.animationType !== 'none' ? `${item.data.animationDuration ?? 0.5}s` : undefined,
       }}
       onClick={handleClick}
     >
       {content}
+      {item.customCss && (
+        <style>
+          {item.customCss.includes('&') || item.customCss.includes('.this-item') 
+            ? item.customCss.replace(/&|\.this-item/g, `[data-node-id="${item.id}"]`)
+            : `[data-node-id="${item.id}"] { ${item.customCss} }`
+          }
+        </style>
+      )}
     </div >
   );
 };

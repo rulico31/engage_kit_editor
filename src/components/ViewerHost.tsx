@@ -152,11 +152,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
           Object.values(normalizedPages).forEach((page: any) => {
             (page.placedItems || []).forEach((item: any) => {
               // モバイルモード時はモバイル座標を優先
-              const initialX = isActuallyMobile && item.mobileX !== undefined 
-                ? item.mobileX 
+              const initialX = isActuallyMobile && item.mobileX !== undefined
+                ? item.mobileX
                 : (item.x ?? item.position?.x ?? 0);
-              const initialY = isActuallyMobile && item.mobileY !== undefined 
-                ? item.mobileY 
+              const initialY = isActuallyMobile && item.mobileY !== undefined
+                ? item.mobileY
                 : (item.y ?? item.position?.y ?? 0);
 
               initialItemStates[item.id] = {
@@ -260,7 +260,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     const handleResize = () => {
       const windowWidth = window.innerWidth;
       const deviceInfo = getDeviceInfo();
-      
+
       // UserAgent判定または画面幅判定
       if (deviceInfo.device_type === 'mobile' || windowWidth < MOBILE_BREAKPOINT) {
         // スマホ：スケーリングせず375px等倍表示
@@ -290,6 +290,9 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   // @ts-ignore - projectData は Supabase の行データを含んでいるため
   const theme = projectData?.published_content?.theme;
 
+  // 現在のページの背景設定を取得
+  const currentPage = previewState.currentPageId ? pages[previewState.currentPageId] : null;
+
   // テーマ変数のCSSプロパティ生成
   const themeStyles = useMemo(() => {
     const defaults = {
@@ -301,14 +304,13 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     const current = { ...defaults, ...theme };
     return {
       '--theme-font-family': current.fontFamily,
+      '--page-font-family': currentPage?.fontFamily || current.fontFamily,
       '--theme-accent-color': current.accentColor,
       '--theme-background-color': current.backgroundColor,
       '--theme-border-radius': `${current.borderRadius}px`,
     } as React.CSSProperties;
-  }, [theme]);
+  }, [theme, currentPage?.fontFamily]);
 
-  // 現在のページの背景設定を取得
-  const currentPage = previewState.currentPageId ? pages[previewState.currentPageId] : null;
   const backgroundColor = currentPage?.backgroundColor || '#ffffff';
   const backgroundImage = currentPage?.backgroundImage;
 
@@ -348,10 +350,10 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
 
   const maxY = isMobileDevice
     ? currentPageItems.reduce((max: number, item: PlacedItemType) => {
-        const mobileY = item.mobileY ?? item.position.y * 0.375;
-        const mobileH = item.mobileHeight ?? item.size.height * 0.45;
-        return Math.max(max, mobileY + mobileH);
-      }, FIXED_HEIGHT)
+      const mobileY = item.mobileY ?? item.position.y * 0.375;
+      const mobileH = item.mobileHeight ?? item.size.height * 0.45;
+      return Math.max(max, mobileY + mobileH);
+    }, FIXED_HEIGHT)
     : currentPageItems.reduce((max: number, item: PlacedItemType) => Math.max(max, item.position.y + item.size.height), FIXED_HEIGHT);
   const contentHeight = Math.max(FIXED_HEIGHT, maxY + 50); // 余白
 
@@ -370,7 +372,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         paddingBottom: "0px"
       }}>
 
-      {/* コンテンツラッパー: 自動計算された高さを使用 */}
+        {/* コンテンツラッパー: 自動計算された高さを使用 */}
         <div style={{
           width: isMobileDevice ? `${MOBILE_WIDTH}px` : `${FIXED_WIDTH * scale}px`,
           height: `${contentHeight * (isMobileDevice ? 1 : scale)}px`,

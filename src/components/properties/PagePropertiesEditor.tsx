@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { usePageStore } from "../../stores/usePageStore";
 import { AccordionSection } from "./SharedComponents";
+import { FONT_FAMILIES } from "../../constants/fonts";
 import ImageCropModal from "../ImageCropModal";
 import type { Crop } from 'react-image-crop';
 
@@ -117,6 +118,23 @@ export const PagePropertiesEditor: React.FC<PagePropertiesEditorProps> = ({ page
                         onChange={(e) => setName(e.target.value)}
                         onBlur={handleNameBlur}
                     />
+                </div>
+
+                {/* Default Font */}
+                <div className="prop-group" style={{ marginTop: '12px' }}>
+                    <div className="prop-label">デフォルトフォント (Default Font)</div>
+                    <select
+                        className="prop-select"
+                        value={page.fontFamily || 'inherit'}
+                        onChange={(e) => updatePage(pageId, { fontFamily: e.target.value })}
+                        style={{ width: '100%' }}
+                    >
+                        {FONT_FAMILIES.map(font => (
+                            <option key={font.value} value={font.value} style={{ fontFamily: font.value }}>
+                                {font.label}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             </AccordionSection>
 

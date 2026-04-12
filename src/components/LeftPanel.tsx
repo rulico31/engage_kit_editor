@@ -29,7 +29,8 @@ const LayerPanel: React.FC = () => {
           <span className="layer-icon">
             {item.name.startsWith("画像") ? "🖼️" :
               item.name.startsWith("テキスト") ? "T" :
-                item.name.startsWith("ボタン") ? "🔘" : "⬜"}
+                item.name.startsWith("ボタン") ? "🔘" : 
+                  item.type === 'custom_html' ? "<>" : "⬜"}
           </span>
           <span className="layer-name">{item.data.text || item.name}</span>
         </div>
@@ -380,11 +381,26 @@ const LeftPanel: React.FC = () => {
       {/* 上部コンテンツ (ツール or レイヤー) */}
       <div className="left-panel-content" style={{ height: contentHeight, flex: 'none' }}>
         {activeTab === 'tools' ? (
-          <div className="tools-grid">
-            <DraggableTool type={ItemTypes.TEXT} name="テキスト" label="テキスト" icon="T" />
-            <DraggableTool type={ItemTypes.BUTTON} name="ボタン" label="ボタン" icon="🔘" />
-            <DraggableTool type={ItemTypes.IMAGE} name="画像" label="画像" icon="🖼️" />
-            <DraggableTool type={ItemTypes.BOX} name="テキスト入力欄" label="テキスト入力欄" icon="📝" />
+          <div className="left-panel-tools-container" style={{ padding: '0 8px' }}>
+            <div className="tool-section-title" style={{ fontSize: '12px', fontWeight: 'bold', margin: '12px 0 8px', opacity: 0.7 }}>基本アイテム</div>
+            <div className="tools-grid">
+              <DraggableTool type={ItemTypes.TEXT} name="テキスト" label="テキスト" icon="T" />
+              <DraggableTool type={ItemTypes.BUTTON} name="ボタン" label="ボタン" icon="🔘" />
+              <DraggableTool type={ItemTypes.IMAGE} name="画像" label="画像" icon="🖼️" />
+              <DraggableTool type={ItemTypes.BOX} name="テキスト入力欄" label="テキスト入力欄" icon="📝" />
+            </div>
+
+            <div className="tool-section-title" style={{ fontSize: '12px', fontWeight: 'bold', margin: '16px 0 8px', opacity: 0.7 }}>レイアウトプリセット</div>
+            <div className="tools-grid">
+              <DraggableTool type="LAYOUT_COLUMN_2" name="layout-50-50" label="2カラム (50:50)" icon="🌓" />
+              <DraggableTool type="LAYOUT_COLUMN_2_64" name="layout-60-40" label="2カラム (60:40)" icon="🌗" />
+            </div>
+
+            <div className="tool-section-title" style={{ fontSize: '12px', fontWeight: 'bold', margin: '16px 0 8px', opacity: 0.7 }}>特殊コンポーネント</div>
+            <div className="tools-grid">
+               <DraggableTool type="COMP_LINE_REG" name="line-reg" label="LINE登録誘導" icon="💬" />
+               <DraggableTool type={ItemTypes.CUSTOM_HTML} name="custom-html" label="カスタムHTML" icon="<>" />
+            </div>
           </div>
         ) : (
           <LayerPanel />

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import ViewerHost from './components/ViewerHost';
 import './index.css'; // Global styles
+import './styles/animations.css';
 
 const params = new URLSearchParams(window.location.search);
 const projectId = params.get('project_id');

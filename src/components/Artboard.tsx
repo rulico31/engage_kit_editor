@@ -19,11 +19,13 @@ import { ContextMenu } from "./artboard/ContextMenu";
 import { useArtboardLogic, snapToGrid } from "./artboard/useArtboardLogic";
 import ConfirmationModal from "./ConfirmationModal";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { createColumnLayout } from "../lib/layoutHelpers";
+import { createLineRegistrationComponent } from "../lib/lineComponents";
 
 const Artboard: React.FC = () => {
   // ストアデータの取得
   const { addItem, updateItem } = usePageStore(state => ({ addItem: state.addItem, updateItem: state.updateItem }));
-  const { placedItems, comments, addComment, updateComment, deleteComment, backgroundColor, backgroundImage } = usePageStore(state => {
+  const { placedItems, comments, addComment, updateComment, deleteComment, backgroundColor, backgroundImage, pageFontFamily } = usePageStore(state => {
     const page = state.selectedPageId ? state.pages[state.selectedPageId] : undefined;
     return {
       placedItems: page?.placedItems || [],
@@ -33,6 +35,7 @@ const Artboard: React.FC = () => {
       deleteComment: state.deleteComment,
       backgroundColor: page?.backgroundColor,
       backgroundImage: page?.backgroundImage,
+      pageFontFamily: page?.fontFamily,
     };
   });
 
@@ -90,11 +93,12 @@ const Artboard: React.FC = () => {
 
     return {
       '--theme-font-family': current.fontFamily,
+      '--page-font-family': pageFontFamily || current.fontFamily,
       '--theme-accent-color': current.accentColor,
       '--theme-background-color': current.backgroundColor,
       '--theme-border-radius': `${current.borderRadius}px`,
     } as React.CSSProperties;
-  }, [theme]);
+  }, [theme, pageFontFamily]);
 
   const artboardRef = useRef<HTMLDivElement>(null);
 
@@ -218,7 +222,11 @@ const Artboard: React.FC = () => {
     ItemTypes.BUTTON,
     ItemTypes.VIDEO,
     "EXISTING_ITEM",
-    "COMMENT"
+    "COMMENT",
+    "LAYOUT_COLUMN_2",
+    "LAYOUT_COLUMN_2_64",
+    "COMP_LINE_REG",
+    ItemTypes.CUSTOM_HTML,
   ], []);
 
   const [{ isOver }, drop] = useDrop(() => ({
@@ -245,7 +253,24 @@ const Artboard: React.FC = () => {
         return;
       }
 
-      // 新規追加
+      // 新規レイアウト・コンポーネントの一括追加
+      if (item.type === "LAYOUT_COLUMN_2" || item.type === "LAYOUT_COLUMN_2_64") {
+        const subItems = createColumnLayout(
+          item.type === "LAYOUT_COLUMN_2" ? '50-50' : '60-40',
+          snappedX,
+          snappedY
+        );
+        subItems.forEach((si: any) => addItem(si));
+        return;
+      }
+      
+      if (item.type === "COMP_LINE_REG") {
+        const subItems = createLineRegistrationComponent(snappedX, snappedY);
+        subItems.forEach((si: any) => addItem(si));
+        return;
+      }
+
+      // 新規個別アイテム追加
       const newItemId = `${item.type}-${Date.now()}`;
 
       const pcWidth = (item.type === ItemTypes.TEXT || item.type === ItemTypes.BUTTON || item.type === ItemTypes.BOX) ? 200 : 100;
@@ -277,15 +302,16 @@ const Artboard: React.FC = () => {
         size: { width: pcWidth, height: pcHeight },
         zIndex: placedItems.length + 1,
 
+        data: { 
+          text: item.type === ItemTypes.CUSTOM_HTML ? "" : (item.label || item.type),
+          html: item.type === ItemTypes.CUSTOM_HTML ? "<div>Custom HTML Content</div>" : undefined
+        },
+
         // モバイル用プロパティを初期設定
         mobileX,
         mobileY,
         mobileWidth,
         mobileHeight,
-
-        data: {
-          text: item.label || "New Item",
-        },
       });
     },
     collect: (monitor) => ({
