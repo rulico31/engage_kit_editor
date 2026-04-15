@@ -145,7 +145,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         if (firstPageId) {
           // デバイス判定（UserAgentベースの判定を優先）
           const deviceInfo = getDeviceInfo();
-          const isActuallyMobile = deviceInfo.device_type === 'mobile';
+          const isActuallyMobile = deviceInfo.device_type === 'mobile' || window.innerWidth < 480;
 
           // 全アイテムの初期表示状態を作成
           const initialItemStates: Record<string, any> = {};
@@ -262,21 +262,55 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
       const deviceInfo = getDeviceInfo();
 
       // UserAgent判定または画面幅判定
-      if (deviceInfo.device_type === 'mobile' || windowWidth < MOBILE_BREAKPOINT) {
-        // スマホ：スケーリングせず375px等倍表示
-        setIsMobileDevice(true);
-        setScale(1);
+      const newIsMobile = deviceInfo.device_type === 'mobile' || windowWidth < MOBILE_BREAKPOINT;
+      
+      if (newIsMobile !== isMobileDevice) {
+        setIsMobileDevice(newIsMobile);
+        setScale(newIsMobile ? 1 : 1); // 常に1（後続の処理でスケールが変わるか確認）
+        
+        // Mobile/Desktop切り替え時に、previewState内の初期座標(x,y)を再計算して流し直す
+        // これがないと、ロード時の座標が固定化されてしまい、リサイズ時にレイアウトが完全に崩壊する
+        if (projectData && projectData.published_content) {
+          const pagesRecord = projectData.published_content.pages || {};
+          const currentPS = usePreviewStore.getState().previewState;
+          const updatedPS = { ...currentPS };
+          let hasChanges = false;
+
+          Object.values(pagesRecord).forEach((page: any) => {
+            (page.placedItems || []).forEach((item: any) => {
+              if (updatedPS[item.id]) {
+                const initialX = newIsMobile && item.mobileX !== undefined
+                  ? item.mobileX
+                  : (newIsMobile ? (item.x ?? item.position?.x ?? 0) * 0.375 : (item.x ?? item.position?.x ?? 0));
+                const initialY = newIsMobile && item.mobileY !== undefined
+                  ? item.mobileY
+                  : (newIsMobile ? (item.y ?? item.position?.y ?? 0) * 0.375 : (item.y ?? item.position?.y ?? 0));
+                
+                updatedPS[item.id] = {
+                  ...updatedPS[item.id],
+                  x: initialX,
+                  y: initialY
+                };
+                hasChanges = true;
+              }
+            });
+          });
+
+          if (hasChanges) {
+             console.log('[ViewerHost] Device flipped. Rehydrating layout coordinates...');
+             usePreviewStore.getState().setPreviewState(updatedPS);
+          }
+        }
+
         // store側のisMobileも同期させる（再表示時などのため）
-        if (!usePreviewStore.getState().isMobile) {
-          usePreviewStore.setState({ isMobile: true });
+        if (usePreviewStore.getState().isMobile !== newIsMobile) {
+          usePreviewStore.setState({ isMobile: newIsMobile });
         }
       } else {
-        // PC・タブレット：1000pxより小さい場合のみ縮小（従来通り）
-        setIsMobileDevice(false);
+        // リサイズ時、モバイル判定が変わらなくてもスケールは更新する
         const newScale = windowWidth < FIXED_WIDTH ? windowWidth / FIXED_WIDTH : 1;
-        setScale(newScale);
-        if (usePreviewStore.getState().isMobile) {
-          usePreviewStore.setState({ isMobile: false });
+        if (!newIsMobile) {
+          setScale(newScale);
         }
       }
     };
