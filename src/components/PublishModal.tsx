@@ -368,7 +368,10 @@ window.addEventListener('message', function(e) {
             <div className="publish-success">
               <div className="success-icon">🎉</div>
               <h3>公開準備が完了しました</h3>
-              <p>以下のコードをWebサイトのHTMLに貼り付けてください。</p>
+              <p>
+                以下のコードをWebサイトのHTMLに貼り付けてください。<br />
+                <span className="publish-disclaimer">※プレビューと実際に公開されたもので違うことがあります。</span>
+              </p>
 
               <div className="embed-code-container">
                 <textarea
