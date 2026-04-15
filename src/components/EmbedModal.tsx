@@ -46,7 +46,10 @@ window.addEventListener('message', function(e) {
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content embed-modal" onClick={e => e.stopPropagation()}>
                 <h3>埋め込みコードの取得</h3>
-                <p>以下のコードをコピーして、WebサイトのHTMLに貼り付けてください。</p>
+                <p>
+                    以下のコードをコピーして、WebサイトのHTMLに貼り付けてください。<br />
+                    <span className="embed-disclaimer">※プレビューと実際に公開されたもので違うことがあります。</span>
+                </p>
 
                 <div className="embed-code-container">
                     <pre>{embedCode}</pre>

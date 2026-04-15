@@ -48,3 +48,10 @@
 .close-button:hover {
     background-color: #bbb;
 }
+
+.embed-disclaimer {
+    display: block;
+    font-size: 12px;
+    color: #f39c12;
+    margin-top: 4px;
+}
