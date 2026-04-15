@@ -421,7 +421,7 @@ const Artboard: React.FC = () => {
 
   // アートボードのサイズ決定
   // モバイル時は「はみ出し」を確認しやすくするため、標準の375pxより広めに設定（ガイド表示用）
-  const artboardWidth = isMobileView ? 375 : 1000;
+  const artboardWidth = isMobileView ? 450 : 1000;
   
   // スマホビュー時の最大高さを算出（要素がはみ出さないように）
   const mobileMaxHeight = useMemo(() => {

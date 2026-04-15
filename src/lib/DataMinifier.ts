@@ -38,7 +38,8 @@ export class DataMinifier {
                 edges: [], // Viewerでは不要だが型定義上必要
                 comments: [], // Viewerでは不要だが型定義上必要
                 backgroundColor: pageData.backgroundColor,
-                backgroundImage: pageData.backgroundImage
+                backgroundImage: pageData.backgroundImage,
+                fontFamily: pageData.fontFamily
             } as any;
         });
 

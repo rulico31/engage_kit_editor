@@ -32,16 +32,16 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   // isMobile=true の場合はモバイル専用座標・サイズを優先して使用
   // モバイル座標が未設定の場合は PC 座標にフォールバック
   const x = isMobile
-    ? (itemState?.x ?? item.mobileX ?? (item.x * 0.375))
+    ? (itemState?.x ?? item.mobileX ?? item.x)
     : (itemState?.x ?? item.x);
   const y = isMobile
-    ? (itemState?.y ?? item.mobileY ?? (item.y * 0.375))
+    ? (itemState?.y ?? item.mobileY ?? item.y)
     : (itemState?.y ?? item.y);
   const width = isMobile
-    ? (item.mobileWidth ?? (item.width * 0.375))
+    ? (item.mobileWidth ?? item.width)
     : item.width;
   const height = isMobile
-    ? (item.mobileHeight ?? (item.height * 0.375))
+    ? (item.mobileHeight ?? item.height)
     : item.height;
 
   const onItemEvent = usePreviewStore(state => state.handleItemEvent);
