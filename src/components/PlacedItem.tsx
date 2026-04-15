@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
-import "./PreviewItem.css";
+import "./PlacedItem.css";
 import { usePreviewStore } from "../stores/usePreviewStore";
 import { InputTracker } from "../lib/InputTracker";
 import { logAnalyticsEvent } from "../lib/analytics";

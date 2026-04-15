@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import PreviewItem from "./PreviewItem";
 import { ArtboardItem } from "./artboard/ArtboardItem";
 import ConfirmationModal from "./ConfirmationModal";
 import DebugLogPanel from "./DebugLogPanel";
