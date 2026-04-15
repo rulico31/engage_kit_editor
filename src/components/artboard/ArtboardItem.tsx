@@ -72,10 +72,10 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   const isAutoHeight = !isGroup && ((item.name.startsWith("テキスト") && !item.name.startsWith("テキスト入力欄")) || item.name.startsWith("ボタン"));
 
   // モバイル用の座標・サイズ（未設定時はデスクトップ値を使用）
-  const x = isMobileView && item.mobileX !== undefined ? item.mobileX : item.x;
-  const y = isMobileView && item.mobileY !== undefined ? item.mobileY : item.y;
-  const width = isMobileView && item.mobileWidth !== undefined ? item.mobileWidth : item.width;
-  const height = isMobileView && item.mobileHeight !== undefined ? item.mobileHeight : item.height;
+  const x = isMobileView && item.mobileX !== undefined ? item.mobileX : (isMobileView ? item.x * 0.375 : item.x);
+  const y = isMobileView && item.mobileY !== undefined ? item.mobileY : (isMobileView ? item.y * 0.375 : item.y);
+  const width = isMobileView && item.mobileWidth !== undefined ? item.mobileWidth : (isMobileView ? item.width * 0.375 : item.width);
+  const height = isMobileView && item.mobileHeight !== undefined ? item.mobileHeight : (isMobileView ? item.height * 0.375 : item.height);
   
   // 子要素があるかどうかを判定（プレースホルダー表示用）
   const hasChildren = usePageStore((s) => {
@@ -572,7 +572,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
       </button>
     );
   } else if (item.name.startsWith("画像") || item.type === 'image') {
-    containerStyle.height = item.height;
+    containerStyle.height = height;
     containerStyle.minHeight = undefined;
     if (item.data?.src) {
       content = (
@@ -583,7 +583,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     } else {
       content = (
         <div className="item-image-content is-placeholder">
-          {item.data.text} (No Image)
+          🖼️ 画像をドロップ
         </div>
       );
     }

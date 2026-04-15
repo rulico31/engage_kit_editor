@@ -32,16 +32,16 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   // isMobile=true の場合はモバイル専用座標・サイズを優先して使用
   // モバイル座標が未設定の場合は PC 座標にフォールバック
   const x = isMobile
-    ? (itemState?.x ?? item.mobileX ?? item.x)
+    ? (itemState?.x ?? item.mobileX ?? (item.x * 0.375))
     : (itemState?.x ?? item.x);
   const y = isMobile
-    ? (itemState?.y ?? item.mobileY ?? item.y)
+    ? (itemState?.y ?? item.mobileY ?? (item.y * 0.375))
     : (itemState?.y ?? item.y);
   const width = isMobile
-    ? (item.mobileWidth ?? item.width)
+    ? (item.mobileWidth ?? (item.width * 0.375))
     : item.width;
   const height = isMobile
-    ? (item.mobileHeight ?? item.height)
+    ? (item.mobileHeight ?? (item.height * 0.375))
     : item.height;
 
   const onItemEvent = usePreviewStore(state => state.handleItemEvent);
@@ -182,9 +182,9 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   const rootRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
 
-  const isAutoHeight = !id.startsWith("group") && ((name.startsWith("テキスト") && !name.startsWith("テキスト入力欄")) || name.startsWith("ボタン"));
-  const isInput = name.startsWith("テキスト入力欄") || item.type === 'input';
-  const isButton = name.includes("ボタン") || item.type === 'button';
+  const isAutoHeight = !id.startsWith("group") && ((item.name.startsWith("テキスト") && !item.name.startsWith("テキスト入力欄")) || item.name.startsWith("ボタン"));
+  const isInput = item.name.startsWith("テキスト入力欄") || item.type === 'input';
+  const isButton = item.name.includes("ボタン") || item.type === 'button';
 
   useEffect(() => {
     if (isInput) {
@@ -326,7 +326,7 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
   };
 
   // 画像判定の強化: 名前が変更されていても type で判定
-  const isImage = name.startsWith("画像") || item.type === 'image';
+  const isImage = item.name.startsWith("画像") || item.type === 'image';
 
   // Debug logging for image items
   if (isImage) {

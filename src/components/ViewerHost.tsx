@@ -151,13 +151,13 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
           const initialItemStates: Record<string, any> = {};
           Object.values(normalizedPages).forEach((page: any) => {
             (page.placedItems || []).forEach((item: any) => {
-              // モバイルモード時はモバイル座標を優先
+              // モバイルモード時はモバイル座標を優先（設定がない場合は 375/1000 = 0.375 倍でスケール）
               const initialX = isActuallyMobile && item.mobileX !== undefined
                 ? item.mobileX
-                : (item.x ?? item.position?.x ?? 0);
+                : (isActuallyMobile ? (item.x ?? item.position?.x ?? 0) * 0.375 : (item.x ?? item.position?.x ?? 0));
               const initialY = isActuallyMobile && item.mobileY !== undefined
                 ? item.mobileY
-                : (item.y ?? item.position?.y ?? 0);
+                : (isActuallyMobile ? (item.y ?? item.position?.y ?? 0) * 0.375 : (item.y ?? item.position?.y ?? 0));
 
               initialItemStates[item.id] = {
                 isVisible: item.data?.initialVisibility !== false,
