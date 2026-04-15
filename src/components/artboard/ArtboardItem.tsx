@@ -615,6 +615,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     );
     containerStyle.height = height;
     containerStyle.minHeight = undefined;
+  } else if (item.name.startsWith("画像") || item.type === 'image' || item.id.startsWith('image')) {
     if (item.data?.src) {
       // 画像の縦横比（aspect-ratio）
       const pcWidth = item.width ?? 100;
