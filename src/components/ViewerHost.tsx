@@ -325,6 +325,35 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     backgroundRepeat: backgroundImage?.displayMode === 'tile' ? 'repeat' : 'no-repeat',
   };
 
+  // コンテンツの高さ計算 (ページ内の最下部アイテムを探す)
+  // フックの順序を守るため、条件分岐（早期リターン）の前に配置
+  const currentPageData = previewState.currentPageId ? pages[previewState.currentPageId] : null;
+  const placedItems = currentPageData?.placedItems || [];
+  const currentPageItems = placedItems;
+
+  const maxY = isMobileDevice
+    ? currentPageItems.reduce((max: number, item: PlacedItemType) => {
+      const mobileY = item.mobileY ?? item.position.y * 0.375;
+      const mobileH = item.mobileHeight ?? item.size.height * 0.45;
+      return Math.max(max, mobileY + mobileH);
+    }, FIXED_HEIGHT)
+    : currentPageItems.reduce((max: number, item: PlacedItemType) => Math.max(max, item.position.y + item.size.height), FIXED_HEIGHT);
+  const contentHeight = Math.max(FIXED_HEIGHT, maxY + 50); // 余白
+
+  // 親サイトへの高さ通知
+  useEffect(() => {
+    // iframe内での動作確認 (親ウィンドウが存在し、かつデータロードが完了している場合のみ)
+    if (window.parent !== window && !loading && projectData) {
+      const finalHeight = contentHeight * (isMobileDevice ? 1 : scale);
+      window.parent.postMessage({
+        type: 'ENGAGE_KIT_RESIZE',
+        height: Math.ceil(finalHeight),
+        projectId: projectId
+      }, '*');
+      console.log('[ViewerHost] Sent resize message to parent:', Math.ceil(finalHeight));
+    }
+  }, [contentHeight, scale, isMobileDevice, projectId, loading, !!projectData]);
+
   // デバッグログ: レンダリング状態
   console.log('[ViewerHost] Render state:', { loading, error, projectData: !!projectData, previewState, currentPage, pages });
 
@@ -341,21 +370,7 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
     return <div className="viewer-error">No Data</div>;
   }
 
-  // コンテンツの高さ計算 (ページ内の最下部アイテムを探す)
-  const currentPageData = previewState.currentPageId ? pages[previewState.currentPageId] : null;
-  const placedItems = currentPageData?.placedItems || [];
-  const currentPageItems = placedItems;
-
   console.log('[ViewerHost] Rendering content:', { currentPageData, placedItems: placedItems.length, currentPageItems });
-
-  const maxY = isMobileDevice
-    ? currentPageItems.reduce((max: number, item: PlacedItemType) => {
-      const mobileY = item.mobileY ?? item.position.y * 0.375;
-      const mobileH = item.mobileHeight ?? item.size.height * 0.45;
-      return Math.max(max, mobileY + mobileH);
-    }, FIXED_HEIGHT)
-    : currentPageItems.reduce((max: number, item: PlacedItemType) => Math.max(max, item.position.y + item.size.height), FIXED_HEIGHT);
-  const contentHeight = Math.max(FIXED_HEIGHT, maxY + 50); // 余白
 
   console.log('[ViewerHost] About to render main content with', placedItems.length, 'items');
 

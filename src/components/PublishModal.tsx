@@ -261,13 +261,24 @@ const PublishModal: React.FC<PublishModalProps> = ({ projectId, onClose }) => {
 
       // 埋め込み用コードの生成
       const code = `<iframe
+  id="engage-kit-frame-${targetProjectId}"
   src="${publicUrl}"
   width="100%"
-  height="600"
-  style="border: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"
+  style="border: none; overflow: hidden; width: 100%;"
+  scrolling="no"
   allow="clipboard-write"
   loading="lazy"
-></iframe>`;
+></iframe>
+<script>
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'ENGAGE_KIT_RESIZE' && e.data.projectId === '${targetProjectId}') {
+    var frame = document.getElementById('engage-kit-frame-${targetProjectId}');
+    if (frame) {
+      frame.style.height = e.data.height + 'px';
+    }
+  }
+});
+</script>`;
       setEmbedCode(code);
 
       setPublishStep("done");

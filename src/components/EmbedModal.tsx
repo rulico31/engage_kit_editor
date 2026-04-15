@@ -21,7 +21,7 @@ const EmbedModal: React.FC<EmbedModalProps> = ({ projectId, onClose }) => {
 ></iframe>
 <script>
 window.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'ENGAGE_KIT_RESIZE') {
+  if (e.data && e.data.type === 'ENGAGE_KIT_RESIZE' && e.data.projectId === '${projectId}') {
     var frame = document.getElementById('engage-kit-frame-${projectId}');
     if (frame) {
       frame.style.height = e.data.height + 'px';
