@@ -416,6 +416,15 @@ const PreviewItem: React.FC<PreviewItemProps> = ({
             '--placeholder-color': item.data?.color || '#999999',
             color: item.data?.color || '#333333',
             fontSize: item.data?.fontSize ? `${item.data.fontSize}px` : '15px',
+            padding: '10px 12px', // コンテナのパディングの代わりに入力エリアにパディングを設定
+            boxSizing: 'border-box', // パディングを含めたサイズ計算にする
+            height: '100%',
+            maxHeight: '100%',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
+            wordBreak: 'break-all',
           }}
           placeholder={placeholder}
           value={inputValue}
