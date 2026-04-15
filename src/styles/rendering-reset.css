@@ -1,0 +1,42 @@
+/* src/styles/rendering-reset.css */
+
+/** 
+ * モバイルブラウザでの表示の一貫性を確保するためのリセットスタイル
+ */
+
+html, body, #root {
+  /* iPhone/Android で横向きにした時などにテキストが勝手に拡大されるのを防ぐ */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  
+  /* すべての要素のサイズ計算を border-box に統一 */
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+/* プレビューアイテムおよびアートボードアイテムの共通ベース設定 */
+.artboard-item,
+.preview-item {
+  /* 行間を明示的に指定してブラウザ間の差異をなくす */
+  line-height: 1.5; 
+  /* fallback to 1.5 if not specified, 
+     but we will also set specific line-height for inputs below */
+}
+
+/* 入力・ボタン系のテキスト設定を統一 */
+input, textarea, button, select {
+  font-family: inherit;
+  font-size: inherit;
+  /* 入力系は少し詰め気味にすることが多いため 1.4 を基準にする */
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* 画像の境界をきれいにする */
+img {
+  max-width: 100%;
+  display: block;
+}

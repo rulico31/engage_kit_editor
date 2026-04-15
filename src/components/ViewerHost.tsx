@@ -334,7 +334,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
   const maxY = isMobileDevice
     ? currentPageItems.reduce((max: number, item: PlacedItemType) => {
       const mobileY = item.mobileY ?? item.position.y * 0.375;
-      const mobileH = item.mobileHeight ?? item.size.height * 0.45;
+      const mobileH = item.mobileHeight ?? item.size.height * 0.375;
+
       return Math.max(max, mobileY + mobileH);
     }, FIXED_HEIGHT)
     : currentPageItems.reduce((max: number, item: PlacedItemType) => Math.max(max, item.position.y + item.size.height), FIXED_HEIGHT);

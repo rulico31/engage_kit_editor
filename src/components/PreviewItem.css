@@ -13,8 +13,9 @@
   word-break: break-word;
   overflow-wrap: break-word;
   /* 追加: 確実に折り返し */
-  line-height: normal;
-  /* 行の高さをデフォルトに戻す */
+  line-height: inherit;
+  /* 行の高さを共通リセットに合わせる */
+
 
   box-sizing: border-box;
   flex-shrink: 0;

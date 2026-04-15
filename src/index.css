@@ -1,4 +1,6 @@
 /* src/index.css */
+@import "./styles/rendering-reset.css";
+
 
 /*
   ブラウザのデフォルトスタイル（余白など）をリセットし、

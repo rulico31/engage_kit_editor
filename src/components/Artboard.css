@@ -71,7 +71,9 @@
   justify-content: flex-start;
 
   transition: border-color 0.1s, box-shadow 0.1s;
+  line-height: inherit;
 }
+
 
 /* 選択状態 */
 .artboard-item.selected {
