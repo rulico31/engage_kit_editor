@@ -264,9 +264,12 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
       // UserAgent判定または画面幅判定
       const newIsMobile = deviceInfo.device_type === 'mobile' || windowWidth < MOBILE_BREAKPOINT;
       
+      const pcScale = windowWidth < FIXED_WIDTH ? windowWidth / FIXED_WIDTH : 1;
+      const mobileScale = windowWidth < MOBILE_WIDTH ? windowWidth / MOBILE_WIDTH : (windowWidth < MOBILE_BREAKPOINT ? windowWidth / MOBILE_WIDTH : 1);
+      
       if (newIsMobile !== isMobileDevice) {
         setIsMobileDevice(newIsMobile);
-        setScale(newIsMobile ? 1 : 1); // 常に1（後続の処理でスケールが変わるか確認）
+        setScale(newIsMobile ? mobileScale : pcScale);
         
         // Mobile/Desktop切り替え時に、previewState内の初期座標(x,y)を再計算して流し直す
         // これがないと、ロード時の座標が固定化されてしまい、リサイズ時にレイアウトが完全に崩壊する
@@ -308,10 +311,8 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
         }
       } else {
         // リサイズ時、モバイル判定が変わらなくてもスケールは更新する
-        const newScale = windowWidth < FIXED_WIDTH ? windowWidth / FIXED_WIDTH : 1;
-        if (!newIsMobile) {
-          setScale(newScale);
-        }
+        const currentScale = newIsMobile ? windowWidth / MOBILE_WIDTH : (windowWidth < FIXED_WIDTH ? windowWidth / FIXED_WIDTH : 1);
+        setScale(currentScale);
       }
     };
 
@@ -430,11 +431,11 @@ const ViewerHost: React.FC<ViewerHostProps> = ({ projectId }) => {
           overflow: "hidden", // はみ出し防止
         }}>
 
-          {/* 中身: scale変換（モバイル時はスケールなし） */}
+          {/* 中身: scale変換（モバイル時もスケールを適用するように修正） */}
           <div style={{
             width: isMobileDevice ? `${MOBILE_WIDTH}px` : `${FIXED_WIDTH}px`,
             height: `${contentHeight}px`,
-            transform: isMobileDevice ? 'none' : `scale(${scale})`,
+            transform: `scale(${scale})`,
             transformOrigin: "top left",
             position: "absolute",
             top: 0,

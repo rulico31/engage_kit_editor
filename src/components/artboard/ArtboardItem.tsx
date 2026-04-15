@@ -38,6 +38,7 @@ interface ArtboardItemProps {
   onVariableChange: (variableName: string, value: any) => void;
   zoomLevel: number;
   onItemUpdate: (id: string, updates: Partial<PlacedItemType>, addToHistory?: boolean) => void;
+  isViewerMode?: boolean; // 追加
 }
 
 export const ArtboardItem: React.FC<ArtboardItemProps> = ({
@@ -55,6 +56,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   onVariableChange,
   zoomLevel,
   onItemUpdate,
+  isViewerMode = false, // 追加
 }) => {
   // activeLogicGraphIdを取得（ロジック編集中のアイテムIDを保持）
   const activeLogicGraphId = useSelectionStore((s) => s.activeLogicGraphId);
@@ -100,9 +102,11 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     zIndex: item.zIndex || 0,
     // 選択時はリサイズハンドルを表示するためoverflowをvisibleに
     // また、プレビュー中の入力欄もスクロールバーを表示するためにvisibleにする
-    overflow: ((isSelected && !isPreviewing) || (isPreviewing && item.name.startsWith("テキスト入力欄"))) ? 'visible' : 'hidden',
+    overflow: ((isSelected && !isPreviewing && !isViewerMode) || (isPreviewing && item.name.startsWith("テキスト入力欄")) || (isViewerMode && item.name.startsWith("テキスト入力欄"))) ? 'visible' : 'hidden',
     // テキスト入力欄またはカスタムHTMLの場合はコンテナのパディングを0にする
     padding: (item.name.startsWith("テキスト入力欄") || item.type === 'custom_html') ? 0 : undefined,
+    // 公開ビュワーモードではcursorをdefaultにする（ボタン等は別途設定）
+    cursor: isViewerMode ? 'default' : undefined,
   };
 
   // 背景色（isTransparentがtrueの場合は強制的にtransparent）
@@ -248,8 +252,10 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   }, [isPreviewing, inputValue, item.name, item.id, containerStyle.height]);
 
   // バリデーション関数 (validation.tsを使用)
+  // バリデーション関数 (validation.tsを使用)
   const validate = (val: string) => {
-    if (!isPreviewing) return true; // 編集モード時はバリデーションしない
+    // 編集モード（エディタの非プレビュー時）は何もしない
+    if (!isPreviewing && !isViewerMode) return true;
 
     const errorMsg = validateInput(val, {
       required: !!item.data.required,
@@ -258,6 +264,13 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
     });
 
     setError(errorMsg);
+    
+    // Store側のプレビュー状態にもエラーを反映させる（共有化のため）
+    if (isPreviewing || isViewerMode) {
+      // 実際には previewState を更新するアクションが必要だが、
+      // 簡易的にコンポーネント内ステートで管理しつつ、
+      // 必要があれば親に通知する仕組みを検討
+    }
     return errorMsg === null;
   };
 
@@ -337,65 +350,94 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
   // イベントハンドラ
   // イベントハンドラ
   const handleClick = async (e: React.MouseEvent) => {
-    if (isPreviewing) {
+    // 公開ビュワーまたはプレビューモードの場合
+    if (isViewerMode || isPreviewing) {
       if (e.target instanceof HTMLTextAreaElement) return;
 
-      // ★ ワンクリック送信 (Simplified CV) - Editor Preview Support
-      if (item.data.actionType === 'submit') {
-        console.log('🚀 One-Click Submit Triggered (Editor Preview)');
-        e.stopPropagation(); // イベント伝播を止める
+      console.log("📍 Item clicked (Viewer/Preview):", item.name, item.id);
 
-        // ★★ 重要: スコア加算のためにまずclickイベントを発火
-        // これにより handleItemEvent 内で _system_total_score が加算される
-        onItemEvent("click", item.id);
+      // 自爆バリデーション (PreviewItem.tsxから移植)
+      if (item.data.linkUrl || item.data.actionType === 'submit') {
+        const { pages, selectedPageId } = usePageStore.getState();
+        const currentPage = pages[selectedPageId!];
+        
+        if (currentPage) {
+          let hasValidationError = false;
+          const currentVars = usePreviewStore.getState().variables;
+
+          // ページ内の全入力項目をチェック
+          currentPage.placedItems.forEach((pi: PlacedItemType) => {
+            const isInputItem = pi.name.startsWith("テキスト入力欄") || pi.type === 'input';
+            if (isInputItem) {
+              const vName = pi.data.variableName || pi.id;
+              const val = currentVars[vName];
+              const errorMsg = validateInput(val, {
+                required: !!pi.data.required,
+                inputType: pi.data.inputType,
+                enableCountryCode: pi.data.enableCountryCode
+              });
+
+              if (errorMsg) {
+                hasValidationError = true;
+                // 注意: ここで store を直接たたくか、prop経由で通知するか
+                // とりあえず previewState がある場合は、個別の項目のエラーとして表示されるように期待
+              }
+            }
+          });
+
+          if (hasValidationError) {
+            console.warn('🛑 Validation failed. Blocking action.');
+            // エラー表示のステート更新ロジックは別途検討（現状はPreviewItemと同様の動きを目指す）
+            return;
+          }
+        }
+      }
+
+      // 隠し変数の保存
+      if (item.data.variableName && item.data.variableValue !== undefined && item.data.variableValue !== "") {
+        onVariableChange(item.data.variableName, item.data.variableValue);
+      }
+
+      // 外部リンク遷移
+      if (item.data.linkUrl) {
+        if (item.data.linkUrl.startsWith('http://') || item.data.linkUrl.startsWith('https://')) {
+          window.open(item.data.linkUrl, '_blank', 'noopener,noreferrer');
+        }
+      }
+
+      // ワンクリック送信 (Simplified CV)
+      if (item.data.actionType === 'submit') {
+        console.log('🚀 One-Click Submit Triggered');
+        onItemEvent("click", item.id); // スコア加算
 
         try {
-          // 1. 変数の取得
-          const variables = usePreviewStore.getState().variables; // ストアから直接取得
+          const variables = usePreviewStore.getState().variables;
           const submitData = { ...variables };
-
-          // 2. Project IDの取得 (URL or Store)
-          // Editorの場合はURLに project_id がある場合が多い、または store から
-          let projectId: string | undefined = useProjectStore.getState().currentProjectId || undefined;
+          let projectId: string | undefined = useProjectStore.getState().currentProjectId || usePreviewStore.getState().projectId || undefined;
+          
           if (!projectId) {
             const params = new URLSearchParams(window.location.search);
             projectId = params.get('project_id') || undefined;
           }
 
-          // 3. データ送信 (leads.ts の submitLeadData を使用)
-          // Editor Previewではページ全体の状態を取得してスコア計算に利用する
-          const currentPageId = usePageStore.getState().selectedPageId;
-          const pages = usePageStore.getState().pages;
-          const placedItems = (currentPageId && pages[currentPageId]) ? pages[currentPageId].placedItems : [];
+          const { submitLeadData } = await import("../../lib/leads");
+          await submitLeadData(submitData, projectId);
 
-          // leads.tsのsubmitLeadDataを呼び出し（ここでleadsテーブルへのINSERTとanalyticsログ送信が行われる）
-          const { submitLeadData } = await import("../../lib/leads"); // Dynamic import to avoid circular dependency issues if any
-
-          await submitLeadData(
-            submitData,
-            projectId,
-            placedItems
-          );
-
-          console.log('✅ Lead Submitted via submitLeadData (Editor Preview)');
-
-          // 4. リダイレクト処理 (Editor上ではAlertのみにするか、window.openにするか)
           if (item.data.submitRedirectUrl) {
-            // Editor Previewなので、遷移せずにアラートだけ出すのが安全かも
-            alert(`送信成功！\n本来は "${item.data.submitRedirectUrl}" に遷移します。\n(Editor Preview Mode)`);
+            window.location.href = item.data.submitRedirectUrl;
           } else {
-            alert('送信しました！ (Thank you for submitting!)');
+            alert('送信しました！');
           }
-
         } catch (err) {
           console.error('❌ Submit Failed:', err);
-          alert('送信に失敗しました。(Submission Failed)');
+          alert('送信に失敗しました。');
         }
         return;
       }
 
       onItemEvent("click", item.id);
     } else {
+      // エディタモード
       onItemSelect(e, item.id, item.data.text || item.name);
       e.stopPropagation();
     }
@@ -571,13 +613,32 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         {item.data.text}
       </button>
     );
-  } else if (item.name.startsWith("画像") || item.type === 'image') {
     containerStyle.height = height;
     containerStyle.minHeight = undefined;
     if (item.data?.src) {
+      // 画像の縦横比（aspect-ratio）
+      const pcWidth = item.width ?? 100;
+      const pcHeight = item.height ?? 100;
+      const imageAspectRatio = pcWidth > 0 && pcHeight > 0 ? `${pcWidth} / ${pcHeight}` : undefined;
+
       content = (
         <div className="item-image-content">
-          <img src={item.data.src} alt={item.data.text} draggable={false} />
+          <img 
+            src={item.data.src} 
+            alt={item.data.text} 
+            draggable={false} 
+            style={{ 
+              aspectRatio: imageAspectRatio, 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'contain' 
+            }}
+            onLoad={() => {
+              if (isPreviewing || isViewerMode) {
+                onItemEvent("onImageLoad", item.id);
+              }
+            }}
+          />
         </div>
       );
     } else {
@@ -626,7 +687,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
             padding: '10px 12px', // コンテナのパディングの代わりに入力エリアにパディングを設定
             boxSizing: 'border-box', // パディングを含めたサイズ計算にする
             // プレビュー中以外で、かつ編集モードでない場合はクリックを透過させる（ドラッグ移動を優先）
-            pointerEvents: !isPreviewing && !isEditing ? 'none' : 'auto',
+            pointerEvents: (!isPreviewing && !isViewerMode && !isEditing) ? 'none' : 'auto',
             // スクロール関連のスタイルをインラインで強制適用
             height: '100%',
             maxHeight: '100%',
@@ -637,16 +698,16 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
             wordBreak: 'break-all',
           }}
           // エディタモード時はプレースホルダー文字列自体を編集するため、placeholder属性は空にする（重複表示防止）
-          placeholder={isPreviewing ? placeholder : ""}
+          placeholder={(isPreviewing || isViewerMode) ? placeholder : ""}
           value={inputValue}
-          readOnly={!isPreviewing && !isEditing}
-          onCompositionStart={() => isPreviewing && inputTracker.onCompositionStart()}
-          onCompositionEnd={() => isPreviewing && inputTracker.onCompositionEnd()}
+          readOnly={!isPreviewing && !isViewerMode && !isEditing}
+          onCompositionStart={() => (isPreviewing || isViewerMode) && inputTracker.onCompositionStart()}
+          onCompositionEnd={() => (isPreviewing || isViewerMode) && inputTracker.onCompositionEnd()}
           onChange={(e) => {
-            if (isPreviewing || isEditing) {
+            if (isPreviewing || isViewerMode || isEditing) {
               const newValue = e.target.value;
               setInputValue(newValue);
-              if (isPreviewing) {
+              if (isPreviewing || isViewerMode) {
                 inputTracker.onInput(newValue); //InputTrackerへ通知
                 onVariableChange(variableName, newValue);
                 // 入力中にエラーをクリア
@@ -658,7 +719,7 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
             }
           }}
           onKeyDown={(e) => {
-            if (isPreviewing) {
+            if (isPreviewing || isViewerMode) {
               inputTracker.onKeyDown(e.nativeEvent, inputValue); // KeyDown通知
               if (e.key === "Enter") {
                 // 長文テキスト以外の場合のみBlurさせる (textareaは改行)
@@ -674,17 +735,17 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
           }}
           onBlur={() => {
             handleBlur();
-            if (!isPreviewing) {
+            if (!isPreviewing && !isViewerMode) {
               setIsEditing(false); // 編集モード終了
             }
           }}
           onFocus={() => {
-            if (isPreviewing) {
+            if (isPreviewing || isViewerMode) {
               focusTimeRef.current = Date.now();
             }
           }}
           onClick={(e) => {
-            if (!isPreviewing) {
+            if (!isPreviewing && !isViewerMode) {
               e.stopPropagation();
               onItemSelect(e, item.id, item.data.text || item.name);
             }
@@ -731,9 +792,6 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
         }
       }}
       onMouseDown={handleMouseDown}
-      data-node-id={item.id}
-      data-node-name={item.data.customName || item.name}
-      data-node-type={item.type || 'unknown'}
     >
       {content}
       {item.customCss && (
@@ -744,9 +802,9 @@ export const ArtboardItem: React.FC<ArtboardItemProps> = ({
           }
         </style>
       )}
-      {renderChildren(item.id)}
+      {!isViewerMode && renderChildren(item.id)}
 
-      {isSelected && !isPreviewing && (
+      {isSelected && !isPreviewing && !isViewerMode && (
         <ResizeHandles
           item={item}
           zoomLevel={zoomLevel}

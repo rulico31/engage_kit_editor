@@ -1,10 +1,13 @@
 import React, { useEffect } from "react";
 import PreviewItem from "./PreviewItem";
+import { ArtboardItem } from "./artboard/ArtboardItem";
 import ConfirmationModal from "./ConfirmationModal";
 import DebugLogPanel from "./DebugLogPanel";
 import { useDebugLogStore } from "../stores/useDebugLogStore";
+import { usePreviewStore } from "../stores/usePreviewStore";
 import type { PlacedItemType, PreviewState, NodeGraph } from "../types";
 import "./Artboard.css"; // (Artboard のスタイルを流用)
+import { usePageStore } from "../stores/usePageStore";
 
 interface PreviewHostProps {
   placedItems: PlacedItemType[];
@@ -23,9 +26,17 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
   setPreviewState,
   allItemLogics,
   isMobile = false,
-  projectId
+  projectId,
 }) => {
   const clearLogs = useDebugLogStore(state => state.clearLogs);
+  const { variables, handleItemEvent, handleVariableChangeFromItem } = usePreviewStore(state => ({
+    variables: state.variables,
+    handleItemEvent: state.handleItemEvent,
+    handleVariableChangeFromItem: state.handleVariableChangeFromItem
+  }));
+
+  // プロジェクトメタデータやその他の必要な情報をストアから取得（ダミーまたはビュワー用）
+  const updateItem = () => {}; // ビュワーではアイテム更新は不要（またはロジック経由のみ）
 
   // プレビュー開始時にログをクリア
   useEffect(() => {
@@ -41,40 +52,44 @@ const PreviewHost: React.FC<PreviewHostProps> = ({
     overflow: "hidden", // アイテムがはみ出さないように
   };
 
-  return (
-    <div style={containerStyle}>
-      {placedItems.map((item) => {
+  // 再帰的なレンダリング関数 (Artboard.tsx と共通化)
+  const renderChildren = (parentId: string | undefined) => {
+    return placedItems
+      .filter((item: PlacedItemType) => item.groupId === parentId)
+      .map((item: PlacedItemType) => {
         const itemState = previewState[item.id];
 
-        // ★ 修正: 背景として設定されているアイテムは描画しない
-        if (item.data.isArtboardBackground) {
+        // 背景アイテム、またはステートが存在しない/非表示の場合は描画しない
+        if (item.data.isArtboardBackground || !itemState || !itemState.isVisible) {
           return null;
         }
 
-        // Debug: Log image items
-        if (item.type === 'image' || item.name?.startsWith('画像')) {
-          console.log('[PreviewHost] Image item found:', { id: item.id, name: item.name, type: item.type, hasSrc: !!item.data?.src, itemState });
-        }
-
-        // アイテムの状態が存在しない、または非表示設定の場合は描画しない
-        if (!itemState || !itemState.isVisible) {
-          return null;
-        }
-
-        // 表示状態なら PreviewItem を描画
         return (
-          <PreviewItem
+          <ArtboardItem
             key={item.id}
             item={item}
+            renderChildren={renderChildren}
+            onItemSelect={() => {}} // ビュワーでは不要
+            onItemDragStart={() => {}} // ビュワーでは不要
+            selectedIds={[]} // ビュワーでは不要
+            activeTabId={null} // ビュワーでは不要
+            isPreviewing={true} // ビュワーでもプレビューモードと同じ振る舞いをさせる
+            isMobileView={isMobile}
             previewState={previewState}
-            setPreviewState={setPreviewState}
-            allItemLogics={allItemLogics}
-            isMobile={isMobile}
-            projectId={projectId}
-            placedItems={placedItems} // Added for submitLeadData
+            onItemEvent={handleItemEvent}
+            variables={variables}
+            onVariableChange={handleVariableChangeFromItem}
+            zoomLevel={1} // ビュワーのベーススケールは1 (親がscaleで制御)
+            onItemUpdate={updateItem}
+            isViewerMode={true} // ★重要: 閲覧モードフラグ
           />
         );
-      })}
+      });
+  };
+
+  return (
+    <div style={containerStyle}>
+      {renderChildren(undefined)}
 
       {/* 確認モーダル */}
       <ConfirmationModal />
